@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Shield } from 'lucide-react'
+import { Shield, GitCompareArrows } from 'lucide-react'
 
 export default function Header() {
   return (
@@ -13,6 +13,13 @@ export default function Header() {
         </Link>
 
         <nav className="flex items-center gap-4">
+          <Link
+            to="/compare"
+            className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
+          >
+            <GitCompareArrows className="h-4 w-4" strokeWidth={1.5} />
+            <span className="hidden sm:inline">Comparar</span>
+          </Link>
           <a
             href="https://imaginawp.com"
             target="_blank"

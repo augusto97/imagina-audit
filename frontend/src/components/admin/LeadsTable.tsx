@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Search, Eye, MessageCircle, Trash2, Copy, ChevronLeft, ChevronRight, SearchX } from 'lucide-react'
+import { Search, Eye, MessageCircle, Trash2, Copy, ChevronLeft, ChevronRight, SearchX, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAdmin } from '@/hooks/useAdmin'
 import { getLevelClassName } from '@/lib/utils'
+import api from '@/lib/api'
 
 interface Lead {
   id: string; url: string; domain: string; leadName: string | null
@@ -61,6 +62,25 @@ export default function LeadsTable() {
     toast.success('Email copiado')
   }
 
+  const [exporting, setExporting] = useState(false)
+  const exportCsv = async () => {
+    setExporting(true)
+    try {
+      const res = await api.get('/admin/export-leads.php', {
+        params: { filter, search },
+        responseType: 'blob',
+      })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `imagina-audit-leads-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('CSV exportado')
+    } catch { toast.error('Error al exportar') }
+    setExporting(false)
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -89,6 +109,10 @@ export default function LeadsTable() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />
           <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar por dominio, nombre o email..." className="pl-10" />
         </div>
+        <Button variant="outline" size="sm" onClick={exportCsv} disabled={exporting}>
+          <Download className="h-4 w-4" strokeWidth={1.5} />
+          <span className="hidden sm:inline">{exporting ? 'Exportando...' : 'CSV'}</span>
+        </Button>
       </div>
 
       <Card>

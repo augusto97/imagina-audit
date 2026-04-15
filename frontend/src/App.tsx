@@ -4,6 +4,7 @@ import { Toaster } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import HomePage from './pages/HomePage'
 import ResultsPage from './pages/ResultsPage'
+import ComparePage from './pages/ComparePage'
 import NotFoundPage from './pages/NotFoundPage'
 
 const AdminPage = lazy(() => import('./pages/AdminPage'))
@@ -14,6 +15,7 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/results/:auditId" element={<ResultsPage />} />
+        <Route path="/compare" element={<ComparePage />} />
         <Route path="/admin/*" element={
           <Suspense fallback={
             <div className="flex h-screen items-center justify-center bg-[var(--bg-secondary)]">

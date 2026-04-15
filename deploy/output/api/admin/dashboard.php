@@ -38,6 +38,29 @@ try {
         ];
     }, $recent);
 
+    // Dominios recurrentes
+    $recurring = $db->query(
+        "SELECT domain, COUNT(*) as total, MAX(global_score) as best_score, MIN(global_score) as worst_score, MAX(id) as last_audit_id FROM audits GROUP BY domain HAVING COUNT(*) > 1 ORDER BY COUNT(*) DESC LIMIT 10"
+    );
+    $recurringDomains = array_map(function ($row) use ($db) {
+        // Calcular tendencia
+        $last2 = $db->query("SELECT global_score FROM audits WHERE domain = ? ORDER BY created_at DESC LIMIT 2", [$row['domain']]);
+        $trend = 'stable';
+        if (count($last2) >= 2) {
+            $diff = $last2[0]['global_score'] - $last2[1]['global_score'];
+            if ($diff > 5) $trend = 'improving';
+            elseif ($diff < -5) $trend = 'declining';
+        }
+        return [
+            'domain' => $row['domain'],
+            'totalAudits' => (int) $row['total'],
+            'bestScore' => (int) $row['best_score'],
+            'worstScore' => (int) $row['worst_score'],
+            'lastAuditId' => $row['last_audit_id'],
+            'trend' => $trend,
+        ];
+    }, $recurring);
+
     Response::success([
         'totalAudits' => $totalAudits,
         'totalLeads' => $totalLeads,
@@ -47,6 +70,7 @@ try {
         'averageScore' => $averageScore,
         'scoreDistribution' => $dist,
         'recentAudits' => $recentAudits,
+        'recurringDomains' => $recurringDomains,
     ]);
 } catch (Throwable $e) {
     Logger::error('Error en dashboard: ' . $e->getMessage());
