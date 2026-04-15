@@ -1,17 +1,11 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
-
-  # No reescribir archivos reales ni la carpeta api/
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_URI} !^/api/
-
-  # Redirigir todo a index.html (React Router)
   RewriteRule ^(.*)$ index.html [L]
 </IfModule>
-
-# Bloquear acceso a archivos sensibles
 <FilesMatch "\.(env|db|sqlite|log|sql)$">
     Order Allow,Deny
     Deny from all
