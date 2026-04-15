@@ -21,10 +21,10 @@ const itemVariants = {
 }
 
 export default function HomePage() {
-  const { status } = useAuditStore()
+  const status = useAuditStore((s) => s.status)
 
-  // Mostrar animación de escaneo si está en progreso
-  if (status === 'scanning') {
+  // Mostrar animación de escaneo o pantalla de error
+  if (status === 'scanning' || status === 'error') {
     return <ScanningAnimation />
   }
 
