@@ -38,6 +38,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'logoUrl' => $dbSettings['logo_url'] ?? $defaults['logo_url'] ?? '',
             'googlePagespeedApiKey' => $dbSettings['google_pagespeed_api_key'] ?? '',
             'leadNotificationEmail' => $dbSettings['lead_notification_email'] ?? '',
+            'smtpHost' => $dbSettings['smtp_host'] ?? '',
+            'smtpPort' => (int) ($dbSettings['smtp_port'] ?? 587),
+            'smtpUsername' => $dbSettings['smtp_username'] ?? '',
+            'smtpPassword' => !empty($dbSettings['smtp_password']) ? '••••••••' : '',
+            'smtpEncryption' => $dbSettings['smtp_encryption'] ?? 'tls',
+            'smtpFromEmail' => $dbSettings['smtp_from_email'] ?? '',
+            'smtpFromName' => $dbSettings['smtp_from_name'] ?? 'Imagina Audit',
             'moduleWeights' => $weights,
             'thresholds' => [
                 'excellent' => (int) ($dbSettings['threshold_excellent'] ?? $defaults['threshold_excellent']),
@@ -66,6 +73,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
 
     try {
         foreach ($body as $key => $value) {
+            // No sobreescribir contraseña SMTP con el placeholder
+            if ($key === 'smtpPassword' && ($value === '••••••••' || $value === '')) {
+                continue;
+            }
+
             // Cambio de contraseña admin
             if ($key === 'adminPassword' && !empty($value)) {
                 $hash = password_hash($value, PASSWORD_BCRYPT);

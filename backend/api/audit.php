@@ -165,7 +165,7 @@ try {
                 . "Empresa: $leadCompany\n\n"
                 . "Fecha: " . date('d/m/Y H:i') . "\n";
 
-            @mail($notifEmail, $subject, $emailBody, "From: noreply@{$domain}\r\nContent-Type: text/plain; charset=UTF-8");
+            Mailer::send($notifEmail, $subject, $emailBody);
         }
     }
 } catch (Throwable $e) {
