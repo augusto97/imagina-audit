@@ -61,31 +61,35 @@ try {
 }
 
 // Cache: verificar si ya se escaneó esta URL recientemente
+// Si forceRefresh=true, saltar el cache y hacer un escaneo nuevo
+$forceRefresh = !empty($body['forceRefresh']);
 $cacheTtl = (int) env('CACHE_TTL_SECONDS', '86400');
 try {
-    $db = Database::getInstance();
-    $cached = $db->queryOne(
-        "SELECT * FROM audits WHERE url = ? AND created_at > datetime('now', '-' || ? || ' seconds') ORDER BY created_at DESC LIMIT 1",
-        [$url, $cacheTtl]
-    );
+    if (!$forceRefresh) {
+        $db = Database::getInstance();
+        $cached = $db->queryOne(
+            "SELECT * FROM audits WHERE url = ? AND created_at > datetime('now', '-' || ? || ' seconds') ORDER BY created_at DESC LIMIT 1",
+            [$url, $cacheTtl]
+        );
 
-    if ($cached) {
-        $result = json_decode($cached['result_json'], true);
+        if ($cached) {
+            $result = json_decode($cached['result_json'], true);
 
-        // Si hay nuevos datos de lead, actualizar el registro
-        $leadName = trim($body['leadName'] ?? '');
-        $leadEmail = trim($body['leadEmail'] ?? '');
-        $leadWhatsapp = trim($body['leadWhatsapp'] ?? '');
-        $leadCompany = trim($body['leadCompany'] ?? '');
+            // Si hay nuevos datos de lead, actualizar el registro
+            $leadName = trim($body['leadName'] ?? '');
+            $leadEmail = trim($body['leadEmail'] ?? '');
+            $leadWhatsapp = trim($body['leadWhatsapp'] ?? '');
+            $leadCompany = trim($body['leadCompany'] ?? '');
 
-        if ($leadName || $leadEmail || $leadWhatsapp || $leadCompany) {
-            $db->execute(
-                "UPDATE audits SET lead_name = COALESCE(NULLIF(?, ''), lead_name), lead_email = COALESCE(NULLIF(?, ''), lead_email), lead_whatsapp = COALESCE(NULLIF(?, ''), lead_whatsapp), lead_company = COALESCE(NULLIF(?, ''), lead_company) WHERE id = ?",
-                [$leadName, $leadEmail, $leadWhatsapp, $leadCompany, $cached['id']]
-            );
+            if ($leadName || $leadEmail || $leadWhatsapp || $leadCompany) {
+                $db->execute(
+                    "UPDATE audits SET lead_name = COALESCE(NULLIF(?, ''), lead_name), lead_email = COALESCE(NULLIF(?, ''), lead_email), lead_whatsapp = COALESCE(NULLIF(?, ''), lead_whatsapp), lead_company = COALESCE(NULLIF(?, ''), lead_company) WHERE id = ?",
+                    [$leadName, $leadEmail, $leadWhatsapp, $leadCompany, $cached['id']]
+                );
+            }
+
+            Response::success($result);
         }
-
-        Response::success($result);
     }
 } catch (Throwable $e) {
     Logger::error('Error consultando cache: ' . $e->getMessage());
@@ -131,7 +135,41 @@ try {
     );
 } catch (Throwable $e) {
     Logger::error('Error guardando auditoría: ' . $e->getMessage());
-    // No fallar si no se puede guardar — el usuario ya tiene su resultado
+}
+
+// Notificar al admin por email si el lead tiene datos de contacto
+try {
+    $leadEmail = trim($body['leadEmail'] ?? '');
+    $leadWhatsapp = trim($body['leadWhatsapp'] ?? '');
+
+    if ($leadEmail || $leadWhatsapp) {
+        $db = Database::getInstance();
+        $notifRow = $db->queryOne("SELECT value FROM settings WHERE key = 'lead_notification_email'");
+        $notifEmail = $notifRow['value'] ?? '';
+
+        if (!empty($notifEmail) && filter_var($notifEmail, FILTER_VALIDATE_EMAIL)) {
+            $domain = $result['domain'];
+            $score = $result['globalScore'];
+            $level = $result['globalLevel'];
+            $leadName = trim($body['leadName'] ?? '') ?: 'No proporcionado';
+            $leadCompany = trim($body['leadCompany'] ?? '') ?: 'No proporcionado';
+
+            $subject = "Nuevo lead: $domain (Score: $score/100)";
+            $emailBody = "Nuevo lead capturado en Imagina Audit\n\n"
+                . "Sitio: {$result['url']}\n"
+                . "Score: $score/100 ($level)\n\n"
+                . "Datos de contacto:\n"
+                . "Nombre: $leadName\n"
+                . "Email: " . ($leadEmail ?: 'No proporcionado') . "\n"
+                . "WhatsApp: " . ($leadWhatsapp ?: 'No proporcionado') . "\n"
+                . "Empresa: $leadCompany\n\n"
+                . "Fecha: " . date('d/m/Y H:i') . "\n";
+
+            Mailer::send($notifEmail, $subject, $emailBody);
+        }
+    }
+} catch (Throwable $e) {
+    Logger::warning('Error enviando notificación de lead: ' . $e->getMessage());
 }
 
 Response::success($result);

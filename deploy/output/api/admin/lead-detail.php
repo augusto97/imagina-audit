@@ -1,8 +1,5 @@
 <?php
-require_once dirname(__DIR__) . "/bootstrap.php";
-/**
- * GET /api/admin/lead-detail?id=UUID
- */
+require_once dirname(__DIR__) . '/bootstrap.php';
 Auth::requireAuth();
 
 $id = $_GET['id'] ?? '';
@@ -12,14 +9,22 @@ if (empty($id)) {
 
 try {
     $db = Database::getInstance();
-    $audit = $db->queryOne("SELECT result_json FROM audits WHERE id = ?", [$id]);
+    $audit = $db->queryOne("SELECT result_json, lead_name, lead_email, lead_whatsapp, lead_company, created_at FROM audits WHERE id = ?", [$id]);
 
     if (!$audit) {
         Response::error('Auditoría no encontrada.', 404);
     }
 
     $result = json_decode($audit['result_json'], true);
+    // Agregar datos del lead al resultado
+    $result['leadName'] = $audit['lead_name'];
+    $result['leadEmail'] = $audit['lead_email'];
+    $result['leadWhatsapp'] = $audit['lead_whatsapp'];
+    $result['leadCompany'] = $audit['lead_company'];
+    $result['createdAt'] = $audit['created_at'];
+
     Response::success($result);
 } catch (Throwable $e) {
+    Logger::error('Error en lead-detail: ' . $e->getMessage());
     Response::error('Error al obtener el detalle.', 500);
 }

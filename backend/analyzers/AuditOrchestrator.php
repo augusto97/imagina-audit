@@ -110,10 +110,7 @@ class AuditOrchestrator {
             $modules[] = $this->createFailedModule('conversion', 'Conversión y Marketing', 'bar-chart-3');
         }
 
-        // 9. Backups (módulo estático — siempre en warning porque no se puede verificar externamente)
-        $modules[] = $this->createBackupsModule();
-
-        // 10. Calcular resultados globales
+        // 9. Calcular resultados globales
         $globalScore = Scoring::calculateGlobalScore($modules);
         $globalLevel = Scoring::getLevel($globalScore);
         $totalIssues = Scoring::countIssues($modules);
@@ -160,58 +157,6 @@ class AuditOrchestrator {
             'metrics' => [],
             'summary' => "No fue posible analizar este módulo.",
             'salesMessage' => $defaults["sales_$id"] ?? '',
-        ];
-    }
-
-    /**
-     * Crea el módulo de Backups (estático, no se puede verificar externamente)
-     */
-    private function createBackupsModule(): array {
-        $defaults = require dirname(__DIR__) . '/config/defaults.php';
-
-        $metrics = [
-            Scoring::createMetric(
-                'backup_auto',
-                'Backups automáticos',
-                null,
-                'No verificable externamente',
-                30,
-                'No es posible verificar externamente si tu sitio tiene backups automáticos configurados.',
-                'Configurar backups automáticos diarios con retención de al menos 30 días.',
-                'Configuramos backups diarios automáticos con retención de 30 días almacenados fuera del servidor.'
-            ),
-            Scoring::createMetric(
-                'backup_offsite',
-                'Almacenamiento externo',
-                null,
-                'No verificable externamente',
-                30,
-                'Los backups deben almacenarse fuera del servidor principal para proteger contra pérdida total.',
-                'Almacenar backups en un servicio externo como Google Drive, Dropbox o Amazon S3.',
-                'Almacenamos tus backups en la nube, separados del servidor, para máxima seguridad.'
-            ),
-            Scoring::createMetric(
-                'backup_restore',
-                'Plan de restauración',
-                null,
-                'No verificable externamente',
-                30,
-                'Es importante tener un plan probado de restauración en caso de emergencia.',
-                'Establecer un procedimiento de restauración y probarlo periódicamente.',
-                'Incluimos restauración gratuita en caso de emergencia con tiempo de respuesta de 2 horas.'
-            ),
-        ];
-
-        return [
-            'id' => 'backups',
-            'name' => 'Backups y Recuperación',
-            'icon' => 'hard-drive',
-            'score' => 30,
-            'level' => 'warning',
-            'weight' => $defaults['weight_backups'],
-            'metrics' => $metrics,
-            'summary' => 'Los backups no se pueden verificar externamente. La mayoría de sitios no tienen backups adecuados.',
-            'salesMessage' => $defaults['sales_backups'],
         ];
     }
 

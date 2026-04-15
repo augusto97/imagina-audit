@@ -13,36 +13,247 @@ export default function PdfReport({ result }: PdfReportProps) {
 
   const generatePdf = useCallback(async () => {
     setGenerating(true)
-
     try {
-      const html2pdf = (await import('html2pdf.js')).default
+      const { jsPDF } = await import('jspdf')
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+      const W = 210
+      const margin = 15
+      const contentW = W - margin * 2
+      let y = 0
 
-      // Crear contenedor VISIBLE (html2canvas necesita que sea renderizable)
-      const container = document.createElement('div')
-      container.innerHTML = buildPdfHtml(result)
-      container.style.cssText = 'position:fixed;top:0;left:0;width:210mm;z-index:-9999;background:#fff;'
-      document.body.appendChild(container)
+      const colors = {
+        primary: [12, 192, 223] as [number, number, number],
+        dark: [15, 23, 42] as [number, number, number],
+        gray: [100, 116, 139] as [number, number, number],
+        lightGray: [148, 163, 184] as [number, number, number],
+        white: [255, 255, 255] as [number, number, number],
+        bg: [248, 250, 251] as [number, number, number],
+        critical: [239, 68, 68] as [number, number, number],
+        warning: [245, 158, 11] as [number, number, number],
+        good: [16, 185, 129] as [number, number, number],
+      }
 
-      // Esperar a que el navegador renderice el contenido
-      await new Promise((r) => setTimeout(r, 300))
+      const levelColor = (level: string): [number, number, number] => {
+        const map: Record<string, [number, number, number]> = {
+          critical: colors.critical, warning: colors.warning,
+          good: colors.good, excellent: [5, 150, 105],
+          info: colors.gray, unknown: colors.gray,
+        }
+        return map[level] || colors.gray
+      }
 
-      await html2pdf()
-        .set({
-          margin: [8, 8, 8, 8],
-          filename: `auditoria-${result.domain}-${new Date().toISOString().slice(0, 10)}.pdf`,
-          image: { type: 'jpeg', quality: 0.95 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            windowWidth: 794, // A4 en px a 96dpi
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        } as Record<string, unknown>)
-        .from(container)
-        .save()
+      // Asegura que haya espacio; si no, nueva página
+      const ensureSpace = (needed: number) => {
+        if (y + needed > 280) {
+          doc.addPage()
+          y = margin
+        }
+      }
 
-      document.body.removeChild(container)
+      // ===== PORTADA =====
+      // Franja superior turquesa
+      doc.setFillColor(...colors.primary)
+      doc.rect(0, 0, W, 50, 'F')
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(28)
+      doc.setTextColor(...colors.white)
+      doc.text('Imagina Audit', W / 2, 25, { align: 'center' })
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'normal')
+      doc.text('Informe de Auditoría Web', W / 2, 35, { align: 'center' })
+
+      // Dominio
+      y = 70
+      doc.setFontSize(11)
+      doc.setTextColor(...colors.lightGray)
+      doc.text('Sitio analizado', W / 2, y, { align: 'center' })
+      y += 8
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(22)
+      doc.setTextColor(...colors.dark)
+      doc.text(result.domain, W / 2, y, { align: 'center' })
+      y += 7
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(...colors.lightGray)
+      doc.text(result.url, W / 2, y, { align: 'center' })
+
+      // Círculo de score
+      y += 20
+      const circleColor = levelColor(result.globalLevel)
+      doc.setDrawColor(...circleColor)
+      doc.setLineWidth(2)
+      doc.circle(W / 2, y + 18, 18)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(28)
+      doc.setTextColor(...circleColor)
+      doc.text(String(result.globalScore), W / 2, y + 18, { align: 'center', baseline: 'middle' })
+      doc.setFontSize(9)
+      doc.setTextColor(...colors.lightGray)
+      doc.text('/100', W / 2, y + 28, { align: 'center' })
+
+      y += 45
+      doc.setFontSize(14)
+      doc.setTextColor(...circleColor)
+      doc.setFont('helvetica', 'bold')
+      doc.text(getLevelLabel(result.globalLevel), W / 2, y, { align: 'center' })
+
+      // Badges de issues
+      y += 12
+      doc.setFontSize(10)
+      const badges = []
+      if (result.totalIssues.critical > 0) badges.push({ text: `${result.totalIssues.critical} Críticos`, color: colors.critical })
+      if (result.totalIssues.warning > 0) badges.push({ text: `${result.totalIssues.warning} Importantes`, color: colors.warning })
+      if (result.totalIssues.good > 0) badges.push({ text: `${result.totalIssues.good} Correctos`, color: colors.good })
+
+      const badgeW = 35
+      const badgeStart = W / 2 - (badges.length * (badgeW + 4)) / 2
+      badges.forEach((b, i) => {
+        const bx = badgeStart + i * (badgeW + 4)
+        doc.setFillColor(...b.color)
+        doc.roundedRect(bx, y - 4, badgeW, 7, 2, 2, 'F')
+        doc.setTextColor(...colors.white)
+        doc.setFontSize(8)
+        doc.text(b.text, bx + badgeW / 2, y, { align: 'center' })
+      })
+
+      // Fecha
+      y += 16
+      doc.setFontSize(9)
+      doc.setTextColor(...colors.lightGray)
+      doc.text(
+        `Fecha: ${new Date(result.timestamp).toLocaleDateString('es-CO')}  ·  Duración: ${(result.scanDurationMs / 1000).toFixed(1)}s`,
+        W / 2, y, { align: 'center' }
+      )
+
+      // ===== MÓDULOS =====
+      doc.addPage()
+      y = margin
+
+      // Título sección
+      doc.setFillColor(...colors.primary)
+      doc.rect(margin, y, contentW, 8, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(12)
+      doc.setTextColor(...colors.white)
+      doc.text('Detalle por Módulos', margin + 4, y + 5.5)
+      y += 14
+
+      for (const mod of result.modules) {
+        ensureSpace(25 + mod.metrics.length * 7)
+
+        // Header del módulo
+        doc.setFillColor(...colors.bg)
+        doc.roundedRect(margin, y, contentW, 10, 2, 2, 'F')
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(11)
+        doc.setTextColor(...colors.dark)
+        doc.text(mod.name, margin + 3, y + 6.5)
+
+        const scoreColor = levelColor(mod.level)
+        doc.setTextColor(...scoreColor)
+        doc.text(`${mod.score ?? '-'}/100`, margin + contentW - 3, y + 6.5, { align: 'right' })
+        y += 13
+
+        // Métricas
+        for (const metric of mod.metrics) {
+          ensureSpace(8)
+          const dotColor = levelColor(metric.level)
+          doc.setFillColor(...dotColor)
+          doc.circle(margin + 4, y + 1, 1.5, 'F')
+
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(9)
+          doc.setTextColor(...colors.dark)
+          doc.text(metric.name, margin + 9, y + 2.5)
+
+          doc.setTextColor(...colors.lightGray)
+          doc.setFontSize(8)
+          const displayVal = metric.displayValue.length > 45 ? metric.displayValue.slice(0, 42) + '...' : metric.displayValue
+          doc.text(displayVal, margin + contentW - 2, y + 2.5, { align: 'right' })
+
+          y += 6.5
+        }
+
+        // Línea separadora
+        y += 3
+        doc.setDrawColor(...(colors.bg))
+        doc.setLineWidth(0.3)
+        doc.line(margin, y, margin + contentW, y)
+        y += 5
+      }
+
+      // ===== SOLUCIONES =====
+      if (result.solutionMap.length > 0) {
+        ensureSpace(40)
+        if (y > 50) {
+          doc.addPage()
+          y = margin
+        }
+
+        doc.setFillColor(...colors.primary)
+        doc.rect(margin, y, contentW, 8, 'F')
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(12)
+        doc.setTextColor(...colors.white)
+        doc.text('Plan de Soluciones', margin + 4, y + 5.5)
+        y += 14
+
+        // Encabezado tabla
+        doc.setFillColor(...colors.bg)
+        doc.rect(margin, y, contentW, 7, 'F')
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(8)
+        doc.setTextColor(...colors.gray)
+        doc.text('Problema', margin + 8, y + 4.5)
+        doc.text('Solución Imagina WP', margin + contentW / 2 + 5, y + 4.5)
+        y += 9
+
+        for (const sol of result.solutionMap.slice(0, 15)) {
+          ensureSpace(14)
+          const dotColor = levelColor(sol.level)
+          doc.setFillColor(...dotColor)
+          doc.circle(margin + 3, y + 1, 1.5, 'F')
+
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(7.5)
+
+          doc.setTextColor(...colors.dark)
+          const probLines = doc.splitTextToSize(sol.problem, contentW / 2 - 10)
+          doc.text(probLines.slice(0, 2), margin + 8, y + 2)
+
+          doc.setTextColor(...colors.gray)
+          const solLines = doc.splitTextToSize(sol.solution, contentW / 2 - 5)
+          doc.text(solLines.slice(0, 2), margin + contentW / 2 + 5, y + 2)
+
+          const lineHeight = Math.max(probLines.length, solLines.length, 1) * 3.5
+          y += Math.max(lineHeight, 6) + 2
+        }
+      }
+
+      // ===== FOOTER =====
+      ensureSpace(30)
+      y += 10
+      doc.setDrawColor(...colors.bg)
+      doc.setLineWidth(0.5)
+      doc.line(margin, y, margin + contentW, y)
+      y += 8
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(13)
+      doc.setTextColor(...colors.primary)
+      doc.text('Imagina WP', W / 2, y, { align: 'center' })
+      y += 6
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(...colors.lightGray)
+      doc.text('Especialistas exclusivos en WordPress · 15 años de experiencia', W / 2, y, { align: 'center' })
+      y += 5
+      doc.text('imaginawp.com', W / 2, y, { align: 'center' })
+
+      // Guardar
+      doc.save(`auditoria-${result.domain}-${new Date().toISOString().slice(0, 10)}.pdf`)
     } catch (err) {
       console.error('Error generando PDF:', err)
     } finally {
@@ -59,114 +270,4 @@ export default function PdfReport({ result }: PdfReportProps) {
       {generating ? 'Generando...' : 'Descargar PDF'}
     </Button>
   )
-}
-
-/** Genera el HTML para el PDF — SIN flexbox, solo estilos que html2canvas soporta */
-function buildPdfHtml(result: AuditResult): string {
-  const levelColor = (level: string) => {
-    const colors: Record<string, string> = {
-      critical: '#EF4444', warning: '#F59E0B', good: '#10B981',
-      excellent: '#059669', info: '#6B7280', unknown: '#6B7280',
-    }
-    return colors[level] || '#6B7280'
-  }
-
-  const modulesHtml = result.modules.map((m) => `
-    <div style="margin-bottom: 20px; padding: 16px; border: 1px solid #E5E7EB; border-radius: 8px;">
-      <table style="width: 100%; margin-bottom: 8px;">
-        <tr>
-          <td style="text-align: left;"><h3 style="margin: 0; font-size: 15px; color: #1F2937;">${m.name}</h3></td>
-          <td style="text-align: right; font-weight: bold; color: ${levelColor(m.level)}; font-size: 18px;">${m.score ?? '-'}/100</td>
-        </tr>
-      </table>
-      <p style="color: #6B7280; font-size: 11px; margin: 4px 0 12px 0;">${m.summary}</p>
-      ${m.metrics.map((metric) => `
-        <table style="width: 100%; border-bottom: 1px solid #F3F4F6; margin-bottom: 2px;">
-          <tr>
-            <td style="width: 16px; padding: 5px 0;">
-              <div style="width: 10px; height: 10px; border-radius: 50%; background: ${levelColor(metric.level)}; display: inline-block;"></div>
-            </td>
-            <td style="font-size: 11px; color: #374151; padding: 5px 8px;">${metric.name}</td>
-            <td style="font-size: 10px; color: #9CA3AF; text-align: right; padding: 5px 0; white-space: nowrap;">${metric.displayValue}</td>
-          </tr>
-        </table>
-      `).join('')}
-    </div>
-  `).join('')
-
-  const solutionsHtml = result.solutionMap.slice(0, 15).map((s) => `
-    <tr>
-      <td style="padding: 6px 8px; border-bottom: 1px solid #E5E7EB; width: 20px;">
-        <div style="width: 8px; height: 8px; border-radius: 50%; background: ${levelColor(s.level)}; display: inline-block;"></div>
-      </td>
-      <td style="padding: 6px 8px; border-bottom: 1px solid #E5E7EB; font-size: 10px; color: #374151;">${s.problem}</td>
-      <td style="padding: 6px 8px; border-bottom: 1px solid #E5E7EB; font-size: 10px; color: #1F2937;">${s.solution}</td>
-    </tr>
-  `).join('')
-
-  return `
-    <div style="font-family: Arial, Helvetica, sans-serif; color: #1F2937; width: 100%; background: #fff; padding: 20px;">
-
-      <!-- Portada -->
-      <div style="text-align: center; padding: 30px 20px 40px 20px;">
-        <h1 style="font-size: 28px; color: #3B82F6; margin: 0 0 4px 0;">Imagina Audit</h1>
-        <h2 style="font-size: 18px; font-weight: normal; color: #6B7280; margin: 0;">Informe de Auditoría Web</h2>
-
-        <div style="margin: 30px 0;">
-          <p style="font-size: 13px; color: #9CA3AF; margin: 0;">Sitio analizado</p>
-          <p style="font-size: 22px; font-weight: bold; color: #1F2937; margin: 4px 0;">${result.domain}</p>
-          <p style="font-size: 11px; color: #9CA3AF; margin: 0;">${result.url}</p>
-        </div>
-
-        <div style="margin: 30px auto; width: 120px; height: 120px; border-radius: 50%; border: 6px solid ${levelColor(result.globalLevel)}; text-align: center; line-height: 120px;">
-          <span style="font-size: 36px; font-weight: bold; color: ${levelColor(result.globalLevel)}; vertical-align: middle;">${result.globalScore}</span>
-          <span style="font-size: 12px; color: #9CA3AF; vertical-align: middle;">/100</span>
-        </div>
-
-        <p style="font-size: 16px; font-weight: 600; color: ${levelColor(result.globalLevel)}; margin: 8px 0;">${getLevelLabel(result.globalLevel)}</p>
-
-        <table style="margin: 16px auto;">
-          <tr>
-            ${result.totalIssues.critical > 0 ? `<td style="padding: 2px 8px; background: #FEE2E2; color: #DC2626; border-radius: 12px; font-size: 11px; font-weight: 600;">${result.totalIssues.critical} Críticos</td>` : ''}
-            ${result.totalIssues.warning > 0 ? `<td style="padding: 2px 8px; background: #FEF3C7; color: #D97706; border-radius: 12px; font-size: 11px; font-weight: 600; margin-left: 4px;">${result.totalIssues.warning} Importantes</td>` : ''}
-            ${result.totalIssues.good > 0 ? `<td style="padding: 2px 8px; background: #D1FAE5; color: #059669; border-radius: 12px; font-size: 11px; font-weight: 600; margin-left: 4px;">${result.totalIssues.good} Correctos</td>` : ''}
-          </tr>
-        </table>
-
-        <p style="font-size: 11px; color: #9CA3AF; margin-top: 20px;">Fecha: ${new Date(result.timestamp).toLocaleDateString('es-CO')} &middot; Duración: ${(result.scanDurationMs / 1000).toFixed(1)}s</p>
-      </div>
-
-      <!-- Resumen de módulos -->
-      <div style="padding: 0;">
-        <h2 style="font-size: 18px; margin: 0 0 16px 0; color: #1F2937; border-bottom: 2px solid #3B82F6; padding-bottom: 8px;">Detalle por Módulos</h2>
-        ${modulesHtml}
-      </div>
-
-      <!-- Soluciones -->
-      ${result.solutionMap.length > 0 ? `
-        <div style="padding: 20px 0;">
-          <h2 style="font-size: 18px; margin: 0 0 16px 0; color: #1F2937; border-bottom: 2px solid #3B82F6; padding-bottom: 8px;">Plan de Soluciones</h2>
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-              <tr style="background: #F3F4F6;">
-                <th style="padding: 8px; text-align: left; width: 30px;"></th>
-                <th style="padding: 8px; text-align: left; color: #6B7280; font-size: 11px;">Problema</th>
-                <th style="padding: 8px; text-align: left; color: #6B7280; font-size: 11px;">Solución Imagina WP</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${solutionsHtml}
-            </tbody>
-          </table>
-        </div>
-      ` : ''}
-
-      <!-- Footer -->
-      <div style="text-align: center; margin-top: 30px; padding-top: 16px; border-top: 1px solid #E5E7EB;">
-        <p style="font-size: 14px; color: #3B82F6; font-weight: 600; margin: 0;">Imagina WP</p>
-        <p style="font-size: 11px; color: #9CA3AF; margin: 4px 0 0 0;">Especialistas exclusivos en WordPress &middot; 15 años de experiencia</p>
-        <p style="font-size: 10px; color: #9CA3AF; margin: 4px 0 0 0;">imaginawp.com</p>
-      </div>
-    </div>
-  `
 }

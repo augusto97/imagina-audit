@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, RotateCw } from 'lucide-react'
+import { ArrowLeft, RotateCw, RefreshCw } from 'lucide-react'
 import Layout from '@/components/layout/Layout'
 import ScoreOverview from '@/components/audit/ScoreOverview'
 import ModuleCard from '@/components/audit/ModuleCard'
@@ -11,6 +11,7 @@ import PdfReport from '@/components/audit/PdfReport'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuditStore } from '@/store/auditStore'
+import { useAudit } from '@/hooks/useAudit'
 import { getAuditResult, getConfig } from '@/lib/api'
 import type { AuditResult } from '@/types/audit'
 
@@ -18,10 +19,17 @@ export default function ResultsPage() {
   const { auditId } = useParams<{ auditId: string }>()
   const storeResult = useAuditStore((s) => s.result)
   const setConfig = useAuditStore((s) => s.setConfig)
+  const { startAudit } = useAudit()
 
   const [result, setResult] = useState<AuditResult | null>(storeResult)
   const [loading, setLoading] = useState(!storeResult)
   const [error, setError] = useState<string | null>(null)
+
+  /** Re-escanear el mismo sitio forzando nuevo análisis */
+  const rescan = () => {
+    if (!result) return
+    startAudit({ url: result.url, forceRefresh: true })
+  }
 
   useEffect(() => {
     getConfig().then(setConfig)
@@ -92,6 +100,10 @@ export default function ResultsPage() {
           </div>
           <div className="flex items-center gap-2">
             <PdfReport result={result} />
+            <Button variant="outline" size="sm" onClick={rescan}>
+              <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
+              <span className="hidden sm:inline">Re-escanear</span>
+            </Button>
             <Link to="/">
               <Button variant="ghost" size="sm">
                 <RotateCw className="h-4 w-4" strokeWidth={1.5} />
