@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+/* === Fuente Inter === */
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Colores de la paleta — modo oscuro por defecto */
+  --color-bg-primary: #0B0F1A;
+  --color-bg-secondary: #111827;
+  --color-bg-tertiary: #1F2937;
+
+  --color-text-primary: #F1F5F9;
+  --color-text-secondary: #94A3B8;
+  --color-text-tertiary: #64748B;
+
+  --color-border-default: #1E293B;
+  --color-border-hover: #334155;
+
+  --color-accent-primary: #3B82F6;
+  --color-accent-hover: #2563EB;
+
+  --color-critical: #EF4444;
+  --color-warning: #F59E0B;
+  --color-good: #10B981;
+  --color-excellent: #059669;
+  --color-info: #6B7280;
+
+  --radius-card: 12px;
+  --radius-sm: 8px;
+}
+
+/* Variables CSS globales */
+:root {
+  --bg-primary: #0B0F1A;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1F2937;
+  --bg-glass: rgba(17, 24, 39, 0.7);
+
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --text-tertiary: #64748B;
+
+  --border-default: #1E293B;
+  --border-hover: #334155;
+
+  --accent-primary: #3B82F6;
+  --accent-hover: #2563EB;
+  --accent-glow: rgba(59, 130, 246, 0.15);
+
+  --color-critical: #EF4444;
+  --color-warning: #F59E0B;
+  --color-good: #10B981;
+  --color-excellent: #059669;
+  --color-info: #6B7280;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+/* === Estilos base === */
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+}
+
+/* === Glass card === */
+.glass-card {
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+}
+
+/* === Glow === */
+.glow {
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.glow-hover:hover {
+  box-shadow: 0 0 30px var(--accent-glow);
+}
+
+/* === Gradiente hero === */
+.hero-gradient {
+  background: linear-gradient(180deg, var(--bg-primary) 0%, #0f172a 100%);
+}
+
+/* === Scrollbar personalizado === */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* === Animación de pulso para el scanner === */
+@keyframes scan-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.animate-scan-pulse {
+  animation: scan-pulse 2s ease-in-out infinite;
+}
+
+/* === Animación de grid para fondo del scanner === */
+@keyframes grid-move {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(20px); }
+}
+
+.animate-grid-move {
+  animation: grid-move 3s ease-in-out infinite alternate;
+}

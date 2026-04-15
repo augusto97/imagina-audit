@@ -1,0 +1,22 @@
+# Dependencies
+frontend/node_modules/
+frontend/dist/
+
+# Environment
+backend/.env
+*.db
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+backend/logs/*.log
+backend/cache/*.json
+
+# Build
+*.tsbuildinfo
