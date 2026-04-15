@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 export default function Footer() {
   return (
     <footer className="border-t border-[var(--border-default)] bg-[var(--bg-secondary)]">
@@ -15,7 +17,11 @@ export default function Footer() {
             </a>
             {' '}&middot; Especialistas exclusivos en WordPress
           </p>
-          <p>15 años de experiencia en WordPress</p>
+          <div className="flex items-center gap-3 text-xs">
+            <span>15 años de experiencia en WordPress</span>
+            <span>&middot;</span>
+            <Link to="/admin" className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors">Admin</Link>
+          </div>
         </div>
       </div>
     </footer>

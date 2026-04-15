@@ -90,6 +90,23 @@ export interface AuditResult {
   }
   /** Mapeo problema → solución */
   solutionMap: SolutionItem[]
+  /** Stack tecnológico detectado (informativo, no afecta score) */
+  techStack?: {
+    server?: string | null
+    cms?: string | null
+    pageBuilder?: string[]
+    ecommerce?: string[]
+    cachePlugin?: string[]
+    seoPlugin?: string[]
+    securityPlugin?: string[]
+    jsLibraries?: string[]
+    cssFramework?: string[]
+    fonts?: string[]
+    cdn?: string | null
+    analytics?: string[]
+    phpVersion?: string | null
+    httpProtocol?: string | null
+  }
 }
 
 export interface AuditRequest {

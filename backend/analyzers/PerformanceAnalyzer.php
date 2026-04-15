@@ -212,6 +212,20 @@ class PerformanceAnalyzer {
         ];
 
         $apiKey = env('GOOGLE_PAGESPEED_API_KEY', '');
+
+        // Si no hay key en .env, intentar obtenerla de la tabla settings
+        if (empty($apiKey)) {
+            try {
+                $db = Database::getInstance();
+                $row = $db->queryOne("SELECT value FROM settings WHERE key = 'google_pagespeed_api_key'");
+                if ($row && !empty($row['value'])) {
+                    $apiKey = $row['value'];
+                }
+            } catch (Throwable $e) {
+                // Continuar sin key
+            }
+        }
+
         $params = [
             'url' => $this->url,
             'category' => 'performance',

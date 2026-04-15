@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Loader2, Save, Send } from 'lucide-react'
+import { Loader2, Save, Send, Copy, Code } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -195,6 +195,98 @@ export default function SettingsGeneral() {
           Guardar Cambios
         </Button>
       </form>
+
+      {/* Widget Embebible */}
+      <WidgetSection />
     </div>
+  )
+}
+
+/** Sección del widget embebible con código copiable y personalización */
+function WidgetSection() {
+  const [widgetColor, setWidgetColor] = useState('#0CC0DF')
+  const [widgetPosition, setWidgetPosition] = useState('bottom-right')
+  const [widgetLang, setWidgetLang] = useState('es')
+
+  const baseUrl = window.location.origin
+  const widgetCode = `<script\n  src="${baseUrl}/widget/imagina-audit-widget.js"\n  data-api="${baseUrl}/api"\n  data-color="${widgetColor}"\n  data-position="${widgetPosition}"\n  data-lang="${widgetLang}">\n</script>`
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(widgetCode)
+    toast.success('Código copiado al portapapeles')
+  }
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Code className="h-5 w-5 text-[var(--accent-primary)]" strokeWidth={1.5} />
+          <CardTitle>Widget Embebible</CardTitle>
+        </div>
+        <p className="text-sm text-[var(--text-secondary)]">
+          Pega este código en cualquier sitio web para ofrecer auditorías desde esa página. Aparece un botón flotante que abre un popup de auditoría.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {/* Personalizadores */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Color del botón</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={widgetColor}
+                onChange={(e) => setWidgetColor(e.target.value)}
+                className="h-10 w-12 cursor-pointer rounded-lg border border-[var(--border-default)] bg-white p-1"
+              />
+              <span className="text-xs text-[var(--text-tertiary)] font-mono">{widgetColor}</span>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Posición</label>
+            <select
+              value={widgetPosition}
+              onChange={(e) => setWidgetPosition(e.target.value)}
+              className="h-10 w-full rounded-xl border border-[var(--border-default)] bg-white px-3 text-sm"
+            >
+              <option value="bottom-right">Inferior derecha</option>
+              <option value="bottom-left">Inferior izquierda</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Idioma</label>
+            <select
+              value={widgetLang}
+              onChange={(e) => setWidgetLang(e.target.value)}
+              className="h-10 w-full rounded-xl border border-[var(--border-default)] bg-white px-3 text-sm"
+            >
+              <option value="es">Español</option>
+              <option value="en">Inglés</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Código */}
+        <div className="relative">
+          <pre className="overflow-x-auto rounded-xl bg-[#1e293b] p-4 text-[13px] leading-relaxed text-emerald-300 font-mono">
+            {widgetCode}
+          </pre>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="absolute right-3 top-3"
+            onClick={copyCode}
+          >
+            <Copy className="h-3.5 w-3.5" strokeWidth={1.5} />
+            Copiar
+          </Button>
+        </div>
+
+        <p className="text-xs text-[var(--text-tertiary)]">
+          El widget es un archivo JavaScript de ~12KB, sin dependencias externas. Se carga de forma asíncrona y no afecta la velocidad del sitio donde se instale.
+        </p>
+      </CardContent>
+    </Card>
   )
 }
