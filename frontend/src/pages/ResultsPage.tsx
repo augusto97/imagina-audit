@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, RotateCw, RefreshCw, Share2, LinkIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import Layout from '@/components/layout/Layout'
@@ -44,6 +44,7 @@ _Informe generado por Imagina Audit_`
 
 export default function ResultsPage() {
   const { auditId } = useParams<{ auditId: string }>()
+  const navigate = useNavigate()
   const storeResult = useAuditStore((s) => s.result)
   const setConfig = useAuditStore((s) => s.setConfig)
   const config = useAuditStore((s) => s.config)
@@ -55,7 +56,10 @@ export default function ResultsPage() {
 
   const rescan = () => {
     if (!result) return
-    startAudit({ url: result.url, forceRefresh: true })
+    // Navegar al home y ejecutar el escaneo desde ahí
+    navigate('/')
+    // Pequeño delay para que el HomePage monte antes de disparar el escaneo
+    setTimeout(() => startAudit({ url: result.url, forceRefresh: true }), 50)
   }
 
   const copyLink = () => {
