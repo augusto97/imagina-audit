@@ -28,9 +28,10 @@ try {
 
 $domain = UrlValidator::extractDomain($url);
 
-// Rate limiting
+// Rate limiting (no aplica si estás logueado como admin)
 $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 $maxPerHour = (int) env('RATE_LIMIT_MAX_PER_HOUR', '10');
+$isAdmin = Auth::checkAuth();
 
 try {
     $db = Database::getInstance();
@@ -40,14 +41,16 @@ try {
         "DELETE FROM rate_limits WHERE request_time < datetime('now', '-1 hour')"
     );
 
-    // Contar peticiones de esta IP
-    $count = (int) $db->scalar(
-        "SELECT COUNT(*) FROM rate_limits WHERE ip_address = ? AND endpoint = 'audit'",
-        [$ip]
-    );
+    if (!$isAdmin) {
+        // Contar peticiones de esta IP
+        $count = (int) $db->scalar(
+            "SELECT COUNT(*) FROM rate_limits WHERE ip_address = ? AND endpoint = 'audit'",
+            [$ip]
+        );
 
-    if ($count >= $maxPerHour) {
-        Response::error('Has alcanzado el límite de auditorías por hora. Intenta más tarde.', 429);
+        if ($count >= $maxPerHour) {
+            Response::error('Has alcanzado el límite de auditorías por hora. Intenta más tarde.', 429);
+        }
     }
 
     // Registrar esta petición

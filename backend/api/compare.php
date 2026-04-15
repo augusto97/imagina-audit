@@ -27,18 +27,21 @@ try {
     Response::error($e->getMessage());
 }
 
-// Rate limiting
+// Rate limiting (no aplica si estás logueado como admin)
 $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 $maxPerHour = (int) env('RATE_LIMIT_MAX_PER_HOUR', '10');
+$isAdmin = Auth::checkAuth();
 try {
     $db = Database::getInstance();
     $db->execute("DELETE FROM rate_limits WHERE request_time < datetime('now', '-1 hour')");
-    $count = (int) $db->scalar(
-        "SELECT COUNT(*) FROM rate_limits WHERE ip_address = ? AND endpoint = 'compare'",
-        [$ip]
-    );
-    if ($count >= $maxPerHour) {
-        Response::error('Has alcanzado el límite de comparaciones por hora.', 429);
+    if (!$isAdmin) {
+        $count = (int) $db->scalar(
+            "SELECT COUNT(*) FROM rate_limits WHERE ip_address = ? AND endpoint = 'compare'",
+            [$ip]
+        );
+        if ($count >= $maxPerHour) {
+            Response::error('Has alcanzado el límite de comparaciones por hora.', 429);
+        }
     }
     $db->execute("INSERT INTO rate_limits (ip_address, endpoint) VALUES (?, 'compare')", [$ip]);
 } catch (Throwable $e) {
