@@ -10,6 +10,7 @@ import SolutionMapping from '@/components/audit/SolutionMapping'
 import CtaSection from '@/components/audit/CtaSection'
 import PdfReport from '@/components/audit/PdfReport'
 import HistorySection from '@/components/audit/HistorySection'
+import TechStackSection from '@/components/audit/TechStackSection'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuditStore } from '@/store/auditStore'
@@ -158,6 +159,9 @@ export default function ResultsPage() {
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         {/* Historial (solo se muestra si hay más de 1 auditoría) */}
         <HistorySection domain={result.domain} />
+
+        {/* Stack tecnológico (informativo) */}
+        {result.techStack && <TechStackSection techStack={result.techStack} />}
 
         {result.modules
           .filter((m) => ['wordpress', 'security'].includes(m.id))

@@ -110,7 +110,16 @@ class AuditOrchestrator {
             $modules[] = $this->createFailedModule('conversion', 'Conversión y Marketing', 'bar-chart-3');
         }
 
-        // 9. Calcular resultados globales
+        // 9. Detectar stack tecnológico (informativo, no afecta score)
+        $techStack = [];
+        try {
+            $techDetector = new TechDetector($html, $headers);
+            $techStack = $techDetector->detect();
+        } catch (Throwable $e) {
+            Logger::warning('TechDetector falló: ' . $e->getMessage());
+        }
+
+        // 10. Calcular resultados globales
         $globalScore = Scoring::calculateGlobalScore($modules);
         $globalLevel = Scoring::getLevel($globalScore);
         $totalIssues = Scoring::countIssues($modules);
@@ -137,6 +146,7 @@ class AuditOrchestrator {
             'isWordPress' => $isWordPress,
             'economicImpact' => $economicImpact,
             'solutionMap' => $solutionMap,
+            'techStack' => $techStack,
         ];
     }
 
