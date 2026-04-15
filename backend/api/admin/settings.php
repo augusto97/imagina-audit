@@ -45,6 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'smtpEncryption' => $dbSettings['smtp_encryption'] ?? 'tls',
             'smtpFromEmail' => $dbSettings['smtp_from_email'] ?? '',
             'smtpFromName' => $dbSettings['smtp_from_name'] ?? 'Imagina Audit',
+            'rateLimitMaxPerHour' => (int) ($dbSettings['rate_limit_max_per_hour'] ?? env('RATE_LIMIT_MAX_PER_HOUR', '100')),
+            'cacheTtlHours' => (int) round(((int) ($dbSettings['cache_ttl_seconds'] ?? env('CACHE_TTL_SECONDS', '86400'))) / 3600),
             'moduleWeights' => $weights,
             'thresholds' => [
                 'excellent' => (int) ($dbSettings['threshold_excellent'] ?? $defaults['threshold_excellent']),
@@ -84,6 +86,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 $db->execute(
                     "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('admin_password_hash', ?, datetime('now'))",
                     [$hash]
+                );
+                continue;
+            }
+
+            // Convertir cacheTtlHours a cache_ttl_seconds
+            if ($key === 'cacheTtlHours') {
+                $seconds = max(0, (int) $value) * 3600;
+                $db->execute(
+                    "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('cache_ttl_seconds', ?, datetime('now'))",
+                    [(string) $seconds]
                 );
                 continue;
             }

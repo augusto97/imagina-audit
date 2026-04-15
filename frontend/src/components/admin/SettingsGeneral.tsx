@@ -97,6 +97,25 @@ export default function SettingsGeneral() {
           </CardContent>
         </Card>
 
+        {/* Límites y Cache */}
+        <Card>
+          <CardHeader><CardTitle>Límites y Cache</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-medium text-[var(--text-secondary)]">Auditorías por hora (por IP)</label>
+                <Input {...register('rateLimitMaxPerHour')} type="number" min={1} max={1000} placeholder="100" />
+                <p className="mt-1 text-xs text-[var(--text-tertiary)]">Usuarios no administradores. Tú como admin no tienes límite.</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[var(--text-secondary)]">Cache de auditorías (horas)</label>
+                <Input {...register('cacheTtlHours')} type="number" min={0} max={168} placeholder="24" />
+                <p className="mt-1 text-xs text-[var(--text-tertiary)]">Tiempo que se reutiliza un resultado antes de re-escanear. 0 = sin cache.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Notificaciones email */}
         <Card>
           <CardHeader><CardTitle>Notificaciones de Leads</CardTitle></CardHeader>

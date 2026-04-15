@@ -30,7 +30,12 @@ $domain = UrlValidator::extractDomain($url);
 
 // Rate limiting (no aplica si estás logueado como admin)
 $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+// Leer límite de la DB primero, fallback a .env
 $maxPerHour = (int) env('RATE_LIMIT_MAX_PER_HOUR', '10');
+try {
+    $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'rate_limit_max_per_hour'");
+    if ($row && is_numeric($row['value'])) $maxPerHour = (int) $row['value'];
+} catch (Throwable $e) { /* usar valor de .env */ }
 $isAdmin = Auth::checkAuth();
 
 try {
@@ -67,6 +72,10 @@ try {
 // Si forceRefresh=true, saltar el cache y hacer un escaneo nuevo
 $forceRefresh = !empty($body['forceRefresh']);
 $cacheTtl = (int) env('CACHE_TTL_SECONDS', '86400');
+try {
+    $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'cache_ttl_seconds'");
+    if ($row && is_numeric($row['value'])) $cacheTtl = (int) $row['value'];
+} catch (Throwable $e) { /* usar valor de .env */ }
 try {
     if (!$forceRefresh) {
         $db = Database::getInstance();
