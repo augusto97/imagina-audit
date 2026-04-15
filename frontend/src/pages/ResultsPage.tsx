@@ -23,12 +23,10 @@ export default function ResultsPage() {
   const [loading, setLoading] = useState(!storeResult)
   const [error, setError] = useState<string | null>(null)
 
-  // Cargar configuración pública
   useEffect(() => {
     getConfig().then(setConfig)
   }, [setConfig])
 
-  // Si no hay resultado en el store, cargarlo de la API
   useEffect(() => {
     if (storeResult && storeResult.id === auditId) {
       setResult(storeResult)
@@ -56,8 +54,8 @@ export default function ResultsPage() {
         <div className="mx-auto max-w-5xl px-4 py-16">
           <Skeleton className="mx-auto h-48 w-48 rounded-full" />
           <div className="mt-8 space-y-4">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full rounded-2xl" />
+            <Skeleton className="h-32 w-full rounded-2xl" />
           </div>
         </div>
       </Layout>
@@ -84,10 +82,10 @@ export default function ResultsPage() {
   return (
     <Layout showFooter={false}>
       {/* Header sticky con acciones */}
-      <div className="sticky top-16 z-40 border-b border-[var(--border-default)] bg-[var(--bg-primary)]/90 backdrop-blur-lg">
+      <div className="sticky top-16 z-40 border-b border-[var(--border-default)] bg-white/90 backdrop-blur-lg">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-[var(--text-primary)]">{result.domain}</span>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">{result.domain}</span>
             <span className="text-xs text-[var(--text-tertiary)]">
               {new Date(result.timestamp).toLocaleDateString('es-CO')}
             </span>
@@ -109,36 +107,29 @@ export default function ResultsPage() {
 
       {/* Módulos */}
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-        {/* Módulos antes del impacto económico */}
         {result.modules
           .filter((m) => ['wordpress', 'security'].includes(m.id))
           .map((module, idx) => (
             <ModuleCard key={module.id} module={module} index={idx} />
           ))}
 
-        {/* Impacto económico (entre Seguridad y Performance) */}
         <EconomicImpact
           estimatedMonthlyLoss={result.economicImpact.estimatedMonthlyLoss}
           currency={result.economicImpact.currency}
           explanation={result.economicImpact.explanation}
         />
 
-        {/* Resto de módulos */}
         {result.modules
           .filter((m) => !['wordpress', 'security'].includes(m.id))
           .map((module, idx) => (
             <ModuleCard key={module.id} module={module} index={idx + 2} />
           ))}
 
-        {/* Tabla de soluciones */}
         <SolutionMapping solutions={result.solutionMap} />
-
-        {/* CTA final */}
         <CtaSection />
 
-        {/* Footer del informe */}
         <div className="py-8 text-center text-xs text-[var(--text-tertiary)]">
-          <p>Informe generado por Imagina Audit &mdash; imaginawp.com</p>
+          <p>Informe generado por <span className="font-medium text-[var(--accent-primary)]">Imagina Audit</span> &mdash; imaginawp.com</p>
           <p className="mt-1">
             Duración del escaneo: {(result.scanDurationMs / 1000).toFixed(1)}s
           </p>

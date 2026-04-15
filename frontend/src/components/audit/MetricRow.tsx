@@ -20,21 +20,18 @@ export default function MetricRow({ metric }: MetricRowProps) {
       }
     >
       <div className="space-y-3 pl-6 text-sm">
-        {/* Descripción */}
         <p className="text-[var(--text-secondary)]">{metric.description}</p>
 
-        {/* Recomendación */}
         {metric.recommendation && (
-          <div className="rounded-lg bg-[var(--bg-tertiary)] p-3">
-            <p className="text-xs font-medium text-[var(--text-tertiary)] mb-1">Recomendación</p>
+          <div className="rounded-xl bg-[var(--bg-tertiary)] p-3">
+            <p className="text-xs font-semibold text-[var(--text-tertiary)] mb-1">Recomendación</p>
             <p className="text-[var(--text-secondary)]">{metric.recommendation}</p>
           </div>
         )}
 
-        {/* Solución Imagina WP */}
         {metric.imaginaSolution && (
-          <div className="rounded-lg border border-[var(--accent-primary)]/20 bg-[var(--accent-primary)]/5 p-3">
-            <p className="text-xs font-medium text-[var(--accent-primary)] mb-1">
+          <div className="rounded-xl border border-[var(--accent-primary)]/20 bg-[var(--accent-primary)]/5 p-3">
+            <p className="text-xs font-semibold text-[var(--accent-primary)] mb-1">
               Cómo lo resuelve Imagina WP
             </p>
             <p className="text-[var(--text-secondary)]">{metric.imaginaSolution}</p>

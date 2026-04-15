@@ -15,8 +15,8 @@ export default function CtaSection() {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
     >
-      <Card className="overflow-hidden">
-        <div className="bg-gradient-to-br from-[var(--accent-primary)]/10 to-[var(--bg-secondary)]">
+      <Card className="overflow-hidden border-[var(--accent-primary)]/30">
+        <div className="bg-gradient-to-br from-[#F0FDFE] to-white">
           <CardContent className="p-8 sm:p-12 text-center">
             <h2 className="text-2xl font-bold text-[var(--text-primary)] sm:text-3xl">
               {config.ctaTitle}
@@ -25,7 +25,6 @@ export default function CtaSection() {
               {config.ctaDescription}
             </p>
 
-            {/* Botones */}
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
                 <Button size="xl" variant="success" className="w-full sm:w-auto">
@@ -41,17 +40,16 @@ export default function CtaSection() {
               </a>
             </div>
 
-            {/* Trust bar */}
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-xs text-[var(--text-tertiary)]">
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-xs text-[var(--text-secondary)]">
               {['Elementor', 'WP Rocket', 'Rank Math', 'Cloudflare', 'WooCommerce'].map((tool) => (
-                <span key={tool} className="rounded-full border border-[var(--border-default)] px-3 py-1">
+                <span key={tool} className="rounded-full border border-[var(--border-default)] bg-white px-3 py-1 font-medium shadow-sm">
                   {tool}
                 </span>
               ))}
             </div>
 
             <p className="mt-4 text-sm text-[var(--text-tertiary)]">
-              15 años de experiencia exclusiva en WordPress
+              <span className="highlight-yellow">15 años</span> de experiencia exclusiva en WordPress
             </p>
           </CardContent>
         </div>

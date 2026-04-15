@@ -50,7 +50,7 @@ export default function ModuleCard({ module, index }: ModuleCardProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--bg-tertiary)]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-primary)]/10">
                 <Icon className="h-5 w-5 text-[var(--accent-primary)]" strokeWidth={1.5} />
               </div>
               <div>
@@ -81,9 +81,8 @@ export default function ModuleCard({ module, index }: ModuleCardProps) {
             <p className="text-sm text-[var(--text-tertiary)]">No hay métricas disponibles para este módulo.</p>
           )}
 
-          {/* Mensaje de venta */}
           {module.salesMessage && (
-            <div className="mt-4 rounded-lg border border-[var(--accent-primary)]/20 bg-[var(--accent-primary)]/5 p-4">
+            <div className="mt-4 rounded-xl border border-[var(--accent-primary)]/20 bg-[var(--accent-primary)]/5 p-4">
               <p className="text-sm text-[var(--text-secondary)]">{module.salesMessage}</p>
             </div>
           )}
