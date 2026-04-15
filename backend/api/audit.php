@@ -135,7 +135,41 @@ try {
     );
 } catch (Throwable $e) {
     Logger::error('Error guardando auditoría: ' . $e->getMessage());
-    // No fallar si no se puede guardar — el usuario ya tiene su resultado
+}
+
+// Notificar al admin por email si el lead tiene datos de contacto
+try {
+    $leadEmail = trim($body['leadEmail'] ?? '');
+    $leadWhatsapp = trim($body['leadWhatsapp'] ?? '');
+
+    if ($leadEmail || $leadWhatsapp) {
+        $db = Database::getInstance();
+        $notifRow = $db->queryOne("SELECT value FROM settings WHERE key = 'lead_notification_email'");
+        $notifEmail = $notifRow['value'] ?? '';
+
+        if (!empty($notifEmail) && filter_var($notifEmail, FILTER_VALIDATE_EMAIL)) {
+            $domain = $result['domain'];
+            $score = $result['globalScore'];
+            $level = $result['globalLevel'];
+            $leadName = trim($body['leadName'] ?? '') ?: 'No proporcionado';
+            $leadCompany = trim($body['leadCompany'] ?? '') ?: 'No proporcionado';
+
+            $subject = "Nuevo lead: $domain (Score: $score/100)";
+            $emailBody = "Nuevo lead capturado en Imagina Audit\n\n"
+                . "Sitio: {$result['url']}\n"
+                . "Score: $score/100 ($level)\n\n"
+                . "Datos de contacto:\n"
+                . "Nombre: $leadName\n"
+                . "Email: " . ($leadEmail ?: 'No proporcionado') . "\n"
+                . "WhatsApp: " . ($leadWhatsapp ?: 'No proporcionado') . "\n"
+                . "Empresa: $leadCompany\n\n"
+                . "Fecha: " . date('d/m/Y H:i') . "\n";
+
+            @mail($notifEmail, $subject, $emailBody, "From: noreply@{$domain}\r\nContent-Type: text/plain; charset=UTF-8");
+        }
+    }
+} catch (Throwable $e) {
+    Logger::warning('Error enviando notificación de lead: ' . $e->getMessage());
 }
 
 Response::success($result);

@@ -1,8 +1,5 @@
 <?php
-require_once dirname(__DIR__) . "/bootstrap.php";
-/**
- * GET/POST/PUT/DELETE /api/admin/vulnerabilities
- */
+require_once dirname(__DIR__) . '/bootstrap.php';
 Auth::requireAuth();
 
 $db = Database::getInstance();
@@ -12,11 +9,46 @@ if ($method === 'GET') {
     $page = max(1, (int) ($_GET['page'] ?? 1));
     $limit = min(100, max(1, (int) ($_GET['limit'] ?? 50)));
     $offset = ($page - 1) * $limit;
+    $search = trim($_GET['search'] ?? '');
+
+    $where = '1=1';
+    $params = [];
+
+    if ($search !== '') {
+        $where .= " AND (plugin_slug LIKE ? OR plugin_name LIKE ?)";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+    }
 
     try {
-        $total = (int) $db->scalar("SELECT COUNT(*) FROM vulnerabilities");
-        $rows = $db->query("SELECT * FROM vulnerabilities ORDER BY created_at DESC LIMIT ? OFFSET ?", [$limit, $offset]);
-        Response::success(['vulnerabilities' => $rows, 'total' => $total]);
+        $total = (int) $db->scalar("SELECT COUNT(*) FROM vulnerabilities WHERE $where", $params);
+        $totalPages = (int) ceil($total / $limit);
+
+        $rows = $db->query(
+            "SELECT * FROM vulnerabilities WHERE $where ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            array_merge($params, [$limit, $offset])
+        );
+
+        $vulns = array_map(function ($row) {
+            return [
+                'id' => (int) $row['id'],
+                'pluginSlug' => $row['plugin_slug'],
+                'pluginName' => $row['plugin_name'],
+                'affectedVersions' => $row['affected_versions'],
+                'severity' => $row['severity'],
+                'cveId' => $row['cve_id'] ?? '',
+                'description' => $row['description'],
+                'fixedInVersion' => $row['fixed_in_version'] ?? '',
+                'createdAt' => $row['created_at'],
+            ];
+        }, $rows);
+
+        Response::success([
+            'vulnerabilities' => $vulns,
+            'total' => $total,
+            'page' => $page,
+            'totalPages' => $totalPages,
+        ]);
     } catch (Throwable $e) {
         Response::error('Error al obtener vulnerabilidades.', 500);
     }

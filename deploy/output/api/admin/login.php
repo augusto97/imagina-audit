@@ -1,8 +1,6 @@
 <?php
-require_once dirname(__DIR__) . "/bootstrap.php";
-/**
- * POST /api/admin/login
- */
+require_once dirname(__DIR__) . '/bootstrap.php';
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     Response::error('Método no permitido', 405);
 }

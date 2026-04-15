@@ -1,7 +1,5 @@
 <?php
-require_once dirname(__DIR__) . "/bootstrap.php";
-/**
- * POST /api/admin/logout
- */
+require_once dirname(__DIR__) . '/bootstrap.php';
+
 Auth::logout();
 Response::success();
