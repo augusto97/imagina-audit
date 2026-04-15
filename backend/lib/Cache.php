@@ -102,10 +102,66 @@ class Cache {
     }
 
     /**
+     * Obtiene un valor del cache usando un nombre de archivo legible
+     * Ideal para cache de vulnerabilidades: vuln_elementor, vuln_theme_flavflavor, etc.
+     * @return mixed|null Retorna null si no existe o expiró
+     */
+    public function getByName(string $name): mixed {
+        $filePath = $this->getNamedFilePath($name);
+
+        if (!file_exists($filePath)) {
+            return null;
+        }
+
+        $content = @file_get_contents($filePath);
+        if ($content === false) {
+            return null;
+        }
+
+        $data = json_decode($content, true);
+        if ($data === null || !isset($data['expires_at'], $data['value'])) {
+            return null;
+        }
+
+        if (time() > $data['expires_at']) {
+            @unlink($filePath);
+            return null;
+        }
+
+        return $data['value'];
+    }
+
+    /**
+     * Guarda un valor en el cache usando un nombre de archivo legible
+     */
+    public function setByName(string $name, mixed $value, ?int $ttl = null): void {
+        $filePath = $this->getNamedFilePath($name);
+        $effectiveTtl = $ttl ?? $this->ttl;
+
+        $data = [
+            'key' => $name,
+            'value' => $value,
+            'created_at' => time(),
+            'expires_at' => time() + $effectiveTtl,
+        ];
+
+        @file_put_contents($filePath, json_encode($data, JSON_UNESCAPED_UNICODE), LOCK_EX);
+    }
+
+    /**
      * Genera la ruta del archivo de cache a partir de la key
      */
     private function getFilePath(string $key): string {
         $hash = md5($key);
         return $this->cacheDir . '/' . $hash . '.json';
+    }
+
+    /**
+     * Genera la ruta del archivo de cache usando nombre legible (sanitizado)
+     * Ej: "vuln_elementor" → cache/vuln_elementor.json
+     */
+    private function getNamedFilePath(string $name): string {
+        $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $name);
+        return $this->cacheDir . '/' . $safeName . '.json';
     }
 }

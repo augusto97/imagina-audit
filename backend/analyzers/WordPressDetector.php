@@ -10,6 +10,11 @@ class WordPressDetector {
     private HtmlParser $parser;
     private bool $isWordPress = false;
 
+    /** Datos detectados expuestos para otros analyzers */
+    private ?string $detectedWpVersion = null;
+    private array $detectedPlugins = [];
+    private array $detectedThemeInfo = ['slug' => null, 'name' => null, 'version' => null, 'childTheme' => false];
+
     public function __construct(string $url, string $html, array $headers) {
         $this->url = rtrim($url, '/');
         $this->html = $html;
@@ -47,6 +52,7 @@ class WordPressDetector {
 
         // Versión de WordPress
         $wpVersion = $this->detectVersion();
+        $this->detectedWpVersion = $wpVersion;
         $defaults = require dirname(__DIR__) . '/config/defaults.php';
         $latestVersion = $defaults['latest_wp_version'];
         $isCurrent = $wpVersion !== null && version_compare($wpVersion, $latestVersion, '>=');
@@ -73,6 +79,12 @@ class WordPressDetector {
 
         // Tema
         $themeInfo = $this->detectTheme();
+        $this->detectedThemeInfo = [
+            'slug' => $themeInfo['slug'] ?? null,
+            'name' => $themeInfo['name'],
+            'version' => $themeInfo['version'],
+            'childTheme' => $themeInfo['childTheme'],
+        ];
         $hasChildTheme = $themeInfo['childTheme'];
         $themeScore = $hasChildTheme ? 100 : 70;
 
@@ -91,6 +103,7 @@ class WordPressDetector {
 
         // Plugins
         $plugins = $this->detectPlugins();
+        $this->detectedPlugins = $plugins;
         $outdatedCount = 0;
         $pluginsList = [];
         foreach ($plugins as $p) {
@@ -255,7 +268,7 @@ class WordPressDetector {
      * Detecta el tema activo
      */
     private function detectTheme(): array {
-        $result = ['name' => null, 'version' => null, 'childTheme' => false];
+        $result = ['slug' => null, 'name' => null, 'version' => null, 'childTheme' => false];
 
         // Buscar rutas /wp-content/themes/NOMBRE/ en el HTML
         $themes = [];
@@ -268,6 +281,7 @@ class WordPressDetector {
             return $result;
         }
 
+        $result['slug'] = $themes[0];
         $result['name'] = $themes[0];
         $result['childTheme'] = count($themes) > 1;
 
@@ -425,5 +439,28 @@ class WordPressDetector {
      */
     public function isWordPress(): bool {
         return $this->isWordPress;
+    }
+
+    /**
+     * Retorna la versión de WordPress detectada
+     */
+    public function getDetectedWpVersion(): ?string {
+        return $this->detectedWpVersion;
+    }
+
+    /**
+     * Retorna los plugins detectados con sus versiones
+     * Cada elemento: ['slug' => string, 'name' => string, 'detectedVersion' => ?string, ...]
+     */
+    public function getDetectedPlugins(): array {
+        return $this->detectedPlugins;
+    }
+
+    /**
+     * Retorna la información del tema detectado
+     * ['slug' => ?string, 'name' => ?string, 'version' => ?string, 'childTheme' => bool]
+     */
+    public function getDetectedThemeInfo(): array {
+        return $this->detectedThemeInfo;
     }
 }
