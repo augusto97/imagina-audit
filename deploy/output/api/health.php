@@ -2,6 +2,7 @@
 /**
  * GET /api/health — Healthcheck del backend
  */
+require_once __DIR__ . '/bootstrap.php';
 
 $checks = [
     'php' => PHP_VERSION,

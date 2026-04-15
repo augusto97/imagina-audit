@@ -16,7 +16,6 @@ export default function ScanningAnimation() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const animationDone = useRef(false)
 
-  // Animación simulada de progreso
   useEffect(() => {
     if (status !== 'scanning' && status !== 'completed') return
 
@@ -30,7 +29,6 @@ export default function ScanningAnimation() {
         return
       }
 
-      // Marcar paso actual como "scanning"
       setStepStates((prev) => {
         const next = [...prev]
         next[stepIdx] = 'scanning'
@@ -41,7 +39,6 @@ export default function ScanningAnimation() {
       const stepDuration = SCAN_STEPS[stepIdx].duration
 
       setTimeout(() => {
-        // Marcar como completado
         setStepStates((prev) => {
           const next = [...prev]
           next[stepIdx] = 'done'
@@ -55,9 +52,8 @@ export default function ScanningAnimation() {
     }
 
     advanceStep()
-  }, []) // Se ejecuta una sola vez al montar
+  }, [])
 
-  // Cuando termina la API y la animación, navegar
   useEffect(() => {
     if (status === 'completed' && animationDone.current) {
       const result = useAuditStore.getState().result
@@ -67,14 +63,14 @@ export default function ScanningAnimation() {
     }
   }, [status, navigate])
 
-  // Si hay error
+  // Pantalla de error
   if (status === 'error') {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-primary)] px-4">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-secondary)] px-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="glass-card w-full max-w-md p-8 text-center"
+          className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-white p-8 text-center shadow-lg"
         >
           <AlertCircle className="mx-auto h-12 w-12 text-[var(--color-critical)]" strokeWidth={1.5} />
           <h2 className="mt-4 text-lg font-semibold text-[var(--text-primary)]">Error al analizar</h2>
@@ -90,9 +86,9 @@ export default function ScanningAnimation() {
   const domain = request?.url ? new URL(request.url.startsWith('http') ? request.url : `https://${request.url}`).hostname : ''
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-primary)] px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-secondary)] px-4">
       {/* Grid animado de fondo */}
-      <div className="absolute inset-0 overflow-hidden opacity-5">
+      <div className="absolute inset-0 overflow-hidden opacity-[0.03]">
         <div
           className="animate-grid-move absolute inset-0"
           style={{
@@ -119,7 +115,7 @@ export default function ScanningAnimation() {
             <span>Progreso</span>
             <span>{progress}%</span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
             <motion.div
               className="h-full rounded-full bg-[var(--accent-primary)]"
               initial={{ width: 0 }}
@@ -130,7 +126,7 @@ export default function ScanningAnimation() {
         </div>
 
         {/* Lista de pasos */}
-        <div className="glass-card space-y-0 overflow-hidden p-4">
+        <div className="space-y-0 overflow-hidden rounded-2xl border border-[var(--border-default)] bg-white p-4 shadow-sm">
           {SCAN_STEPS.map((step, idx) => (
             <motion.div
               key={step.id}
@@ -163,7 +159,6 @@ export default function ScanningAnimation() {
           ))}
         </div>
 
-        {/* Texto actual */}
         <p className="mt-4 text-center text-xs text-[var(--text-tertiary)] animate-scan-pulse">
           {currentStepIndex < SCAN_STEPS.length
             ? SCAN_STEPS[currentStepIndex].label

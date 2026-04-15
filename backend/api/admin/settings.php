@@ -1,4 +1,5 @@
 <?php
+require_once dirname(__DIR__) . "/bootstrap.php";
 /**
  * GET/PUT /api/admin/settings
  */

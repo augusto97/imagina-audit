@@ -14,13 +14,13 @@ const api = axios.create({
 
 /** Ejecuta una auditoría */
 export async function runAudit(request: AuditRequest): Promise<AuditResult> {
-  const response = await api.post<{ success: boolean; data: AuditResult }>('/audit', request)
+  const response = await api.post<{ success: boolean; data: AuditResult }>('/audit.php', request)
   return response.data.data
 }
 
 /** Obtiene resultado de una auditoría por ID */
 export async function getAuditResult(id: string): Promise<AuditResult> {
-  const response = await api.get<{ success: boolean; data: AuditResult }>('/audit-status', {
+  const response = await api.get<{ success: boolean; data: AuditResult }>('/audit-status.php', {
     params: { id },
   })
   return response.data.data
@@ -29,7 +29,7 @@ export async function getAuditResult(id: string): Promise<AuditResult> {
 /** Obtiene la configuración pública */
 export async function getConfig(): Promise<typeof DEFAULT_CONFIG> {
   try {
-    const response = await api.get<{ success: boolean; data: typeof DEFAULT_CONFIG }>('/config')
+    const response = await api.get<{ success: boolean; data: typeof DEFAULT_CONFIG }>('/config.php')
     return response.data.data
   } catch {
     return DEFAULT_CONFIG
@@ -39,7 +39,7 @@ export async function getConfig(): Promise<typeof DEFAULT_CONFIG> {
 /** Healthcheck del backend */
 export async function checkHealth(): Promise<boolean> {
   try {
-    const response = await api.get('/health')
+    const response = await api.get('/health.php')
     return response.data?.data?.status === 'healthy'
   } catch {
     return false

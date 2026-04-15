@@ -2,6 +2,7 @@
 /**
  * POST /api/audit — Ejecuta una auditoría completa
  */
+require_once __DIR__ . '/bootstrap.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     Response::error('Método no permitido', 405);

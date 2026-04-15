@@ -1,4 +1,5 @@
 <?php
+require_once dirname(__DIR__) . "/bootstrap.php";
 /**
  * GET/POST/PUT/DELETE /api/admin/vulnerabilities
  */

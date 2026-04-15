@@ -4,57 +4,59 @@
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 
-  /* Colores de la paleta — modo oscuro por defecto */
-  --color-bg-primary: #0B0F1A;
-  --color-bg-secondary: #111827;
-  --color-bg-tertiary: #1F2937;
+  /* Paleta Imagina WP — modo claro */
+  --color-bg-primary: #FFFFFF;
+  --color-bg-secondary: #F8FAFB;
+  --color-bg-tertiary: #F1F5F9;
 
-  --color-text-primary: #F1F5F9;
-  --color-text-secondary: #94A3B8;
-  --color-text-tertiary: #64748B;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #64748B;
+  --color-text-tertiary: #94A3B8;
 
-  --color-border-default: #1E293B;
-  --color-border-hover: #334155;
+  --color-border-default: #E2E8F0;
+  --color-border-hover: #CBD5E1;
 
-  --color-accent-primary: #3B82F6;
-  --color-accent-hover: #2563EB;
+  --color-accent-primary: #0CC0DF;
+  --color-accent-hover: #0AABCC;
 
   --color-critical: #EF4444;
   --color-warning: #F59E0B;
   --color-good: #10B981;
   --color-excellent: #059669;
-  --color-info: #6B7280;
+  --color-info: #64748B;
 
-  --radius-card: 12px;
-  --radius-sm: 8px;
+  --radius-card: 16px;
+  --radius-sm: 10px;
 }
 
 /* Variables CSS globales */
 :root {
-  --bg-primary: #0B0F1A;
-  --bg-secondary: #111827;
-  --bg-tertiary: #1F2937;
-  --bg-glass: rgba(17, 24, 39, 0.7);
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8FAFB;
+  --bg-tertiary: #F1F5F9;
+  --bg-glass: rgba(255, 255, 255, 0.85);
 
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
-  --text-tertiary: #64748B;
+  --text-primary: #0F172A;
+  --text-secondary: #64748B;
+  --text-tertiary: #94A3B8;
 
-  --border-default: #1E293B;
-  --border-hover: #334155;
+  --border-default: #E2E8F0;
+  --border-hover: #CBD5E1;
 
-  --accent-primary: #3B82F6;
-  --accent-hover: #2563EB;
-  --accent-glow: rgba(59, 130, 246, 0.15);
+  --accent-primary: #0CC0DF;
+  --accent-hover: #0AABCC;
+  --accent-glow: rgba(12, 192, 223, 0.15);
+
+  --accent-yellow: #FFD166;
 
   --color-critical: #EF4444;
   --color-warning: #F59E0B;
   --color-good: #10B981;
   --color-excellent: #059669;
-  --color-info: #6B7280;
+  --color-info: #64748B;
 
-  --radius: 12px;
-  --radius-sm: 8px;
+  --radius: 16px;
+  --radius-sm: 10px;
 }
 
 /* === Estilos base === */
@@ -74,20 +76,28 @@ body {
   backdrop-filter: blur(12px);
   border: 1px solid var(--border-default);
   border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
 /* === Glow === */
 .glow {
-  box-shadow: 0 0 20px var(--accent-glow);
+  box-shadow: 0 4px 20px var(--accent-glow);
 }
 
 .glow-hover:hover {
-  box-shadow: 0 0 30px var(--accent-glow);
+  box-shadow: 0 4px 24px var(--accent-glow);
 }
 
 /* === Gradiente hero === */
 .hero-gradient {
-  background: linear-gradient(180deg, var(--bg-primary) 0%, #0f172a 100%);
+  background: linear-gradient(180deg, #F0FDFE 0%, #FFFFFF 100%);
+}
+
+/* === Subrayado decorativo amarillo (estilo Imagina WP) === */
+.highlight-yellow {
+  background-image: linear-gradient(transparent 60%, var(--accent-yellow) 60%);
+  background-size: 100% 100%;
+  padding: 0 4px;
 }
 
 /* === Scrollbar personalizado === */
@@ -96,7 +106,7 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
 }
 
 ::-webkit-scrollbar-thumb {

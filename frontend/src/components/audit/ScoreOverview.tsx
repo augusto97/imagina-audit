@@ -32,7 +32,6 @@ export default function ScoreOverview({ result }: ScoreOverviewProps) {
 
           <ScoreGauge score={result.globalScore} level={result.globalLevel} size="lg" />
 
-          {/* Badges de issues */}
           <div className="flex flex-wrap justify-center gap-2">
             {result.totalIssues.critical > 0 && (
               <Badge variant="destructive">{result.totalIssues.critical} Críticos</Badge>
@@ -58,7 +57,7 @@ export default function ScoreOverview({ result }: ScoreOverviewProps) {
               key={module.id}
               type="button"
               onClick={() => scrollToModule(module.id)}
-              className="glass-card flex flex-col items-center gap-1 p-3 transition-all hover:border-[var(--border-hover)] cursor-pointer"
+              className="flex flex-col items-center gap-1 rounded-2xl border border-[var(--border-default)] bg-white p-3 shadow-sm transition-all hover:border-[var(--accent-primary)] hover:shadow-md cursor-pointer"
             >
               <ScoreGauge
                 score={module.score ?? 0}
@@ -67,7 +66,7 @@ export default function ScoreOverview({ result }: ScoreOverviewProps) {
                 showLabel={false}
                 animate={false}
               />
-              <span className="text-[10px] text-[var(--text-tertiary)] text-center leading-tight">
+              <span className="text-[10px] font-medium text-[var(--text-tertiary)] text-center leading-tight">
                 {module.name}
               </span>
             </button>

@@ -21,10 +21,9 @@ const itemVariants = {
 }
 
 export default function HomePage() {
-  const { status } = useAuditStore()
+  const status = useAuditStore((s) => s.status)
 
-  // Mostrar animación de escaneo si está en progreso
-  if (status === 'scanning') {
+  if (status === 'scanning' || status === 'error') {
     return <ScanningAnimation />
   }
 
@@ -40,7 +39,7 @@ export default function HomePage() {
             className="text-center"
           >
             <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)] sm:text-4xl lg:text-5xl">
-              Auditoría Gratuita de tu{' '}
+              Auditoría <span className="highlight-yellow">Gratuita</span> de tu{' '}
               <span className="text-[var(--accent-primary)]">WordPress</span>
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-base text-[var(--text-secondary)] sm:text-lg">
@@ -61,15 +60,15 @@ export default function HomePage() {
       </section>
 
       {/* Features Grid — 8 módulos */}
-      <section className="py-16">
+      <section className="py-16 bg-white">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           <motion.h2
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            className="mb-8 text-center text-xl font-semibold text-[var(--text-primary)] sm:text-2xl"
+            className="mb-8 text-center text-xl font-bold text-[var(--text-primary)] sm:text-2xl"
           >
-            Analizamos 8 áreas clave de tu sitio
+            Analizamos <span className="highlight-yellow">8 áreas clave</span> de tu sitio
           </motion.h2>
 
           <motion.div
@@ -83,10 +82,10 @@ export default function HomePage() {
               <motion.div
                 key={id}
                 variants={itemVariants}
-                className="glass-card flex flex-col items-center gap-2 p-4 text-center transition-all hover:border-[var(--border-hover)] hover:shadow-lg"
+                className="flex flex-col items-center gap-2 rounded-2xl border border-[var(--border-default)] bg-white p-5 text-center shadow-sm transition-all hover:border-[var(--accent-primary)] hover:shadow-md"
               >
                 <span className="text-2xl">{MODULE_EMOJIS[id]}</span>
-                <span className="text-sm font-medium text-[var(--text-primary)]">
+                <span className="text-sm font-semibold text-[var(--text-primary)]">
                   {MODULE_NAMES[id]}
                 </span>
               </motion.div>
@@ -96,14 +95,14 @@ export default function HomePage() {
       </section>
 
       {/* Trust Bar */}
-      <section className="border-t border-[var(--border-default)] py-12">
+      <section className="border-t border-[var(--border-default)] bg-[var(--bg-secondary)] py-12">
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
-          <p className="text-sm text-[var(--text-tertiary)]">
-            Con la experiencia de 15 años de maestría exclusiva en WordPress
+          <p className="text-sm font-medium text-[var(--text-secondary)]">
+            Con la experiencia de <span className="highlight-yellow">15 años</span> de maestría exclusiva en WordPress
           </p>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-6 text-xs text-[var(--text-tertiary)]">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-[var(--text-secondary)]">
             {['Elementor', 'WP Rocket', 'Rank Math', 'Gravity Forms', 'Cloudflare', 'WooCommerce'].map((tool) => (
-              <span key={tool} className="rounded-full border border-[var(--border-default)] px-3 py-1">
+              <span key={tool} className="rounded-full border border-[var(--border-default)] bg-white px-4 py-1.5 font-medium shadow-sm">
                 {tool}
               </span>
             ))}

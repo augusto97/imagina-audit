@@ -52,7 +52,7 @@ export default function AuditForm() {
   }
 
   return (
-    <Card className="glass-card mx-auto w-full max-w-lg">
+    <Card className="mx-auto w-full max-w-lg shadow-lg border-[var(--border-default)]">
       <CardContent className="p-6 sm:p-8">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* URL */}
@@ -107,7 +107,7 @@ export default function AuditForm() {
           <Button
             type="submit"
             size="xl"
-            className="w-full glow"
+            className="w-full"
             disabled={isScanning}
           >
             <Search className="h-5 w-5" strokeWidth={1.5} />
