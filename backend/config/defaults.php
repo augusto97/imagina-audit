@@ -24,10 +24,9 @@ return [
     'weight_security' => 0.25,
     'weight_performance' => 0.20,
     'weight_seo' => 0.15,
-    'weight_mobile' => 0.05,
-    'weight_infrastructure' => 0.05,
+    'weight_mobile' => 0.07,
+    'weight_infrastructure' => 0.08,
     'weight_conversion' => 0.10,
-    'weight_backups' => 0.05,
 
     // Mensajes de venta por módulo
     'sales_wordpress' => 'Con nuestros planes de soporte, mantenemos tu WordPress actualizado y seguro. Actualizamos core, plugins y temas cada semana con testing previo para evitar problemas de compatibilidad.',

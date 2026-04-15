@@ -31,7 +31,6 @@ export const MODULE_ICONS: Record<string, string> = {
   mobile: 'smartphone',
   infrastructure: 'server',
   conversion: 'bar-chart-3',
-  backups: 'hard-drive',
 }
 
 /** Nombres de módulos en español */
@@ -43,7 +42,6 @@ export const MODULE_NAMES: Record<string, string> = {
   mobile: 'Móvil',
   infrastructure: 'Infraestructura',
   conversion: 'Conversión',
-  backups: 'Backups',
 }
 
 /** Emojis de módulos para el feature grid */
@@ -55,7 +53,6 @@ export const MODULE_EMOJIS: Record<string, string> = {
   mobile: '📱',
   infrastructure: '🖥️',
   conversion: '📊',
-  backups: '💾',
 }
 
 /** Pasos simulados del escaneo */
