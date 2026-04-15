@@ -61,31 +61,35 @@ try {
 }
 
 // Cache: verificar si ya se escaneó esta URL recientemente
+// Si forceRefresh=true, saltar el cache y hacer un escaneo nuevo
+$forceRefresh = !empty($body['forceRefresh']);
 $cacheTtl = (int) env('CACHE_TTL_SECONDS', '86400');
 try {
-    $db = Database::getInstance();
-    $cached = $db->queryOne(
-        "SELECT * FROM audits WHERE url = ? AND created_at > datetime('now', '-' || ? || ' seconds') ORDER BY created_at DESC LIMIT 1",
-        [$url, $cacheTtl]
-    );
+    if (!$forceRefresh) {
+        $db = Database::getInstance();
+        $cached = $db->queryOne(
+            "SELECT * FROM audits WHERE url = ? AND created_at > datetime('now', '-' || ? || ' seconds') ORDER BY created_at DESC LIMIT 1",
+            [$url, $cacheTtl]
+        );
 
-    if ($cached) {
-        $result = json_decode($cached['result_json'], true);
+        if ($cached) {
+            $result = json_decode($cached['result_json'], true);
 
-        // Si hay nuevos datos de lead, actualizar el registro
-        $leadName = trim($body['leadName'] ?? '');
-        $leadEmail = trim($body['leadEmail'] ?? '');
-        $leadWhatsapp = trim($body['leadWhatsapp'] ?? '');
-        $leadCompany = trim($body['leadCompany'] ?? '');
+            // Si hay nuevos datos de lead, actualizar el registro
+            $leadName = trim($body['leadName'] ?? '');
+            $leadEmail = trim($body['leadEmail'] ?? '');
+            $leadWhatsapp = trim($body['leadWhatsapp'] ?? '');
+            $leadCompany = trim($body['leadCompany'] ?? '');
 
-        if ($leadName || $leadEmail || $leadWhatsapp || $leadCompany) {
-            $db->execute(
-                "UPDATE audits SET lead_name = COALESCE(NULLIF(?, ''), lead_name), lead_email = COALESCE(NULLIF(?, ''), lead_email), lead_whatsapp = COALESCE(NULLIF(?, ''), lead_whatsapp), lead_company = COALESCE(NULLIF(?, ''), lead_company) WHERE id = ?",
-                [$leadName, $leadEmail, $leadWhatsapp, $leadCompany, $cached['id']]
-            );
+            if ($leadName || $leadEmail || $leadWhatsapp || $leadCompany) {
+                $db->execute(
+                    "UPDATE audits SET lead_name = COALESCE(NULLIF(?, ''), lead_name), lead_email = COALESCE(NULLIF(?, ''), lead_email), lead_whatsapp = COALESCE(NULLIF(?, ''), lead_whatsapp), lead_company = COALESCE(NULLIF(?, ''), lead_company) WHERE id = ?",
+                    [$leadName, $leadEmail, $leadWhatsapp, $leadCompany, $cached['id']]
+                );
+            }
+
+            Response::success($result);
         }
-
-        Response::success($result);
     }
 } catch (Throwable $e) {
     Logger::error('Error consultando cache: ' . $e->getMessage());

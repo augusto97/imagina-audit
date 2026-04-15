@@ -98,6 +98,8 @@ export interface AuditRequest {
   leadEmail?: string
   leadWhatsapp?: string
   leadCompany?: string
+  /** Forzar nuevo escaneo ignorando cache */
+  forceRefresh?: boolean
 }
 
 /** Estado de la auditoría en curso */
