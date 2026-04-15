@@ -1,4 +1,5 @@
 <?php
+require_once dirname(__DIR__) . "/bootstrap.php";
 /**
  * GET/DELETE /api/admin/leads — Lista y elimina auditorías/leads
  */

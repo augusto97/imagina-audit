@@ -3,6 +3,7 @@
  * GET /api/config — Configuración pública (branding, textos, planes)
  * Este endpoint NO requiere autenticación
  */
+require_once __DIR__ . '/bootstrap.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     Response::error('Método no permitido', 405);

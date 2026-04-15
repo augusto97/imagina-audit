@@ -2,6 +2,7 @@
 /**
  * GET /api/audit-status?id=X — Obtiene resultado de auditoría por ID
  */
+require_once __DIR__ . '/bootstrap.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     Response::error('Método no permitido', 405);
