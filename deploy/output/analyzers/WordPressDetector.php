@@ -85,20 +85,22 @@ class WordPressDetector {
             'version' => $themeInfo['version'],
             'childTheme' => $themeInfo['childTheme'],
         ];
-        $hasChildTheme = $themeInfo['childTheme'];
-        $themeScore = $hasChildTheme ? 100 : 70;
+        $themeName = $themeInfo['name'] ?: 'No detectado';
+        $themeVersion = $themeInfo['version'] ?? null;
+        $themeDisplay = $themeName . ($themeVersion ? " v$themeVersion" : '');
 
         $metrics[] = Scoring::createMetric(
             'wp_theme',
             'Tema de WordPress',
             $themeInfo['name'],
-            $themeInfo['name'] ?: 'No detectado',
-            $themeScore,
+            $themeDisplay,
+            $themeInfo['name'] ? 100 : 50,
             $themeInfo['name']
-                ? ($hasChildTheme ? "Tema: {$themeInfo['name']} (con child theme)." : "Tema: {$themeInfo['name']}. No se detectó child theme.")
-                : 'No se pudo detectar el tema.',
-            $hasChildTheme ? '' : 'Usar un child theme para proteger personalizaciones durante actualizaciones.',
-            'Configuramos child themes para que las actualizaciones no afecten tu diseño.'
+                ? "Tema activo: $themeDisplay."
+                : 'No se pudo detectar el tema activo.',
+            '',
+            'Mantenemos tu tema actualizado y optimizado.',
+            ['themeName' => $themeInfo['name'], 'themeVersion' => $themeVersion, 'childTheme' => $themeInfo['childTheme']]
         );
 
         // Plugins
@@ -127,6 +129,10 @@ class WordPressDetector {
             'Actualizamos todos tus plugins semanalmente con testing de compatibilidad.',
             ['plugins' => $pluginsList]
         );
+
+        // Enumeración de usuarios vía /?author=1
+        $userEnumResult = $this->checkUserEnumeration();
+        $metrics[] = $userEnumResult;
 
         // REST API expuesta
         $restApiExposed = $this->checkRestApiUsers();
@@ -390,16 +396,62 @@ class WordPressDetector {
     }
 
     /**
+     * Verifica enumeración de usuarios vía /?author=1
+     */
+    private function checkUserEnumeration(): array {
+        // Fetch /?author=1 sin seguir redirects
+        $response = Fetcher::get($this->url . '/?author=1', 5, false, 0);
+
+        $exposed = false;
+        $username = null;
+
+        // Si redirige a /author/NOMBRE/, el username está expuesto
+        if (in_array($response['statusCode'], [301, 302])) {
+            $location = $response['headers']['location'] ?? '';
+            if (preg_match('#/author/([^/]+)/?#i', $location, $m)) {
+                $exposed = true;
+                $username = $m[1];
+            }
+        }
+
+        // Si retorna 200 y contiene /author/ en el body
+        if (!$exposed && $response['statusCode'] === 200) {
+            if (preg_match('#/author/([a-z0-9_-]+)/?#i', $response['body'] ?? '', $m)) {
+                $exposed = true;
+                $username = $m[1];
+            }
+        }
+
+        $score = $exposed ? 30 : 100;
+        return Scoring::createMetric(
+            'user_enumeration',
+            'Enumeración de usuarios',
+            $exposed,
+            $exposed ? "Expuesto" . ($username ? " ($username)" : '') : 'Protegido',
+            $score,
+            $exposed
+                ? 'La enumeración de usuarios está activa. Se detectó el username "' . ($username ?? '?') . '" vía /?author=1. Los atacantes pueden usar estos nombres de usuario para ataques de fuerza bruta.'
+                : 'La enumeración de usuarios vía /?author=1 está protegida o deshabilitada.',
+            $exposed ? 'Bloquear la enumeración de usuarios con un plugin de seguridad o regla en .htaccess.' : '',
+            'Bloqueamos la enumeración de usuarios y protegemos contra ataques de fuerza bruta.'
+        );
+    }
+
+    /**
      * Verifica archivos sensibles accesibles
      */
     private function checkSensitiveFiles(): array {
         $found = [];
         $filesToCheck = [
             '/wp-config.php.bak',
+            '/wp-config.old',
+            '/wp-config.txt',
             '/.env',
             '/debug.log',
             '/wp-content/debug.log',
             '/error_log',
+            '/backup.zip',
+            '/wp-content/backups/',
         ];
 
         foreach ($filesToCheck as $file) {

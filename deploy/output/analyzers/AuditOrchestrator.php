@@ -66,7 +66,7 @@ class AuditOrchestrator {
         // 4. Performance Analyzer (hace llamadas externas a Google PageSpeed)
         $performanceAnalyzer = null;
         try {
-            $performanceAnalyzer = new PerformanceAnalyzer($finalUrl, $headers, $fetchTime);
+            $performanceAnalyzer = new PerformanceAnalyzer($finalUrl, array_merge($headers, ['_html' => $html]), $fetchTime);
             $modules[] = $performanceAnalyzer->analyze();
         } catch (Throwable $e) {
             Logger::error('PerformanceAnalyzer falló: ' . $e->getMessage());
@@ -113,7 +113,7 @@ class AuditOrchestrator {
         // 9. Detectar stack tecnológico (informativo, no afecta score)
         $techStack = [];
         try {
-            $techDetector = new TechDetector($html, $headers);
+            $techDetector = new TechDetector($html, $headers, $finalUrl);
             $techStack = $techDetector->detect();
         } catch (Throwable $e) {
             Logger::warning('TechDetector falló: ' . $e->getMessage());

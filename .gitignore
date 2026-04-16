@@ -4,6 +4,7 @@ frontend/dist/
 
 # Environment
 backend/.env
+deploy/output/.env
 *.db
 
 # IDE

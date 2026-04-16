@@ -132,6 +132,32 @@ class PerformanceAnalyzer {
             );
         }
 
+        // Oportunidades de mejora de PageSpeed
+        $opportunities = $this->extractOpportunities($mobileResult);
+        if (!empty($opportunities)) {
+            $oppCount = count($opportunities);
+            $totalSavings = 0;
+            $oppDetails = [];
+            foreach ($opportunities as $opp) {
+                $totalSavings += $opp['savings'];
+                $oppDetails[] = $opp['title'] . ($opp['savings'] > 0 ? ' (-' . round($opp['savings'] / 1000, 1) . 's)' : '');
+            }
+            $oppScore = $oppCount <= 2 ? 80 : ($oppCount <= 4 ? 55 : 25);
+            $savingsText = $totalSavings > 0 ? round($totalSavings / 1000, 1) . 's de ahorro potencial' : '';
+
+            $metrics[] = Scoring::createMetric(
+                'pagespeed_opportunities',
+                'Oportunidades de mejora',
+                $oppCount,
+                "$oppCount oportunidades" . ($savingsText ? " · $savingsText" : ''),
+                $oppScore,
+                "Google detectó $oppCount oportunidades de optimización: " . implode('; ', array_slice($oppDetails, 0, 5)) . ($oppCount > 5 ? "... y " . ($oppCount - 5) . " más." : '.'),
+                'Aplicar las optimizaciones sugeridas por PageSpeed para mejorar la velocidad de carga.',
+                'Implementamos todas las optimizaciones recomendadas por Google PageSpeed.',
+                ['opportunities' => $opportunities]
+            );
+        }
+
         // TTFB propio
         $ttfb = $this->fetchTime;
         $ttfbScore = $ttfb <= 200 ? 100 : ($ttfb <= 500 ? 80 : ($ttfb <= 800 ? 50 : 20));
@@ -165,19 +191,62 @@ class PerformanceAnalyzer {
         );
 
         // Cache headers
-        $hasCache = isset($this->headers['cache-control']) || isset($this->headers['etag']) || isset($this->headers['expires']);
+        $cacheControl = $this->headers['cache-control'] ?? '';
+        $hasEtag = isset($this->headers['etag']);
+        $hasExpires = isset($this->headers['expires']);
+        $hasCacheControl = !empty($cacheControl);
+
+        // Detectar cache de plugins WP por headers específicos
+        $hasCachePlugin = isset($this->headers['x-litespeed-cache'])
+            || isset($this->headers['x-cache-handler'])
+            || isset($this->headers['x-wp-cf-super-cache'])
+            || isset($this->headers['x-srcache-fetch-status'])
+            || isset($this->headers['x-nitropack-cache'])
+            || isset($this->headers['x-proxy-cache'])
+            || (isset($this->headers['x-cache']) && stripos($this->headers['x-cache'], 'HIT') !== false)
+            || (isset($this->headers['cf-cache-status']) && stripos($this->headers['cf-cache-status'], 'HIT') !== false);
+
+        // Detectar por comentarios HTML que dejan los plugins de cache
+        $htmlStr = $this->headers['_html'] ?? '';
+        $hasCacheComment = false;
+        if (!empty($htmlStr)) {
+            $hasCacheComment = str_contains($htmlStr, '<!-- This website is like a Rocket')
+                || str_contains($htmlStr, '<!-- Performance optimized by W3 Total Cache')
+                || str_contains($htmlStr, '<!-- WP Fastest Cache')
+                || str_contains($htmlStr, '<!-- Starter starter starter')
+                || str_contains($htmlStr, '<!-- Cache served by LiteSpeed')
+                || str_contains($htmlStr, '<!-- Super Cache')
+                || str_contains($htmlStr, '<!-- Starter starter starter')
+                || str_contains($htmlStr, '<!-- Starter starter starter')
+                || str_contains($htmlStr, '<!-- Starter starter starter')
+                || str_contains($htmlStr, 'data-rocket-')
+                || str_contains($htmlStr, 'rocket-lazyload');
+        }
+
+        $hasCache = $hasCacheControl || $hasEtag || $hasExpires || $hasCachePlugin || $hasCacheComment;
+
+        $cacheDetails = [];
+        if ($hasCacheControl) $cacheDetails[] = "Cache-Control: $cacheControl";
+        if ($hasEtag) $cacheDetails[] = 'ETag presente';
+        if ($hasExpires) $cacheDetails[] = 'Expires: ' . ($this->headers['expires'] ?? '');
+        if ($hasCachePlugin) $cacheDetails[] = 'Plugin de cache activo (headers de servidor)';
+        if ($hasCacheComment) $cacheDetails[] = 'Plugin de cache detectado en HTML';
+
         $cacheScore = $hasCache ? 100 : 40;
+        $cacheDisplay = $hasCache ? implode(' · ', array_slice($cacheDetails, 0, 2)) : 'No configurado';
+
         $metrics[] = Scoring::createMetric(
             'cache_headers',
             'Cache del navegador',
             $hasCache,
-            $hasCache ? 'Configurado' : 'No configurado',
+            $cacheDisplay,
             $cacheScore,
             $hasCache
-                ? 'Los headers de cache están configurados. Los archivos se almacenan en el navegador.'
-                : 'No se detectaron headers de cache. El navegador descarga todo cada vez.',
-            $hasCache ? '' : 'Configurar headers Cache-Control y Expires para archivos estáticos.',
-            'Configuramos cache agresivo para archivos estáticos con expiración optimizada.'
+                ? 'Cache configurado: ' . implode('. ', $cacheDetails) . '. Los archivos se almacenan para cargas más rápidas.'
+                : 'No se detectaron headers de cache ni plugin de cache activo. El navegador descarga todo cada vez.',
+            $hasCache ? '' : 'Instalar un plugin de cache (WP Rocket, LiteSpeed Cache) y configurar headers Cache-Control.',
+            'Configuramos cache agresivo para archivos estáticos con expiración optimizada.',
+            ['details' => $cacheDetails, 'hasCachePlugin' => $hasCachePlugin, 'hasCacheComment' => $hasCacheComment]
         );
 
         $defaults = require dirname(__DIR__) . '/config/defaults.php';
@@ -268,6 +337,38 @@ class PerformanceAnalyzer {
         $result['si'] = $audits['speed-index']['numericValue'] ?? null;
         $result['ttfb'] = $audits['server-response-time']['numericValue'] ?? null;
 
+        // Extraer oportunidades de mejora
+        $opportunityKeys = [
+            'render-blocking-resources',
+            'uses-optimized-images',
+            'uses-text-compression',
+            'uses-responsive-images',
+            'unused-javascript',
+            'unused-css-rules',
+            'offscreen-images',
+            'efficiently-encode-images',
+            'modern-image-formats',
+            'uses-long-cache-ttl',
+            'total-byte-weight',
+            'dom-size',
+            'redirects',
+            'uses-rel-preconnect',
+            'server-response-time',
+            'third-party-summary',
+        ];
+
+        $result['opportunities'] = [];
+        foreach ($opportunityKeys as $key) {
+            if (isset($audits[$key]) && isset($audits[$key]['score']) && $audits[$key]['score'] < 1) {
+                $result['opportunities'][] = [
+                    'id' => $key,
+                    'title' => $audits[$key]['title'] ?? $key,
+                    'displayValue' => $audits[$key]['displayValue'] ?? '',
+                    'savings' => $audits[$key]['details']['overallSavingsMs'] ?? 0,
+                ];
+            }
+        }
+
         return $result;
     }
 
@@ -290,5 +391,15 @@ class PerformanceAnalyzer {
      */
     public function getLcp(): ?float {
         return $this->lcp;
+    }
+
+    /**
+     * Extrae las oportunidades de mejora del resultado de PageSpeed
+     */
+    private function extractOpportunities(?array $pageSpeedResult): array {
+        if (!$pageSpeedResult || empty($pageSpeedResult['opportunities'])) {
+            return [];
+        }
+        return $pageSpeedResult['opportunities'];
     }
 }

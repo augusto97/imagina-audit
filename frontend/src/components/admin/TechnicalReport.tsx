@@ -432,10 +432,10 @@ function renderTechnicalDetails(metricId: string, details: Record<string, unknow
   if (metricId === 'ssl_valid' && (details.issuer || details.validTo)) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3 text-xs space-y-1">
-        {details.issuer && <div><span className="font-semibold">Emisor:</span> {String(details.issuer)}</div>}
-        {details.protocol && <div><span className="font-semibold">Protocolo:</span> {String(details.protocol)}</div>}
-        {details.validFrom && <div><span className="font-semibold">Válido desde:</span> {String(details.validFrom)}</div>}
-        {details.validTo && <div><span className="font-semibold">Expira:</span> <span className={Number(details.daysRemaining) < 30 ? 'text-red-600 font-bold' : ''}>{String(details.validTo)} ({String(details.daysRemaining)} días restantes)</span></div>}
+        {details.issuer != null && <div><span className="font-semibold">Emisor:</span> {String(details.issuer)}</div>}
+        {details.protocol != null && <div><span className="font-semibold">Protocolo:</span> {String(details.protocol)}</div>}
+        {details.validFrom != null && <div><span className="font-semibold">Válido desde:</span> {String(details.validFrom)}</div>}
+        {details.validTo != null && <div><span className="font-semibold">Expira:</span> <span className={Number(details.daysRemaining) < 30 ? 'text-red-600 font-bold' : ''}>{String(details.validTo)} ({String(details.daysRemaining)} días restantes)</span></div>}
       </div>
     )
   }
@@ -472,8 +472,8 @@ function renderTechnicalDetails(metricId: string, details: Record<string, unknow
   if (metricId === 'wp_theme' && (details.themeName || details.childTheme !== undefined)) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3 text-xs space-y-1">
-        {details.themeName && <div><span className="font-semibold">Tema:</span> {String(details.themeName)}</div>}
-        {details.themeVersion && <div><span className="font-semibold">Versión:</span> {String(details.themeVersion)}</div>}
+        {details.themeName != null && <div><span className="font-semibold">Tema:</span> {String(details.themeName)}</div>}
+        {details.themeVersion != null && <div><span className="font-semibold">Versión:</span> {String(details.themeVersion)}</div>}
         <div><span className="font-semibold">Child theme:</span> {details.childTheme ? <span className="text-emerald-600">Sí</span> : <span className="text-amber-600">No — Las personalizaciones se perderán al actualizar el tema</span>}</div>
       </div>
     )

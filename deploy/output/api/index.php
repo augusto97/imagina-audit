@@ -102,6 +102,10 @@ switch ($endpoint) {
         require __DIR__ . '/admin/vulnerabilities.php';
         break;
 
+    case 'admin/checklist':
+        require __DIR__ . '/admin/checklist.php';
+        break;
+
     default:
         Response::error('Endpoint no encontrado', 404);
 }
