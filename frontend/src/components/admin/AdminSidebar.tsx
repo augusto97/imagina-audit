@@ -40,7 +40,7 @@ export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSid
   return (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className={cn("py-3 border-b border-[#e5e5e5]", collapsed ? "px-2 flex justify-center" : "px-4")}>
+      <div className={cn("h-11 flex items-center border-b border-[#e5e5e5]", collapsed ? "px-2 justify-center" : "px-4")}>
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--accent-primary)] to-[#0a9db8]">
             <Shield className="h-4 w-4 text-white" strokeWidth={2} />
