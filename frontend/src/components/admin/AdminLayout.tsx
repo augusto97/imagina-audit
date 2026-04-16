@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Menu, X, Shield, PanelLeftClose, PanelLeft } from 'lucide-react'
+import { Menu, X, PanelLeftClose, PanelLeft, ExternalLink } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import AdminSidebar from './AdminSidebar'
@@ -14,23 +14,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="flex h-screen bg-white">
-      {/* Sidebar desktop */}
+      {/* Sidebar desktop — dark */}
       <aside
-        className={`hidden md:flex flex-col shrink-0 bg-white border-r border-[var(--border-default)] transition-all duration-300 ${collapsed ? 'w-[68px]' : 'w-[260px]'}`}
+        className={`hidden md:flex flex-col shrink-0 bg-[#1a1a2e] transition-all duration-300 ${collapsed ? 'w-[60px]' : 'w-[220px]'}`}
       >
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <AdminSidebar collapsed={collapsed} />
         </div>
-        <div className="border-t border-[var(--border-default)] p-2">
-          <Button
-            variant="ghost"
-            size="sm"
+        <div className="border-t border-white/10 p-2">
+          <button
             onClick={() => setCollapsed(!collapsed)}
-            className={`w-full ${collapsed ? 'justify-center px-0' : 'justify-start'}`}
+            className={`flex items-center rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors w-full cursor-pointer ${collapsed ? 'justify-center p-2' : 'gap-2 px-3 py-2'}`}
           >
-            {collapsed ? <PanelLeft className="h-4 w-4" strokeWidth={1.5} /> : <PanelLeftClose className="h-4 w-4" strokeWidth={1.5} />}
-            {!collapsed && <span className="ml-1 text-xs">Colapsar</span>}
-          </Button>
+            {collapsed ? <PanelLeft className="h-3.5 w-3.5" strokeWidth={1.5} /> : <PanelLeftClose className="h-3.5 w-3.5" strokeWidth={1.5} />}
+            {!collapsed && <span>Colapsar</span>}
+          </button>
         </div>
       </aside>
 
@@ -42,19 +40,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/50"
               onClick={() => setMobileOpen(false)}
             />
             <motion.aside
-              initial={{ x: -280 }}
+              initial={{ x: -240 }}
               animate={{ x: 0 }}
-              exit={{ x: -280 }}
+              exit={{ x: -240 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative z-10 h-full w-[260px] bg-white shadow-2xl"
+              className="relative z-10 h-full w-[220px] bg-[#1a1a2e] shadow-2xl"
             >
               <button
                 onClick={() => setMobileOpen(false)}
-                className="absolute right-3 top-5 rounded-lg p-1.5 text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] cursor-pointer"
+                className="absolute right-3 top-4 rounded-md p-1 text-gray-400 hover:text-white cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -66,28 +64,28 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Mobile header */}
-        <header className="flex h-14 items-center gap-3 border-b border-[var(--border-default)] bg-white px-4 md:hidden">
-          <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] active:scale-95 transition-all cursor-pointer">
-            <Menu className="h-5 w-5" strokeWidth={1.5} />
-          </button>
+        {/* Top bar — always visible */}
+        <header className="flex h-12 items-center justify-between border-b border-[var(--border-default)] bg-white px-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setMobileOpen(true)} className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 md:hidden cursor-pointer">
+              <Menu className="h-5 w-5" strokeWidth={1.5} />
+            </button>
+            <span className="text-sm font-semibold text-gray-900">Imagina Audit</span>
+            <span className="text-xs text-gray-400">Panel de administración</span>
+          </div>
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--accent-primary)] to-[#0a9db8]">
-              <Shield className="h-4 w-4 text-white" strokeWidth={2} />
-            </div>
-            <span className="text-sm font-bold text-[var(--text-primary)]">Admin</span>
+            <a href="/" target="_blank" rel="noreferrer">
+              <Button variant="ghost" size="sm" className="text-gray-500 text-xs h-8">
+                <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
+                <span className="hidden sm:inline">Ver herramienta</span>
+              </Button>
+            </a>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
-          <div className="p-5 sm:p-8">
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              {children}
-            </motion.div>
+        <main className="flex-1 overflow-y-auto bg-[#fafafa]">
+          <div className="p-5 sm:p-6">
+            {children}
           </div>
         </main>
       </div>
