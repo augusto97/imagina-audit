@@ -13,7 +13,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
-    <div className="flex h-screen bg-[#F4F6F8]">
+    <div className="flex h-screen bg-white">
       {/* Sidebar desktop */}
       <aside
         className={`hidden md:flex flex-col shrink-0 bg-white border-r border-[var(--border-default)] transition-all duration-300 ${collapsed ? 'w-[68px]' : 'w-[260px]'}`}
@@ -80,7 +80,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-6xl p-5 sm:p-8">
+          <div className="p-5 sm:p-8">
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
