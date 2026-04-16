@@ -132,6 +132,32 @@ class PerformanceAnalyzer {
             );
         }
 
+        // Oportunidades de mejora de PageSpeed
+        $opportunities = $this->extractOpportunities($mobileResult);
+        if (!empty($opportunities)) {
+            $oppCount = count($opportunities);
+            $totalSavings = 0;
+            $oppDetails = [];
+            foreach ($opportunities as $opp) {
+                $totalSavings += $opp['savings'];
+                $oppDetails[] = $opp['title'] . ($opp['savings'] > 0 ? ' (-' . round($opp['savings'] / 1000, 1) . 's)' : '');
+            }
+            $oppScore = $oppCount <= 2 ? 80 : ($oppCount <= 4 ? 55 : 25);
+            $savingsText = $totalSavings > 0 ? round($totalSavings / 1000, 1) . 's de ahorro potencial' : '';
+
+            $metrics[] = Scoring::createMetric(
+                'pagespeed_opportunities',
+                'Oportunidades de mejora',
+                $oppCount,
+                "$oppCount oportunidades" . ($savingsText ? " · $savingsText" : ''),
+                $oppScore,
+                "Google detectó $oppCount oportunidades de optimización: " . implode('; ', array_slice($oppDetails, 0, 5)) . ($oppCount > 5 ? "... y " . ($oppCount - 5) . " más." : '.'),
+                'Aplicar las optimizaciones sugeridas por PageSpeed para mejorar la velocidad de carga.',
+                'Implementamos todas las optimizaciones recomendadas por Google PageSpeed.',
+                ['opportunities' => $opportunities]
+            );
+        }
+
         // TTFB propio
         $ttfb = $this->fetchTime;
         $ttfbScore = $ttfb <= 200 ? 100 : ($ttfb <= 500 ? 80 : ($ttfb <= 800 ? 50 : 20));
@@ -268,6 +294,38 @@ class PerformanceAnalyzer {
         $result['si'] = $audits['speed-index']['numericValue'] ?? null;
         $result['ttfb'] = $audits['server-response-time']['numericValue'] ?? null;
 
+        // Extraer oportunidades de mejora
+        $opportunityKeys = [
+            'render-blocking-resources',
+            'uses-optimized-images',
+            'uses-text-compression',
+            'uses-responsive-images',
+            'unused-javascript',
+            'unused-css-rules',
+            'offscreen-images',
+            'efficiently-encode-images',
+            'modern-image-formats',
+            'uses-long-cache-ttl',
+            'total-byte-weight',
+            'dom-size',
+            'redirects',
+            'uses-rel-preconnect',
+            'server-response-time',
+            'third-party-summary',
+        ];
+
+        $result['opportunities'] = [];
+        foreach ($opportunityKeys as $key) {
+            if (isset($audits[$key]) && isset($audits[$key]['score']) && $audits[$key]['score'] < 1) {
+                $result['opportunities'][] = [
+                    'id' => $key,
+                    'title' => $audits[$key]['title'] ?? $key,
+                    'displayValue' => $audits[$key]['displayValue'] ?? '',
+                    'savings' => $audits[$key]['details']['overallSavingsMs'] ?? 0,
+                ];
+            }
+        }
+
         return $result;
     }
 
@@ -290,5 +348,15 @@ class PerformanceAnalyzer {
      */
     public function getLcp(): ?float {
         return $this->lcp;
+    }
+
+    /**
+     * Extrae las oportunidades de mejora del resultado de PageSpeed
+     */
+    private function extractOpportunities(?array $pageSpeedResult): array {
+        if (!$pageSpeedResult || empty($pageSpeedResult['opportunities'])) {
+            return [];
+        }
+        return $pageSpeedResult['opportunities'];
     }
 }

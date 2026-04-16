@@ -16,10 +16,10 @@ function AccordionItem({ title, children, defaultOpen = false, className }: Acco
     <div className={cn('border-b border-[var(--border-default)]', className)}>
       <button
         type="button"
-        className="flex w-full items-center justify-between py-4 text-left text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent-primary)] transition-colors cursor-pointer"
+        className="flex w-full items-center justify-between py-4 text-left text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent-primary)] transition-colors cursor-pointer min-w-0 overflow-hidden"
         onClick={() => setOpen(!open)}
       >
-        {title}
+        <div className="flex-1 min-w-0 overflow-hidden">{title}</div>
         <ChevronDown
           className={cn(
             'h-4 w-4 shrink-0 text-[var(--text-tertiary)] transition-transform duration-200',

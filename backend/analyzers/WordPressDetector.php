@@ -128,6 +128,10 @@ class WordPressDetector {
             ['plugins' => $pluginsList]
         );
 
+        // Enumeración de usuarios vía /?author=1
+        $userEnumResult = $this->checkUserEnumeration();
+        $metrics[] = $userEnumResult;
+
         // REST API expuesta
         $restApiExposed = $this->checkRestApiUsers();
         $restScore = $restApiExposed ? 0 : 100;
@@ -390,16 +394,62 @@ class WordPressDetector {
     }
 
     /**
+     * Verifica enumeración de usuarios vía /?author=1
+     */
+    private function checkUserEnumeration(): array {
+        // Fetch /?author=1 sin seguir redirects
+        $response = Fetcher::get($this->url . '/?author=1', 5, false, 0);
+
+        $exposed = false;
+        $username = null;
+
+        // Si redirige a /author/NOMBRE/, el username está expuesto
+        if (in_array($response['statusCode'], [301, 302])) {
+            $location = $response['headers']['location'] ?? '';
+            if (preg_match('#/author/([^/]+)/?#i', $location, $m)) {
+                $exposed = true;
+                $username = $m[1];
+            }
+        }
+
+        // Si retorna 200 y contiene /author/ en el body
+        if (!$exposed && $response['statusCode'] === 200) {
+            if (preg_match('#/author/([a-z0-9_-]+)/?#i', $response['body'] ?? '', $m)) {
+                $exposed = true;
+                $username = $m[1];
+            }
+        }
+
+        $score = $exposed ? 30 : 100;
+        return Scoring::createMetric(
+            'user_enumeration',
+            'Enumeración de usuarios',
+            $exposed,
+            $exposed ? "Expuesto" . ($username ? " ($username)" : '') : 'Protegido',
+            $score,
+            $exposed
+                ? 'La enumeración de usuarios está activa. Se detectó el username "' . ($username ?? '?') . '" vía /?author=1. Los atacantes pueden usar estos nombres de usuario para ataques de fuerza bruta.'
+                : 'La enumeración de usuarios vía /?author=1 está protegida o deshabilitada.',
+            $exposed ? 'Bloquear la enumeración de usuarios con un plugin de seguridad o regla en .htaccess.' : '',
+            'Bloqueamos la enumeración de usuarios y protegemos contra ataques de fuerza bruta.'
+        );
+    }
+
+    /**
      * Verifica archivos sensibles accesibles
      */
     private function checkSensitiveFiles(): array {
         $found = [];
         $filesToCheck = [
             '/wp-config.php.bak',
+            '/wp-config.old',
+            '/wp-config.txt',
             '/.env',
             '/debug.log',
             '/wp-content/debug.log',
             '/error_log',
+            '/backup.zip',
+            '/wp-content/backups/',
         ];
 
         foreach ($filesToCheck as $file) {
