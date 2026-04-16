@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Search, Eye, MessageCircle, Trash2, Copy, ChevronLeft, ChevronRight, SearchX, Download } from 'lucide-react'
+import { Search, Eye, MessageCircle, Trash2, Copy, ChevronLeft, ChevronRight, SearchX, Download, FileText } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ interface Lead {
 }
 
 export default function LeadsTable() {
+  const navigate = useNavigate()
   const { fetchLeads, deleteLead } = useAdmin()
   const [leads, setLeads] = useState<Lead[]>([])
   const [total, setTotal] = useState(0)
@@ -154,6 +156,7 @@ export default function LeadsTable() {
                       <td className="px-4 py-2.5">
                         <div className="flex gap-1">
                           <a href={`/results/${l.id}`} target="_blank" rel="noreferrer"><Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3.5 w-3.5" strokeWidth={1.5} /></Button></a>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-[var(--accent-primary)]" onClick={() => navigate(`/admin/leads/${l.id}/report`)}><FileText className="h-3.5 w-3.5" strokeWidth={1.5} /></Button>
                           {l.leadEmail && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyEmail(l.leadEmail!)}><Copy className="h-3.5 w-3.5" strokeWidth={1.5} /></Button>}
                           {l.leadWhatsapp && <a href={`https://wa.me/${l.leadWhatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer"><Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-500"><MessageCircle className="h-3.5 w-3.5" strokeWidth={1.5} /></Button></a>}
                           {deleteId === l.id ? (
