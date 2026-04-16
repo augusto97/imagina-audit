@@ -4,8 +4,10 @@ import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useAdmin } from '@/hooks/useAdmin'
 
 interface Plan { name: string; price: string; currency: string }
@@ -53,16 +55,21 @@ export default function SettingsPlans() {
         <CardContent className="space-y-3">
           {plans.map((plan, idx) => (
             <div key={idx} className="flex flex-wrap items-center gap-2">
-              <Input value={plan.name} onChange={(e) => updatePlan(idx, 'name', e.target.value)} placeholder="Nombre" className="w-40" />
-              <Input value={plan.price} onChange={(e) => updatePlan(idx, 'price', e.target.value)} placeholder="Precio" className="w-28" />
-              <select value={plan.currency} onChange={(e) => updatePlan(idx, 'currency', e.target.value)}
-                className="h-10 rounded-xl border border-[var(--border-default)] bg-white px-3 text-sm">
-                <option value="USD">USD</option>
-                <option value="COP">COP</option>
-                <option value="EUR">EUR</option>
-              </select>
+              <div className="space-y-1"><Label className="text-xs">Nombre</Label><Input value={plan.name} onChange={(e) => updatePlan(idx, 'name', e.target.value)} placeholder="Nombre" className="w-40" /></div>
+              <div className="space-y-1"><Label className="text-xs">Precio</Label><Input value={plan.price} onChange={(e) => updatePlan(idx, 'price', e.target.value)} placeholder="Precio" className="w-28" /></div>
+              <div className="space-y-1">
+                <Label className="text-xs">Moneda</Label>
+                <Select value={plan.currency} onValueChange={(v) => updatePlan(idx, 'currency', v)}>
+                  <SelectTrigger className="w-[90px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="COP">COP</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {plans.length > 1 && (
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400" onClick={() => removePlan(idx)}><X className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400 mt-5" onClick={() => removePlan(idx)}><X className="h-4 w-4" /></Button>
               )}
             </div>
           ))}

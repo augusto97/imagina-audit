@@ -1,12 +1,15 @@
 import { useEffect, useState, useCallback } from 'react'
-import { motion } from 'framer-motion'
-import { Search, Eye, MessageCircle, Trash2, Copy, ChevronLeft, ChevronRight, SearchX, Download, FileText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { Search, Eye, MessageCircle, Trash2, Copy, ChevronLeft, ChevronRight, SearchX, Download, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { useAdmin } from '@/hooks/useAdmin'
 import { getLevelClassName } from '@/lib/utils'
 import api from '@/lib/api'
@@ -15,6 +18,10 @@ interface Lead {
   id: string; url: string; domain: string; leadName: string | null
   leadEmail: string | null; leadWhatsapp: string | null; globalScore: number
   globalLevel: string; createdAt: string; hasContactInfo: boolean
+}
+
+const levelBadge: Record<string, 'destructive' | 'warning' | 'success' | 'secondary'> = {
+  critical: 'destructive', warning: 'warning', good: 'success', excellent: 'success', info: 'secondary', unknown: 'secondary',
 }
 
 export default function LeadsTable() {
@@ -37,13 +44,12 @@ export default function LeadsTable() {
       setLeads(data.leads)
       setTotal(data.total)
       setTotalPages(data.totalPages)
-    } catch { /* manejado por useAdmin */ }
+    } catch { /* handled */ }
     setLoading(false)
   }, [fetchLeads, page, filter, sort, search])
 
   useEffect(() => { loadLeads() }, [loadLeads])
 
-  // Debounce de búsqueda
   const [searchInput, setSearchInput] = useState('')
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 500)
@@ -68,10 +74,7 @@ export default function LeadsTable() {
   const exportCsv = async () => {
     setExporting(true)
     try {
-      const res = await api.get('/admin/export-leads.php', {
-        params: { filter, search },
-        responseType: 'blob',
-      })
+      const res = await api.get('/admin/export-leads.php', { params: { filter, search }, responseType: 'blob' })
       const url = URL.createObjectURL(res.data)
       const a = document.createElement('a')
       a.href = url
@@ -84,104 +87,151 @@ export default function LeadsTable() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Leads y Auditorías</h1>
-      </div>
+    <div className="space-y-5">
+      <h1 className="text-2xl font-bold text-[var(--text-primary)]">Leads y Auditorías</h1>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap items-center gap-3">
-        <select value={filter} onChange={(e) => { setFilter(e.target.value); setPage(1) }}
-          className="h-10 rounded-xl border border-[var(--border-default)] bg-white px-3 text-sm text-[var(--text-primary)]">
-          <option value="all">Todos</option>
-          <option value="with_contact">Con contacto</option>
-          <option value="critical">Score crítico</option>
-          <option value="warning">Score bajo</option>
-          <option value="this_week">Esta semana</option>
-          <option value="this_month">Este mes</option>
-        </select>
-        <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1) }}
-          className="h-10 rounded-xl border border-[var(--border-default)] bg-white px-3 text-sm text-[var(--text-primary)]">
-          <option value="date_desc">Más recientes</option>
-          <option value="date_asc">Más antiguos</option>
-          <option value="score_asc">Peor score</option>
-          <option value="score_desc">Mejor score</option>
-        </select>
+      {/* Filters bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={filter} onValueChange={(v) => { setFilter(v); setPage(1) }}>
+          <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="with_contact">Con contacto</SelectItem>
+            <SelectItem value="critical">Score crítico</SelectItem>
+            <SelectItem value="warning">Score bajo</SelectItem>
+            <SelectItem value="this_week">Esta semana</SelectItem>
+            <SelectItem value="this_month">Este mes</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={sort} onValueChange={(v) => { setSort(v); setPage(1) }}>
+          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="date_desc">Más recientes</SelectItem>
+            <SelectItem value="date_asc">Más antiguos</SelectItem>
+            <SelectItem value="score_asc">Peor score</SelectItem>
+            <SelectItem value="score_desc">Mejor score</SelectItem>
+          </SelectContent>
+        </Select>
+
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />
-          <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar por dominio, nombre o email..." className="pl-10" />
+          <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar por dominio, nombre o email..." className="pl-9" />
         </div>
+
         <Button variant="outline" size="sm" onClick={exportCsv} disabled={exporting}>
           <Download className="h-4 w-4" strokeWidth={1.5} />
           <span className="hidden sm:inline">{exporting ? 'Exportando...' : 'CSV'}</span>
         </Button>
       </div>
 
-      <Card>
+      {/* Table */}
+      <Card className="py-0 overflow-hidden">
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-6 space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 rounded-lg" />)}</div>
+            <div className="p-6 space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-11 rounded-lg" />)}</div>
           ) : leads.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-[var(--text-tertiary)]">
+            <div className="flex flex-col items-center gap-3 py-16 text-[var(--text-tertiary)]">
               <SearchX className="h-10 w-10" strokeWidth={1} />
               <p className="text-sm">No se encontraron resultados</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-tertiary)]">
-                    <th className="px-4 py-3">Fecha</th>
-                    <th className="px-4 py-3">Dominio</th>
-                    <th className="px-4 py-3">Nombre</th>
-                    <th className="px-4 py-3">Email</th>
-                    <th className="px-4 py-3">WhatsApp</th>
-                    <th className="px-4 py-3">Score</th>
-                    <th className="px-4 py-3">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leads.map((l) => (
-                    <motion.tr key={l.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="border-b border-[var(--border-default)] last:border-0 hover:bg-[var(--bg-tertiary)]/50">
-                      <td className="px-4 py-2.5 text-xs text-[var(--text-tertiary)] whitespace-nowrap">
-                        {new Date(l.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                      </td>
-                      <td className="px-4 py-2.5 font-medium">
-                        <a href={l.url} target="_blank" rel="noreferrer" className="text-[var(--accent-primary)] hover:underline">{l.domain}</a>
-                      </td>
-                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{l.leadName || '—'}</td>
-                      <td className="px-4 py-2.5">{l.leadEmail ? <button onClick={() => copyEmail(l.leadEmail!)} className="text-[var(--accent-primary)] hover:underline text-xs truncate max-w-[150px] block cursor-pointer">{l.leadEmail}</button> : <span className="text-[var(--text-tertiary)]">—</span>}</td>
-                      <td className="px-4 py-2.5">{l.leadWhatsapp ? <a href={`https://wa.me/${l.leadWhatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline text-xs">{l.leadWhatsapp}</a> : <span className="text-[var(--text-tertiary)]">—</span>}</td>
-                      <td className="px-4 py-2.5"><span className={`font-bold ${getLevelClassName(l.globalLevel)}`}>{l.globalScore}</span></td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex gap-1">
-                          <a href={`/results/${l.id}`} target="_blank" rel="noreferrer"><Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3.5 w-3.5" strokeWidth={1.5} /></Button></a>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-[var(--accent-primary)]" onClick={() => navigate(`/admin/leads/${l.id}/report`)}><FileText className="h-3.5 w-3.5" strokeWidth={1.5} /></Button>
-                          {l.leadEmail && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyEmail(l.leadEmail!)}><Copy className="h-3.5 w-3.5" strokeWidth={1.5} /></Button>}
-                          {l.leadWhatsapp && <a href={`https://wa.me/${l.leadWhatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer"><Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-500"><MessageCircle className="h-3.5 w-3.5" strokeWidth={1.5} /></Button></a>}
-                          {deleteId === l.id ? (
-                            <div className="flex gap-1">
-                              <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => handleDelete(l.id)}>Confirmar</Button>
-                              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setDeleteId(null)}>Cancelar</Button>
-                            </div>
-                          ) : (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600" onClick={() => setDeleteId(l.id)}><Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} /></Button>
-                          )}
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Dominio</TableHead>
+                  <TableHead className="hidden md:table-cell">Nombre</TableHead>
+                  <TableHead className="hidden lg:table-cell">Email</TableHead>
+                  <TableHead className="hidden lg:table-cell">WhatsApp</TableHead>
+                  <TableHead>Score</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {leads.map((l) => (
+                  <TableRow key={l.id}>
+                    <TableCell className="text-xs text-[var(--text-tertiary)] whitespace-nowrap">
+                      {new Date(l.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      <a href={l.url} target="_blank" rel="noreferrer" className="text-[var(--accent-primary)] hover:underline">{l.domain}</a>
+                    </TableCell>
+                    <TableCell className="text-[var(--text-secondary)] hidden md:table-cell">{l.leadName || '—'}</TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      {l.leadEmail ? (
+                        <button onClick={() => copyEmail(l.leadEmail!)} className="text-[var(--accent-primary)] hover:underline text-xs truncate max-w-[150px] block cursor-pointer">{l.leadEmail}</button>
+                      ) : <span className="text-[var(--text-tertiary)]">—</span>}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      {l.leadWhatsapp ? (
+                        <a href={`https://wa.me/${l.leadWhatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline text-xs">{l.leadWhatsapp}</a>
+                      ) : <span className="text-[var(--text-tertiary)]">—</span>}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={levelBadge[l.globalLevel] || 'secondary'} className={getLevelClassName(l.globalLevel)}>
+                        {l.globalScore}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-0.5">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <a href={`/results/${l.id}`} target="_blank" rel="noreferrer"><Button variant="ghost" size="icon" className="h-8 w-8"><Eye className="h-4 w-4" strokeWidth={1.5} /></Button></a>
+                          </TooltipTrigger>
+                          <TooltipContent>Ver informe</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--accent-primary)]" onClick={() => navigate(`/admin/leads/${l.id}/report`)}><FileText className="h-4 w-4" strokeWidth={1.5} /></Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Reporte técnico</TooltipContent>
+                        </Tooltip>
+                        {l.leadEmail && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyEmail(l.leadEmail!)}><Copy className="h-4 w-4" strokeWidth={1.5} /></Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Copiar email</TooltipContent>
+                          </Tooltip>
+                        )}
+                        {l.leadWhatsapp && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <a href={`https://wa.me/${l.leadWhatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer"><Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-500"><MessageCircle className="h-4 w-4" strokeWidth={1.5} /></Button></a>
+                            </TooltipTrigger>
+                            <TooltipContent>WhatsApp</TooltipContent>
+                          </Tooltip>
+                        )}
+                        {deleteId === l.id ? (
+                          <div className="flex gap-1">
+                            <Button variant="destructive" size="sm" className="h-8 text-xs" onClick={() => handleDelete(l.id)}>Confirmar</Button>
+                            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setDeleteId(null)}>Cancelar</Button>
+                          </div>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-600" onClick={() => setDeleteId(l.id)}><Trash2 className="h-4 w-4" strokeWidth={1.5} /></Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Eliminar</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
 
-      {/* Paginación */}
+      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-sm">
-          <span className="text-[var(--text-tertiary)]">Mostrando {(page - 1) * 20 + 1}-{Math.min(page * 20, total)} de {total}</span>
+          <span className="text-[var(--text-tertiary)]">
+            {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} de {total}
+          </span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
               <ChevronLeft className="h-4 w-4" /> Anterior
