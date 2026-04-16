@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Settings, MessageSquare,
-  CreditCard, SlidersHorizontal, ShieldAlert, LogOut, Shield,
+  CreditCard, SlidersHorizontal, ShieldAlert, LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -43,27 +43,28 @@ export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSid
   return (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className={cn("py-4 border-b border-white/10", collapsed ? "px-3 flex justify-center" : "px-4")}>
+      <div className={cn("py-3 border-b border-gray-200", collapsed ? "px-2 flex justify-center" : "px-4")}>
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-primary)]">
-            <Shield className="h-4 w-4 text-white" strokeWidth={2} />
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-orange-500 text-white text-xs font-bold">
+            IA
           </div>
           {!collapsed && (
-            <span className="text-sm font-semibold text-white">Imagina Audit</span>
+            <span className="text-sm font-semibold text-gray-900">Imagina Audit</span>
           )}
         </div>
       </div>
 
       {/* Nav */}
-      <nav className={cn("flex-1 overflow-y-auto py-3", collapsed ? "px-2" : "px-3")}>
+      <nav className={cn("flex-1 overflow-y-auto py-2", collapsed ? "px-1.5" : "px-2")}>
         {navSections.map((section) => (
-          <div key={section.title} className="mb-3">
+          <div key={section.title} className="mb-2">
             {!collapsed && (
-              <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-widest text-gray-500">
+              <p className="mb-0.5 px-2 pt-2 text-[11px] font-medium text-gray-400 uppercase tracking-wide">
                 {section.title}
               </p>
             )}
-            <div className="space-y-0.5">
+            {collapsed && <div className="my-1 mx-1 border-t border-gray-100" />}
+            <div className="space-y-px">
               {section.items.map(({ to, icon: Icon, label }) => {
                 const link = (
                   <NavLink
@@ -72,11 +73,11 @@ export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSid
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       cn(
-                        'group flex items-center rounded-md text-[13px] font-medium transition-colors',
-                        collapsed ? 'justify-center p-2' : 'gap-2.5 px-2 py-1.5',
+                        'group flex items-center rounded text-[13px] transition-colors',
+                        collapsed ? 'justify-center p-2' : 'gap-2 px-2 py-1.5',
                         isActive
-                          ? 'bg-white/15 text-white'
-                          : 'text-gray-400 hover:bg-white/8 hover:text-gray-200'
+                          ? 'bg-gray-100 text-gray-900 font-medium'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       )
                     }
                   >
@@ -101,11 +102,11 @@ export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSid
       </nav>
 
       {/* Logout */}
-      <div className={cn("border-t border-white/10 py-2", collapsed ? "px-2" : "px-3")}>
+      <div className={cn("border-t border-gray-200 py-1.5", collapsed ? "px-1.5" : "px-2")}>
         {collapsed ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <button onClick={logout} className="flex w-full items-center justify-center rounded-md p-2 text-gray-500 hover:bg-white/8 hover:text-red-400 transition-colors cursor-pointer">
+              <button onClick={logout} className="flex w-full items-center justify-center rounded p-2 text-gray-400 hover:bg-gray-50 hover:text-red-500 transition-colors cursor-pointer">
                 <LogOut className="h-4 w-4" strokeWidth={1.5} />
               </button>
             </TooltipTrigger>
@@ -114,7 +115,7 @@ export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSid
         ) : (
           <button
             onClick={logout}
-            className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-gray-500 hover:bg-white/8 hover:text-red-400 transition-colors cursor-pointer"
+            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-[13px] text-gray-500 hover:bg-gray-50 hover:text-red-500 transition-colors cursor-pointer"
           >
             <LogOut className="h-4 w-4" strokeWidth={1.5} />
             Cerrar sesión

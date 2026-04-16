@@ -14,19 +14,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="flex h-screen bg-white">
-      {/* Sidebar desktop — dark */}
+      {/* Sidebar desktop */}
       <aside
-        className={`hidden md:flex flex-col shrink-0 bg-[#1a1a2e] transition-all duration-300 ${collapsed ? 'w-[60px]' : 'w-[220px]'}`}
+        className={`hidden md:flex flex-col shrink-0 bg-white border-r border-gray-200 transition-all duration-300 ${collapsed ? 'w-[60px]' : 'w-[210px]'}`}
       >
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <AdminSidebar collapsed={collapsed} />
         </div>
-        <div className="border-t border-white/10 p-2">
+        <div className="border-t border-gray-200 p-1.5">
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className={`flex items-center rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors w-full cursor-pointer ${collapsed ? 'justify-center p-2' : 'gap-2 px-3 py-2'}`}
+            className={`flex items-center rounded text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors w-full cursor-pointer ${collapsed ? 'justify-center p-2' : 'gap-2 px-3 py-1.5'}`}
           >
-            {collapsed ? <PanelLeft className="h-3.5 w-3.5" strokeWidth={1.5} /> : <PanelLeftClose className="h-3.5 w-3.5" strokeWidth={1.5} />}
+            {collapsed ? <PanelLeft className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
             {!collapsed && <span>Colapsar</span>}
           </button>
         </div>
@@ -40,19 +40,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/50"
+              className="absolute inset-0 bg-black/30"
               onClick={() => setMobileOpen(false)}
             />
             <motion.aside
-              initial={{ x: -240 }}
+              initial={{ x: -220 }}
               animate={{ x: 0 }}
-              exit={{ x: -240 }}
+              exit={{ x: -220 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative z-10 h-full w-[220px] bg-[#1a1a2e] shadow-2xl"
+              className="relative z-10 h-full w-[210px] bg-white border-r border-gray-200 shadow-lg"
             >
               <button
                 onClick={() => setMobileOpen(false)}
-                className="absolute right-3 top-4 rounded-md p-1 text-gray-400 hover:text-white cursor-pointer"
+                className="absolute right-2 top-3 rounded p-1 text-gray-400 hover:text-gray-600 cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -64,26 +64,24 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top bar — always visible */}
-        <header className="flex h-12 items-center justify-between border-b border-[var(--border-default)] bg-white px-4 sm:px-6">
+        {/* Top bar */}
+        <header className="flex h-11 items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-5">
           <div className="flex items-center gap-3">
-            <button onClick={() => setMobileOpen(true)} className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 md:hidden cursor-pointer">
-              <Menu className="h-5 w-5" strokeWidth={1.5} />
+            <button onClick={() => setMobileOpen(true)} className="rounded p-1 text-gray-500 hover:bg-gray-100 md:hidden cursor-pointer">
+              <Menu className="h-5 w-5" />
             </button>
-            <span className="text-sm font-semibold text-gray-900">Imagina Audit</span>
-            <span className="text-xs text-gray-400">Panel de administración</span>
+            <span className="text-sm font-medium text-gray-900">Imagina Audit</span>
+            <span className="hidden sm:inline text-xs text-gray-400">Panel de administración</span>
           </div>
-          <div className="flex items-center gap-2">
-            <a href="/" target="_blank" rel="noreferrer">
-              <Button variant="ghost" size="sm" className="text-gray-500 text-xs h-8">
-                <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
-                <span className="hidden sm:inline">Ver herramienta</span>
-              </Button>
-            </a>
-          </div>
+          <a href="/" target="_blank" rel="noreferrer">
+            <Button variant="ghost" size="sm" className="text-gray-500 text-xs h-7 px-2">
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Ver herramienta</span>
+            </Button>
+          </a>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-[#fafafa]">
+        <main className="flex-1 overflow-y-auto">
           <div className="p-5 sm:p-6">
             {children}
           </div>
