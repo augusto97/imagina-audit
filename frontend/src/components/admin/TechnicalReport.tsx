@@ -59,7 +59,7 @@ export default function TechnicalReport() {
   const warningMetrics = getAllMetricsByLevel(result, 'warning')
 
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="space-y-8">
       <ReportHeader result={result} onBack={() => navigate('/admin/leads')} />
       <ExecutiveSummary result={result} criticalCount={criticalMetrics.length} warningCount={warningMetrics.length} />
       {result.techStack && <TechStackSummary techStack={result.techStack} scanDuration={result.scanDurationMs} />}

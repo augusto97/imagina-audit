@@ -5,13 +5,11 @@ import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { useAdmin } from '@/hooks/useAdmin'
-import { getLevelClassName } from '@/lib/utils'
 import api from '@/lib/api'
 
 interface Lead {
@@ -20,8 +18,18 @@ interface Lead {
   globalLevel: string; createdAt: string; hasContactInfo: boolean
 }
 
-const levelBadge: Record<string, 'destructive' | 'warning' | 'success' | 'secondary'> = {
-  critical: 'destructive', warning: 'warning', good: 'success', excellent: 'success', info: 'secondary', unknown: 'secondary',
+function ScorePill({ score, level }: { score: number; level: string }) {
+  const colors: Record<string, string> = {
+    critical: 'bg-red-100 text-red-700 ring-red-200',
+    warning: 'bg-amber-100 text-amber-700 ring-amber-200',
+    good: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
+    excellent: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
+  }
+  return (
+    <span className={`inline-flex items-center justify-center min-w-[40px] rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${colors[level] || 'bg-gray-100 text-gray-600 ring-gray-200'}`}>
+      {score}
+    </span>
+  )
 }
 
 export default function LeadsTable() {
@@ -169,9 +177,7 @@ export default function LeadsTable() {
                       ) : <span className="text-[var(--text-tertiary)]">—</span>}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={levelBadge[l.globalLevel] || 'secondary'} className={getLevelClassName(l.globalLevel)}>
-                        {l.globalScore}
-                      </Badge>
+                      <ScorePill score={l.globalScore} level={l.globalLevel} />
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-0.5">
