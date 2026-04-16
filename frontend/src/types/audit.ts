@@ -106,6 +106,21 @@ export interface AuditResult {
     analytics?: string[]
     phpVersion?: string | null
     httpProtocol?: string | null
+    hostingInfo?: {
+      ip?: string | null
+      provider?: string | null
+      country?: string | null
+      city?: string | null
+      reverseDns?: string | null
+      nameservers?: string[]
+    } | null
+    domainInfo?: {
+      domain?: string | null
+      registrar?: string | null
+      createdDate?: string | null
+      expiryDate?: string | null
+      daysUntilExpiry?: number | null
+    } | null
   }
 }
 

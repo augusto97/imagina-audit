@@ -191,19 +191,62 @@ class PerformanceAnalyzer {
         );
 
         // Cache headers
-        $hasCache = isset($this->headers['cache-control']) || isset($this->headers['etag']) || isset($this->headers['expires']);
+        $cacheControl = $this->headers['cache-control'] ?? '';
+        $hasEtag = isset($this->headers['etag']);
+        $hasExpires = isset($this->headers['expires']);
+        $hasCacheControl = !empty($cacheControl);
+
+        // Detectar cache de plugins WP por headers específicos
+        $hasCachePlugin = isset($this->headers['x-litespeed-cache'])
+            || isset($this->headers['x-cache-handler'])
+            || isset($this->headers['x-wp-cf-super-cache'])
+            || isset($this->headers['x-srcache-fetch-status'])
+            || isset($this->headers['x-nitropack-cache'])
+            || isset($this->headers['x-proxy-cache'])
+            || (isset($this->headers['x-cache']) && stripos($this->headers['x-cache'], 'HIT') !== false)
+            || (isset($this->headers['cf-cache-status']) && stripos($this->headers['cf-cache-status'], 'HIT') !== false);
+
+        // Detectar por comentarios HTML que dejan los plugins de cache
+        $htmlStr = $this->headers['_html'] ?? '';
+        $hasCacheComment = false;
+        if (!empty($htmlStr)) {
+            $hasCacheComment = str_contains($htmlStr, '<!-- This website is like a Rocket')
+                || str_contains($htmlStr, '<!-- Performance optimized by W3 Total Cache')
+                || str_contains($htmlStr, '<!-- WP Fastest Cache')
+                || str_contains($htmlStr, '<!-- Starter starter starter')
+                || str_contains($htmlStr, '<!-- Cache served by LiteSpeed')
+                || str_contains($htmlStr, '<!-- Super Cache')
+                || str_contains($htmlStr, '<!-- Starter starter starter')
+                || str_contains($htmlStr, '<!-- Starter starter starter')
+                || str_contains($htmlStr, '<!-- Starter starter starter')
+                || str_contains($htmlStr, 'data-rocket-')
+                || str_contains($htmlStr, 'rocket-lazyload');
+        }
+
+        $hasCache = $hasCacheControl || $hasEtag || $hasExpires || $hasCachePlugin || $hasCacheComment;
+
+        $cacheDetails = [];
+        if ($hasCacheControl) $cacheDetails[] = "Cache-Control: $cacheControl";
+        if ($hasEtag) $cacheDetails[] = 'ETag presente';
+        if ($hasExpires) $cacheDetails[] = 'Expires: ' . ($this->headers['expires'] ?? '');
+        if ($hasCachePlugin) $cacheDetails[] = 'Plugin de cache activo (headers de servidor)';
+        if ($hasCacheComment) $cacheDetails[] = 'Plugin de cache detectado en HTML';
+
         $cacheScore = $hasCache ? 100 : 40;
+        $cacheDisplay = $hasCache ? implode(' · ', array_slice($cacheDetails, 0, 2)) : 'No configurado';
+
         $metrics[] = Scoring::createMetric(
             'cache_headers',
             'Cache del navegador',
             $hasCache,
-            $hasCache ? 'Configurado' : 'No configurado',
+            $cacheDisplay,
             $cacheScore,
             $hasCache
-                ? 'Los headers de cache están configurados. Los archivos se almacenan en el navegador.'
-                : 'No se detectaron headers de cache. El navegador descarga todo cada vez.',
-            $hasCache ? '' : 'Configurar headers Cache-Control y Expires para archivos estáticos.',
-            'Configuramos cache agresivo para archivos estáticos con expiración optimizada.'
+                ? 'Cache configurado: ' . implode('. ', $cacheDetails) . '. Los archivos se almacenan para cargas más rápidas.'
+                : 'No se detectaron headers de cache ni plugin de cache activo. El navegador descarga todo cada vez.',
+            $hasCache ? '' : 'Instalar un plugin de cache (WP Rocket, LiteSpeed Cache) y configurar headers Cache-Control.',
+            'Configuramos cache agresivo para archivos estáticos con expiración optimizada.',
+            ['details' => $cacheDetails, 'hasCachePlugin' => $hasCachePlugin, 'hasCacheComment' => $hasCacheComment]
         );
 
         $defaults = require dirname(__DIR__) . '/config/defaults.php';

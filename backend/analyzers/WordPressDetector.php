@@ -85,20 +85,22 @@ class WordPressDetector {
             'version' => $themeInfo['version'],
             'childTheme' => $themeInfo['childTheme'],
         ];
-        $hasChildTheme = $themeInfo['childTheme'];
-        $themeScore = $hasChildTheme ? 100 : 70;
+        $themeName = $themeInfo['name'] ?: 'No detectado';
+        $themeVersion = $themeInfo['version'] ?? null;
+        $themeDisplay = $themeName . ($themeVersion ? " v$themeVersion" : '');
 
         $metrics[] = Scoring::createMetric(
             'wp_theme',
             'Tema de WordPress',
             $themeInfo['name'],
-            $themeInfo['name'] ?: 'No detectado',
-            $themeScore,
+            $themeDisplay,
+            $themeInfo['name'] ? 100 : 50,
             $themeInfo['name']
-                ? ($hasChildTheme ? "Tema: {$themeInfo['name']} (con child theme)." : "Tema: {$themeInfo['name']}. No se detectó child theme.")
-                : 'No se pudo detectar el tema.',
-            $hasChildTheme ? '' : 'Usar un child theme para proteger personalizaciones durante actualizaciones.',
-            'Configuramos child themes para que las actualizaciones no afecten tu diseño.'
+                ? "Tema activo: $themeDisplay."
+                : 'No se pudo detectar el tema activo.',
+            '',
+            'Mantenemos tu tema actualizado y optimizado.',
+            ['themeName' => $themeInfo['name'], 'themeVersion' => $themeVersion, 'childTheme' => $themeInfo['childTheme']]
         );
 
         // Plugins
