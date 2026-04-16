@@ -10,16 +10,16 @@ export default function MetricRow({ metric }: MetricRowProps) {
   return (
     <AccordionItem
       title={
-        <div className="flex items-center gap-3 pr-2">
+        <div className="flex items-center gap-3 pr-2 min-w-0">
           <SemaphoreIcon level={metric.level} />
-          <span className="flex-1 text-left">{metric.name}</span>
-          <span className="text-xs text-[var(--text-tertiary)] shrink-0">
+          <span className="flex-1 text-left truncate">{metric.name}</span>
+          <span className="text-xs text-[var(--text-tertiary)] max-w-[45%] text-right break-words line-clamp-2">
             {metric.displayValue}
           </span>
         </div>
       }
     >
-      <div className="space-y-3 pl-6 text-sm">
+      <div className="space-y-3 pl-6 text-sm overflow-hidden">
         <p className="text-[var(--text-secondary)]">{metric.description}</p>
 
         {metric.recommendation && (

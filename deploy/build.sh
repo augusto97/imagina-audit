@@ -32,6 +32,7 @@ cp -r ../backend/analyzers "$DEPLOY_DIR/analyzers"
 cp -r ../backend/config "$DEPLOY_DIR/config"
 cp -r ../backend/data "$DEPLOY_DIR/data"
 cp -r ../backend/database "$DEPLOY_DIR/database"
+cp -r ../backend/cron "$DEPLOY_DIR/cron"
 mkdir -p "$DEPLOY_DIR/cache"
 mkdir -p "$DEPLOY_DIR/logs"
 

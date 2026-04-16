@@ -26,6 +26,9 @@ class ConversionAnalyzer {
         $metrics[] = $this->checkSocialMedia();
         $metrics[] = $this->checkCookies();
         $metrics[] = $this->checkFacebookPixel();
+        $metrics[] = $this->checkPushNotifications();
+        $metrics[] = $this->checkEmailMarketing();
+        $metrics[] = $this->checkGoogleAds();
 
         $defaults = require dirname(__DIR__) . '/config/defaults.php';
         $score = Scoring::calculateModuleScore($metrics);
@@ -286,6 +289,131 @@ class ConversionAnalyzer {
                 : 'No se detectó Facebook Pixel. No puedes hacer remarketing en Facebook/Instagram.',
             !$found ? 'Instalar Facebook Pixel si haces publicidad en Facebook o Instagram.' : '',
             'Configuramos Facebook Pixel con eventos de conversión personalizados.'
+        );
+    }
+
+    /**
+     * Notificaciones Push
+     */
+    private function checkPushNotifications(): array {
+        $tools = [
+            'onesignal.com' => 'OneSignal',
+            'OneSignal' => 'OneSignal',
+            'gravitec.net' => 'Gravitec',
+            'pushengage.com' => 'PushEngage',
+            'webpushr.com' => 'WebPushr',
+            'pushowl.com' => 'PushOwl',
+            'push.js' => 'Push.js',
+            'pushwoosh.com' => 'Pushwoosh',
+            'cleverpush.com' => 'CleverPush',
+            'subscribers.com' => 'Subscribers',
+        ];
+
+        $detected = null;
+        foreach ($tools as $pattern => $name) {
+            if (str_contains($this->html, $pattern)) {
+                $detected = $name;
+                break;
+            }
+        }
+
+        // También verificar si tiene Service Worker registrado (base para push)
+        $hasServiceWorker = str_contains($this->html, 'serviceWorker.register') || str_contains($this->html, 'ServiceWorker');
+
+        $found = $detected !== null;
+
+        return Scoring::createMetric(
+            'push_notifications',
+            'Notificaciones Push',
+            $found,
+            $found ? "$detected detectado" : ($hasServiceWorker ? 'Service Worker sin push' : 'No detectadas'),
+            $found ? 100 : 60,
+            $found
+                ? "Notificaciones push configuradas con $detected. Permite re-enganchar visitantes que abandonan el sitio."
+                : 'No se detectaron notificaciones push.' . ($hasServiceWorker ? ' Se detectó un Service Worker que podría soportar push.' : ' Las push notifications permiten recuperar hasta un 10% de visitantes perdidos.'),
+            !$found ? 'Considerar implementar notificaciones push con OneSignal o similar para re-enganchar visitantes.' : '',
+            'Implementamos notificaciones push para recuperar visitantes y aumentar conversiones.'
+        );
+    }
+
+    /**
+     * Email Marketing
+     */
+    private function checkEmailMarketing(): array {
+        $tools = [
+            'mailchimp.com' => 'Mailchimp',
+            'mc.js' => 'Mailchimp',
+            'list-manage.com' => 'Mailchimp',
+            'brevo.com' => 'Brevo',
+            'sendinblue' => 'Brevo (Sendinblue)',
+            'sib.js' => 'Brevo',
+            'mailerlite.com' => 'MailerLite',
+            'convertkit.com' => 'ConvertKit',
+            'activecampaign.com' => 'ActiveCampaign',
+            'aweber.com' => 'AWeber',
+            'getresponse.com' => 'GetResponse',
+            'hubspot.com/email' => 'HubSpot Email',
+            'klaviyo.com' => 'Klaviyo',
+            'constantcontact.com' => 'Constant Contact',
+            'drip.com' => 'Drip',
+        ];
+
+        $detected = [];
+        foreach ($tools as $pattern => $name) {
+            if (str_contains($this->html, $pattern)) {
+                $detected[] = $name;
+            }
+        }
+        $detected = array_unique($detected);
+
+        // Buscar formularios de suscripción genéricos
+        $hasSubscriptionForm = str_contains($this->html, 'newsletter') ||
+            str_contains($this->html, 'suscri') ||
+            str_contains($this->html, 'subscri') ||
+            str_contains($this->html, 'boletín');
+
+        $found = !empty($detected) || $hasSubscriptionForm;
+
+        $displayValue = !empty($detected) ? implode(', ', $detected) : ($hasSubscriptionForm ? 'Formulario de suscripción' : 'No detectado');
+
+        return Scoring::createMetric(
+            'email_marketing',
+            'Email Marketing',
+            $found,
+            $displayValue,
+            $found ? 100 : 40,
+            $found
+                ? 'Se detectó integración de email marketing' . (!empty($detected) ? ': ' . implode(', ', $detected) : '') . '. El email marketing tiene el mejor ROI de todos los canales digitales.'
+                : 'No se detectó herramienta de email marketing ni formulario de suscripción. El email marketing genera un ROI promedio de $42 por cada $1 invertido.',
+            !$found ? 'Implementar un formulario de suscripción con Mailchimp, Brevo u otra herramienta de email marketing.' : '',
+            'Integramos herramientas de email marketing con formularios de captura optimizados.',
+            ['detected' => $detected, 'hasSubscriptionForm' => $hasSubscriptionForm]
+        );
+    }
+
+    /**
+     * Google Ads
+     */
+    private function checkGoogleAds(): array {
+        $found = str_contains($this->html, 'googleads.g.doubleclick.net') ||
+                 str_contains($this->html, 'googlesyndication.com') ||
+                 str_contains($this->html, 'adsbygoogle') ||
+                 str_contains($this->html, 'conversion.js') ||
+                 str_contains($this->html, 'google_conversion') ||
+                 str_contains($this->html, 'gads') ||
+                 str_contains($this->html, 'AW-');
+
+        return Scoring::createMetric(
+            'google_ads',
+            'Google Ads',
+            $found,
+            $found ? 'Detectado' : 'No detectado',
+            $found ? 100 : 60,
+            $found
+                ? 'Se detectó integración con Google Ads. Permite medir conversiones de campañas de publicidad.'
+                : 'No se detectó Google Ads. Si realizas campañas de publicidad en Google, necesitas el tag de conversión.',
+            !$found ? 'Si haces publicidad en Google, instalar el tag de Google Ads para medir conversiones.' : '',
+            'Configuramos Google Ads con seguimiento de conversiones y remarketing.'
         );
     }
 }

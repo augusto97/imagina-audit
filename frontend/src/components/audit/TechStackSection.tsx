@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import {
   Server, Blocks, Layout, ShoppingCart, Zap, Search,
   ShieldCheck, Code2, Palette, Type, Globe, BarChart3, Cpu, Wifi,
+  MapPin, Calendar,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -60,6 +61,29 @@ export default function TechStackSection({ techStack }: TechStackSectionProps) {
   add('Analytics', BarChart3, techStack.analytics, 'bg-teal-50 text-teal-600')
   add('PHP', Cpu, techStack.phpVersion, 'bg-purple-50 text-purple-600')
   add('Protocolo HTTP', Wifi, techStack.httpProtocol, 'bg-gray-100 text-gray-600')
+
+  // Hosting info
+  const hi = (techStack as Record<string, unknown>).hostingInfo as Record<string, unknown> | undefined
+  if (hi) {
+    const hostingVals: string[] = []
+    if (hi.provider) hostingVals.push(String(hi.provider))
+    if (hi.ip) hostingVals.push(String(hi.ip))
+    if (hi.city || hi.country) hostingVals.push([hi.city, hi.country].filter(Boolean).join(', '))
+    add('Hosting', MapPin, hostingVals, 'bg-orange-50 text-orange-600')
+  }
+
+  // Domain info
+  const di = (techStack as Record<string, unknown>).domainInfo as Record<string, unknown> | undefined
+  if (di) {
+    const domainVals: string[] = []
+    if (di.registrar) domainVals.push(String(di.registrar))
+    if (di.expiryDate) {
+      const days = di.daysUntilExpiry as number | null
+      domainVals.push(`Expira: ${String(di.expiryDate)}${days !== null && days !== undefined ? ` (${days}d)` : ''}`)
+    }
+    if (di.createdDate) domainVals.push(`Desde: ${String(di.createdDate)}`)
+    add('Dominio', Calendar, domainVals, 'bg-lime-50 text-lime-700')
+  }
 
   if (categories.length === 0) return null
 

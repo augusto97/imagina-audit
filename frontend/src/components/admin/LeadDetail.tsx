@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, MessageCircle, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Mail, MessageCircle, ExternalLink, FileText } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -43,6 +43,9 @@ export default function LeadDetail() {
           <ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> Volver
         </Button>
         <h1 className="text-xl font-bold text-[var(--text-primary)]">{result.domain}</h1>
+        <Button variant="outline" size="sm" onClick={() => navigate(`/admin/leads/${id}/report`)} className="ml-auto">
+          <FileText className="h-4 w-4 mr-1" strokeWidth={1.5} /> Reporte Técnico
+        </Button>
       </div>
 
       {/* Datos del lead */}

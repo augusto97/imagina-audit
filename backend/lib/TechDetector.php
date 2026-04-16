@@ -8,10 +8,12 @@ class TechDetector {
     private string $html;
     private array $headers;
     private HtmlParser $parser;
+    private string $url;
 
-    public function __construct(string $html, array $headers) {
+    public function __construct(string $html, array $headers, string $url = '') {
         $this->html = $html;
         $this->headers = $headers;
+        $this->url = $url;
         $this->parser = new HtmlParser();
         $this->parser->loadHtml($html);
     }
@@ -20,6 +22,9 @@ class TechDetector {
      * Detecta todas las tecnologías y retorna un array organizado por categoría
      */
     public function detect(): array {
+        $hostingInfo = $this->detectHostingInfo();
+        $domainInfo = $this->detectDomainInfo();
+
         return [
             'server' => $this->detectServer(),
             'cms' => $this->detectCms(),
@@ -35,6 +40,8 @@ class TechDetector {
             'analytics' => $this->detectAnalytics(),
             'phpVersion' => $this->detectPhpVersion(),
             'httpProtocol' => $this->detectHttpProtocol(),
+            'hostingInfo' => $hostingInfo,
+            'domainInfo' => $domainInfo,
         ];
     }
 
@@ -66,24 +73,52 @@ class TechDetector {
 
     private function detectPageBuilder(): array {
         $builders = [];
-        $checks = [
-            'elementor' => 'Elementor',
-            'et-boc' => 'Divi Builder',
-            'divi' => 'Divi Builder',
-            'fl-builder' => 'Beaver Builder',
-            'wpb_' => 'WPBakery',
-            'js_composer' => 'WPBakery',
-            'bricks-' => 'Bricks Builder',
-            'oxygen-' => 'Oxygen Builder',
-            'ct-section' => 'Oxygen Builder',
-            'breakdance' => 'Breakdance',
-            'wp-block-' => 'Gutenberg (Bloques)',
-        ];
-        foreach ($checks as $pattern => $name) {
-            if (str_contains($this->html, $pattern) && !in_array($name, $builders)) {
-                $builders[] = $name;
-            }
+
+        // Elementor
+        if (str_contains($this->html, 'elementor') || str_contains($this->html, '/elementor/')) {
+            $builders[] = 'Elementor';
         }
+
+        // Divi — usar patrones específicos del tema/plugin Divi, no la palabra genérica
+        if (str_contains($this->html, 'et-boc')
+            || str_contains($this->html, 'et_pb_')
+            || str_contains($this->html, '/et-core/')
+            || str_contains($this->html, '/Divi/')
+            || str_contains($this->html, 'class="et_')
+            || str_contains($this->html, '/divi/includes/')) {
+            $builders[] = 'Divi Builder';
+        }
+
+        // Beaver Builder
+        if (str_contains($this->html, 'fl-builder') || str_contains($this->html, 'fl-row')) {
+            $builders[] = 'Beaver Builder';
+        }
+
+        // WPBakery
+        if (str_contains($this->html, 'wpb_') || str_contains($this->html, 'js_composer')) {
+            $builders[] = 'WPBakery';
+        }
+
+        // Bricks
+        if (str_contains($this->html, 'bricks-') || str_contains($this->html, '/bricks/')) {
+            $builders[] = 'Bricks Builder';
+        }
+
+        // Oxygen
+        if (str_contains($this->html, 'oxygen-') || str_contains($this->html, 'ct-section') || str_contains($this->html, 'oxy-')) {
+            $builders[] = 'Oxygen Builder';
+        }
+
+        // Breakdance
+        if (str_contains($this->html, 'breakdance') || str_contains($this->html, '/breakdance/')) {
+            $builders[] = 'Breakdance';
+        }
+
+        // Gutenberg blocks
+        if (str_contains($this->html, 'wp-block-')) {
+            $builders[] = 'Gutenberg (Bloques)';
+        }
+
         return $builders;
     }
 
@@ -236,7 +271,181 @@ class TechDetector {
     }
 
     private function detectHttpProtocol(): ?string {
-        // Este dato viene del Fetcher, no lo podemos detectar aquí desde el HTML
         return null;
+    }
+
+    /**
+     * Detecta IP, proveedor de hosting y ubicación geográfica del servidor
+     */
+    private function detectHostingInfo(): ?array {
+        $host = parse_url($this->url, PHP_URL_HOST);
+        if (!$host) return null;
+
+        $ip = gethostbyname($host);
+        if ($ip === $host) return null; // No resolvió
+
+        $info = [
+            'ip' => $ip,
+            'provider' => null,
+            'country' => null,
+            'city' => null,
+            'reverseDns' => null,
+            'nameservers' => [],
+        ];
+
+        // Reverse DNS
+        $reverseDns = @gethostbyaddr($ip);
+        if ($reverseDns && $reverseDns !== $ip) {
+            $info['reverseDns'] = $reverseDns;
+
+            // Detectar proveedor por reverse DNS
+            $providers = [
+                'amazonaws.com' => 'Amazon AWS',
+                'googleusercontent.com' => 'Google Cloud',
+                'cloudflare' => 'Cloudflare',
+                'digitalocean' => 'DigitalOcean',
+                'linode' => 'Linode (Akamai)',
+                'vultr' => 'Vultr',
+                'ovh' => 'OVH',
+                'hetzner' => 'Hetzner',
+                'siteground' => 'SiteGround',
+                'godaddy' => 'GoDaddy',
+                'hostgator' => 'HostGator',
+                'bluehost' => 'Bluehost',
+                'namecheap' => 'Namecheap',
+                'dreamhost' => 'DreamHost',
+                'wpengine' => 'WP Engine',
+                'kinsta' => 'Kinsta',
+                'flywheel' => 'Flywheel',
+                'pantheon' => 'Pantheon',
+                'rackspace' => 'Rackspace',
+                'azure' => 'Microsoft Azure',
+                'contabo' => 'Contabo',
+                'hostinger' => 'Hostinger',
+                'ionos' => 'IONOS',
+            ];
+            foreach ($providers as $pattern => $name) {
+                if (stripos($reverseDns, $pattern) !== false) {
+                    $info['provider'] = $name;
+                    break;
+                }
+            }
+        }
+
+        // Nameservers del dominio
+        $nsRecords = @dns_get_record($host, DNS_NS);
+        if ($nsRecords) {
+            foreach ($nsRecords as $ns) {
+                if (isset($ns['target'])) {
+                    $info['nameservers'][] = $ns['target'];
+                }
+            }
+            // Detectar proveedor por nameservers si aún no se detectó
+            if (!$info['provider']) {
+                $nsStr = strtolower(implode(' ', $info['nameservers']));
+                $nsProviders = [
+                    'cloudflare' => 'Cloudflare',
+                    'awsdns' => 'Amazon AWS (Route 53)',
+                    'googledomains' => 'Google Domains',
+                    'google' => 'Google Cloud DNS',
+                    'digitalocean' => 'DigitalOcean',
+                    'siteground' => 'SiteGround',
+                    'wpengine' => 'WP Engine',
+                    'hostgator' => 'HostGator',
+                    'godaddy' => 'GoDaddy',
+                    'namecheap' => 'Namecheap',
+                    'dreamhost' => 'DreamHost',
+                    'hostinger' => 'Hostinger',
+                    'dnsimple' => 'DNSimple',
+                ];
+                foreach ($nsProviders as $pattern => $name) {
+                    if (str_contains($nsStr, $pattern)) {
+                        $info['provider'] = $name;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Geolocalización por IP usando ip-api.com (gratis, sin key, límite 45/min)
+        try {
+            $geoResponse = Fetcher::get("http://ip-api.com/json/{$ip}?fields=country,city,isp,org", 3, true, 0);
+            if ($geoResponse['statusCode'] === 200) {
+                $geo = json_decode($geoResponse['body'], true);
+                if ($geo) {
+                    $info['country'] = $geo['country'] ?? null;
+                    $info['city'] = $geo['city'] ?? null;
+                    if (!$info['provider'] && !empty($geo['isp'])) {
+                        $info['provider'] = $geo['org'] ?? $geo['isp'];
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            // Geolocalización es opcional
+        }
+
+        return $info;
+    }
+
+    /**
+     * Detecta información del dominio: registrar, fecha expiración, nameservers
+     * Usa RDAP (reemplazo moderno de WHOIS) que retorna JSON
+     */
+    private function detectDomainInfo(): ?array {
+        $host = parse_url($this->url, PHP_URL_HOST);
+        if (!$host) return null;
+
+        // Extraer dominio raíz (quitar subdominios)
+        $parts = explode('.', $host);
+        if (count($parts) >= 2) {
+            $domain = implode('.', array_slice($parts, -2));
+        } else {
+            $domain = $host;
+        }
+
+        $info = [
+            'domain' => $domain,
+            'registrar' => null,
+            'createdDate' => null,
+            'expiryDate' => null,
+            'daysUntilExpiry' => null,
+        ];
+
+        // Consultar RDAP (protocolo sucesor de WHOIS, retorna JSON)
+        try {
+            $rdapResponse = Fetcher::get("https://rdap.org/domain/{$domain}", 5, true, 0);
+            if ($rdapResponse['statusCode'] === 200) {
+                $rdap = json_decode($rdapResponse['body'], true);
+                if ($rdap) {
+                    // Registrar
+                    foreach ($rdap['entities'] ?? [] as $entity) {
+                        $roles = $entity['roles'] ?? [];
+                        if (in_array('registrar', $roles)) {
+                            $info['registrar'] = $entity['vcardArray'][1][1][3] ?? ($entity['handle'] ?? null);
+                            break;
+                        }
+                    }
+
+                    // Fechas
+                    foreach ($rdap['events'] ?? [] as $event) {
+                        if ($event['eventAction'] === 'registration') {
+                            $info['createdDate'] = substr($event['eventDate'] ?? '', 0, 10);
+                        }
+                        if ($event['eventAction'] === 'expiration') {
+                            $info['expiryDate'] = substr($event['eventDate'] ?? '', 0, 10);
+                            // Calcular días hasta expiración
+                            $expiry = strtotime($event['eventDate']);
+                            if ($expiry) {
+                                $info['daysUntilExpiry'] = (int) round(($expiry - time()) / 86400);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            // RDAP es opcional
+        }
+
+        return $info;
     }
 }
