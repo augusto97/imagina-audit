@@ -1,0 +1,11 @@
+# Bloquear acceso directo a archivos sensibles
+<FilesMatch "\.(env|db|sqlite|log|sql)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Bloquear acceso a archivos PHP de configuración
+<FilesMatch "^(env|defaults)\.php$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>

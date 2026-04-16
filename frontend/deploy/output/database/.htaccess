@@ -1,0 +1,9 @@
+Order Allow,Deny
+Deny from all
+
+# Permitir acceso temporal a seed.php para inicializar la DB
+# ELIMINAR estas líneas después de ejecutar seed.php
+<Files "seed.php">
+    Order Deny,Allow
+    Allow from all
+</Files>

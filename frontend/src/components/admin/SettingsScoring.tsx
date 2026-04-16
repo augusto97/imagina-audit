@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAdmin } from '@/hooks/useAdmin'
@@ -69,7 +70,7 @@ export default function SettingsScoring() {
         <CardContent className="space-y-3">
           {moduleIds.map((id) => (
             <div key={id} className="flex items-center gap-3">
-              <span className="w-40 text-sm font-medium text-[var(--text-primary)]">{MODULE_EMOJIS[id]} {MODULE_NAMES[id]}</span>
+              <Label className="w-40">{MODULE_EMOJIS[id]} {MODULE_NAMES[id]}</Label>
               <input
                 type="range" min="0" max="0.5" step="0.01"
                 value={weights[id] ?? 0.1}

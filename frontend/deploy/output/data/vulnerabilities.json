@@ -1,0 +1,20 @@
+[
+  {
+    "pluginSlug": "elementor",
+    "pluginName": "Elementor",
+    "affectedVersions": "<3.18.0",
+    "severity": "high",
+    "cveId": "CVE-2024-0001",
+    "description": "Vulnerabilidad XSS en widgets",
+    "fixedInVersion": "3.18.0"
+  },
+  {
+    "pluginSlug": "contact-form-7",
+    "pluginName": "Contact Form 7",
+    "affectedVersions": "<5.8.4",
+    "severity": "medium",
+    "cveId": "CVE-2023-6449",
+    "description": "Bypass de validación de archivos",
+    "fixedInVersion": "5.8.4"
+  }
+]

@@ -1,0 +1,18 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # IMPORTANTE: Si la app vive en /audit/, cambiar a: RewriteBase /audit/
+  RewriteBase /
+
+  # No tocar archivos reales ni carpetas que existen en disco
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+
+  # Redirigir todo lo demás a index.html (React Router)
+  RewriteRule ^(.*)$ index.html [L]
+</IfModule>
+
+# Bloquear acceso a archivos sensibles
+<FilesMatch "\.(env|db|sqlite|log|sql)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
