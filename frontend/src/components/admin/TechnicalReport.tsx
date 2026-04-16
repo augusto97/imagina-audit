@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ExternalLink, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -6,22 +6,47 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAdmin } from '@/hooks/useAdmin'
 import { getLevelLabel, getLevelColor } from '@/lib/utils'
+import api from '@/lib/api'
 import type { AuditResult, ModuleResult, MetricResult } from '@/types/audit'
+
+interface ChecklistState {
+  [metricId: string]: { completed: boolean; notes: string | null; completedAt: string | null }
+}
 
 export default function TechnicalReport() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { fetchLeadDetail } = useAdmin()
   const [result, setResult] = useState<AuditResult | null>(null)
+  const [checklist, setChecklist] = useState<ChecklistState>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!id) return
-    fetchLeadDetail(id).then((data: AuditResult) => {
-      setResult(data)
+    Promise.all([
+      fetchLeadDetail(id),
+      api.get('/admin/checklist.php', { params: { audit_id: id } }).then(r => r.data?.data).catch(() => [])
+    ]).then(([audit, items]: [AuditResult, Array<{ metric_id: string; completed: number; notes: string | null; completed_at: string | null }>]) => {
+      setResult(audit)
+      const state: ChecklistState = {}
+      for (const item of items || []) {
+        state[item.metric_id] = { completed: item.completed === 1, notes: item.notes, completedAt: item.completed_at }
+      }
+      setChecklist(state)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [id, fetchLeadDetail])
+
+  const toggleCheck = useCallback((metricId: string) => {
+    if (!id) return
+    const current = checklist[metricId]?.completed ?? false
+    const newVal = !current
+    setChecklist(prev => ({ ...prev, [metricId]: { completed: newVal, notes: prev[metricId]?.notes ?? null, completedAt: newVal ? new Date().toISOString() : null } }))
+    api.put('/admin/checklist.php', { auditId: id, metricId, completed: newVal }).catch(() => {
+      // Revert on error
+      setChecklist(prev => ({ ...prev, [metricId]: { completed: current, notes: prev[metricId]?.notes ?? null, completedAt: null } }))
+    })
+  }, [id, checklist])
 
   if (loading) {
     return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-48 rounded-2xl" /></div>
@@ -32,14 +57,13 @@ export default function TechnicalReport() {
 
   const criticalMetrics = getAllMetricsByLevel(result, 'critical')
   const warningMetrics = getAllMetricsByLevel(result, 'warning')
-  const goodMetrics = getAllMetricsByLevel(result, 'good')
 
   return (
     <div className="space-y-8 max-w-4xl">
       <ReportHeader result={result} onBack={() => navigate('/admin/leads')} />
       <ExecutiveSummary result={result} criticalCount={criticalMetrics.length} warningCount={warningMetrics.length} />
       {result.techStack && <TechStackSummary techStack={result.techStack} scanDuration={result.scanDurationMs} />}
-      <ActionPlan critical={criticalMetrics} warning={warningMetrics} />
+      <ActionPlan critical={criticalMetrics} warning={warningMetrics} checklist={checklist} onToggle={toggleCheck} />
       {result.modules.map(m => (
         <ModuleDetail key={m.id} module={m} />
       ))}
@@ -180,19 +204,10 @@ function TechStackSummary({ techStack, scanDuration }: { techStack: NonNullable<
   )
 }
 
-function ActionPlan({ critical, warning }: { critical: MetricWithModule[]; warning: MetricWithModule[] }) {
-  const [checked, setChecked] = useState<Set<string>>(new Set())
-  const total = critical.length + warning.length
-  const doneCount = checked.size
-
-  const toggle = (key: string) => {
-    setChecked(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
+function ActionPlan({ critical, warning, checklist, onToggle }: { critical: MetricWithModule[]; warning: MetricWithModule[]; checklist: ChecklistState; onToggle: (metricId: string) => void }) {
+  const allItems = [...critical, ...warning]
+  const total = allItems.length
+  const doneCount = allItems.filter(m => checklist[m.id]?.completed).length
 
   if (total === 0) {
     return (
@@ -226,7 +241,7 @@ function ActionPlan({ critical, warning }: { critical: MetricWithModule[]; warni
           </h3>
           <div className="space-y-2">
             {critical.map((m, i) => (
-              <ActionItem key={m.id + i} index={i + 1} metric={m} checked={checked.has(m.id + i)} onToggle={() => toggle(m.id + i)} />
+              <ActionItem key={m.id} index={i + 1} metric={m} checked={checklist[m.id]?.completed ?? false} onToggle={() => onToggle(m.id)} />
             ))}
           </div>
         </div>
@@ -239,7 +254,7 @@ function ActionPlan({ critical, warning }: { critical: MetricWithModule[]; warni
           </h3>
           <div className="space-y-2">
             {warning.map((m, i) => (
-              <ActionItem key={m.id + i} index={critical.length + i + 1} metric={m} checked={checked.has(m.id + (critical.length + i))} onToggle={() => toggle(m.id + (critical.length + i))} />
+              <ActionItem key={m.id} index={critical.length + i + 1} metric={m} checked={checklist[m.id]?.completed ?? false} onToggle={() => onToggle(m.id)} />
             ))}
           </div>
         </div>
