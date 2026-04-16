@@ -227,9 +227,11 @@ function WidgetSection() {
   const [widgetColor, setWidgetColor] = useState('#0CC0DF')
   const [widgetPosition, setWidgetPosition] = useState('bottom-right')
   const [widgetLang, setWidgetLang] = useState('es')
+  const [widgetWhatsapp, setWidgetWhatsapp] = useState('')
 
   const baseUrl = window.location.origin
-  const widgetCode = `<script\n  src="${baseUrl}/widget/imagina-audit-widget.js"\n  data-api="${baseUrl}/api"\n  data-color="${widgetColor}"\n  data-position="${widgetPosition}"\n  data-lang="${widgetLang}">\n</script>`
+  const whatsappAttr = widgetWhatsapp ? `\n  data-whatsapp="${widgetWhatsapp}"` : ''
+  const widgetCode = `<script\n  src="${baseUrl}/widget/imagina-audit-widget.js"\n  data-api="${baseUrl}/api"\n  data-color="${widgetColor}"\n  data-position="${widgetPosition}"\n  data-lang="${widgetLang}"${whatsappAttr}>\n</script>`
 
   const copyCode = () => {
     navigator.clipboard.writeText(widgetCode)
@@ -249,7 +251,16 @@ function WidgetSection() {
       </CardHeader>
       <CardContent className="space-y-5">
         {/* Personalizadores */}
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">WhatsApp</label>
+            <Input
+              value={widgetWhatsapp}
+              onChange={(e) => setWidgetWhatsapp(e.target.value)}
+              placeholder="+573001234567"
+            />
+            <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">Si se configura, aparece botón de WhatsApp en el resultado</p>
+          </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Color del botón</label>
             <div className="flex items-center gap-2">
