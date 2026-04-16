@@ -4,18 +4,21 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
 echo "=== Imagina Audit — Build Script ==="
 echo ""
 
 # 1. Compilar frontend
 echo "[1/3] Compilando frontend..."
-cd "$(dirname "$0")/../frontend"
+cd "$PROJECT_DIR/frontend"
 npm install --production=false
 npm run build
 echo "[OK] Frontend compilado en frontend/dist/"
 
 # 2. Crear carpeta de deploy
-DEPLOY_DIR="$(dirname "$0")/output"
+DEPLOY_DIR="$SCRIPT_DIR/output"
 rm -rf "$DEPLOY_DIR"
 mkdir -p "$DEPLOY_DIR"
 
@@ -23,31 +26,36 @@ mkdir -p "$DEPLOY_DIR"
 echo "[2/3] Copiando archivos..."
 
 # Frontend estático
-cp -r dist/* "$DEPLOY_DIR/"
+cp -r "$PROJECT_DIR/frontend/dist/"* "$DEPLOY_DIR/"
 
 # Backend PHP
-cp -r ../backend/api "$DEPLOY_DIR/api"
-cp -r ../backend/lib "$DEPLOY_DIR/lib"
-cp -r ../backend/analyzers "$DEPLOY_DIR/analyzers"
-cp -r ../backend/config "$DEPLOY_DIR/config"
-cp -r ../backend/data "$DEPLOY_DIR/data"
-cp -r ../backend/database "$DEPLOY_DIR/database"
-cp -r ../backend/cron "$DEPLOY_DIR/cron"
+cp -r "$PROJECT_DIR/backend/api" "$DEPLOY_DIR/api"
+cp -r "$PROJECT_DIR/backend/lib" "$DEPLOY_DIR/lib"
+cp -r "$PROJECT_DIR/backend/analyzers" "$DEPLOY_DIR/analyzers"
+cp -r "$PROJECT_DIR/backend/config" "$DEPLOY_DIR/config"
+cp -r "$PROJECT_DIR/backend/data" "$DEPLOY_DIR/data"
+cp -r "$PROJECT_DIR/backend/database" "$DEPLOY_DIR/database"
+cp -r "$PROJECT_DIR/backend/cron" "$DEPLOY_DIR/cron"
 mkdir -p "$DEPLOY_DIR/cache"
 mkdir -p "$DEPLOY_DIR/logs"
 
 # .htaccess files
-cp ../backend/.htaccess "$DEPLOY_DIR/.htaccess.backend"
-cp ../backend/cache/.htaccess "$DEPLOY_DIR/cache/.htaccess"
-cp ../backend/logs/.htaccess "$DEPLOY_DIR/logs/.htaccess"
-cp ../backend/database/.htaccess "$DEPLOY_DIR/database/.htaccess"
-cp ../backend/lib/.htaccess "$DEPLOY_DIR/lib/.htaccess"
-cp ../backend/analyzers/.htaccess "$DEPLOY_DIR/analyzers/.htaccess"
-cp ../backend/config/.htaccess "$DEPLOY_DIR/config/.htaccess"
-cp ../backend/data/.htaccess "$DEPLOY_DIR/data/.htaccess"
+cp "$PROJECT_DIR/backend/.htaccess" "$DEPLOY_DIR/.htaccess.backend"
+cp "$PROJECT_DIR/backend/cache/.htaccess" "$DEPLOY_DIR/cache/.htaccess"
+cp "$PROJECT_DIR/backend/logs/.htaccess" "$DEPLOY_DIR/logs/.htaccess"
+cp "$PROJECT_DIR/backend/database/.htaccess" "$DEPLOY_DIR/database/.htaccess"
+cp "$PROJECT_DIR/backend/lib/.htaccess" "$DEPLOY_DIR/lib/.htaccess"
+cp "$PROJECT_DIR/backend/analyzers/.htaccess" "$DEPLOY_DIR/analyzers/.htaccess"
+cp "$PROJECT_DIR/backend/config/.htaccess" "$DEPLOY_DIR/config/.htaccess"
+cp "$PROJECT_DIR/backend/data/.htaccess" "$DEPLOY_DIR/data/.htaccess"
+
+# Widget
+if [ -d "$PROJECT_DIR/frontend/public/widget" ]; then
+  cp -r "$PROJECT_DIR/frontend/public/widget" "$DEPLOY_DIR/widget"
+fi
 
 # .env ejemplo
-cp ../backend/.env.example "$DEPLOY_DIR/.env.example"
+cp "$PROJECT_DIR/backend/.env.example" "$DEPLOY_DIR/.env.example"
 
 echo "[OK] Archivos copiados a deploy/output/"
 
