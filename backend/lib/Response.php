@@ -44,11 +44,24 @@ class Response {
      */
     public static function cors(): void {
         $allowedOrigin = env('ALLOWED_ORIGIN', '*');
+        $requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-        header("Access-Control-Allow-Origin: $allowedOrigin");
+        if ($allowedOrigin === '*') {
+            // Si es *, reflejar el origin del request (o * si no hay origin)
+            // Esto permite que el widget funcione desde cualquier dominio
+            if (!empty($requestOrigin)) {
+                header("Access-Control-Allow-Origin: $requestOrigin");
+                header('Access-Control-Allow-Credentials: true');
+            } else {
+                header('Access-Control-Allow-Origin: *');
+            }
+        } else {
+            header("Access-Control-Allow-Origin: $allowedOrigin");
+            header('Access-Control-Allow-Credentials: true');
+        }
+
         header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
         header('Access-Control-Allow-Headers: Content-Type, Authorization');
-        header('Access-Control-Allow-Credentials: true');
 
         // Headers de seguridad
         header('X-Content-Type-Options: nosniff');

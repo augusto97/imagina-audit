@@ -28,9 +28,15 @@ try {
 
 $domain = UrlValidator::extractDomain($url);
 
-// Rate limiting
+// Rate limiting (no aplica si estás logueado como admin)
 $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+// Leer límite de la DB primero, fallback a .env
 $maxPerHour = (int) env('RATE_LIMIT_MAX_PER_HOUR', '10');
+try {
+    $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'rate_limit_max_per_hour'");
+    if ($row && is_numeric($row['value'])) $maxPerHour = (int) $row['value'];
+} catch (Throwable $e) { /* usar valor de .env */ }
+$isAdmin = Auth::checkAuth();
 
 try {
     $db = Database::getInstance();
@@ -40,14 +46,16 @@ try {
         "DELETE FROM rate_limits WHERE request_time < datetime('now', '-1 hour')"
     );
 
-    // Contar peticiones de esta IP
-    $count = (int) $db->scalar(
-        "SELECT COUNT(*) FROM rate_limits WHERE ip_address = ? AND endpoint = 'audit'",
-        [$ip]
-    );
+    if (!$isAdmin) {
+        // Contar peticiones de esta IP
+        $count = (int) $db->scalar(
+            "SELECT COUNT(*) FROM rate_limits WHERE ip_address = ? AND endpoint = 'audit'",
+            [$ip]
+        );
 
-    if ($count >= $maxPerHour) {
-        Response::error('Has alcanzado el límite de auditorías por hora. Intenta más tarde.', 429);
+        if ($count >= $maxPerHour) {
+            Response::error('Has alcanzado el límite de auditorías por hora. Intenta más tarde.', 429);
+        }
     }
 
     // Registrar esta petición
@@ -64,6 +72,10 @@ try {
 // Si forceRefresh=true, saltar el cache y hacer un escaneo nuevo
 $forceRefresh = !empty($body['forceRefresh']);
 $cacheTtl = (int) env('CACHE_TTL_SECONDS', '86400');
+try {
+    $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'cache_ttl_seconds'");
+    if ($row && is_numeric($row['value'])) $cacheTtl = (int) $row['value'];
+} catch (Throwable $e) { /* usar valor de .env */ }
 try {
     if (!$forceRefresh) {
         $db = Database::getInstance();
