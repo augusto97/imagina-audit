@@ -163,12 +163,12 @@ export default function LeadsTable() {
                       {new Date(l.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                     </TableCell>
                     <TableCell className="font-medium">
-                      <a href={l.url} target="_blank" rel="noreferrer" className="text-[var(--accent-primary)] hover:underline">{l.domain}</a>
+                      <a href={l.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{l.domain}</a>
                     </TableCell>
                     <TableCell className="text-[var(--text-secondary)] hidden md:table-cell">{l.leadName || '—'}</TableCell>
                     <TableCell className="hidden lg:table-cell">
                       {l.leadEmail ? (
-                        <button onClick={() => copyEmail(l.leadEmail!)} className="text-[var(--accent-primary)] hover:underline text-xs truncate max-w-[150px] block cursor-pointer">{l.leadEmail}</button>
+                        <button onClick={() => copyEmail(l.leadEmail!)} className="text-blue-600 hover:underline text-xs truncate max-w-[150px] block cursor-pointer">{l.leadEmail}</button>
                       ) : <span className="text-[var(--text-tertiary)]">—</span>}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
@@ -189,7 +189,7 @@ export default function LeadsTable() {
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--accent-primary)]" onClick={() => navigate(`/admin/leads/${l.id}/report`)}><FileText className="h-4 w-4" strokeWidth={1.5} /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600" onClick={() => navigate(`/admin/leads/${l.id}/report`)}><FileText className="h-4 w-4" strokeWidth={1.5} /></Button>
                           </TooltipTrigger>
                           <TooltipContent>Reporte técnico</TooltipContent>
                         </Tooltip>

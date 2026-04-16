@@ -1,10 +1,9 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Settings, MessageSquare,
-  CreditCard, SlidersHorizontal, ShieldAlert, LogOut,
+  CreditCard, SlidersHorizontal, ShieldAlert, Shield,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useAuth } from '@/hooks/useAuth'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
 const navSections = [
@@ -38,18 +37,16 @@ interface AdminSidebarProps {
 }
 
 export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSidebarProps) {
-  const { logout } = useAuth()
-
   return (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className={cn("py-3 border-b border-gray-200", collapsed ? "px-2 flex justify-center" : "px-4")}>
+      <div className={cn("py-3 border-b border-[#e5e5e5]", collapsed ? "px-2 flex justify-center" : "px-4")}>
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-orange-500 text-white text-xs font-bold">
-            IA
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--accent-primary)] to-[#0a9db8]">
+            <Shield className="h-4 w-4 text-white" strokeWidth={2} />
           </div>
           {!collapsed && (
-            <span className="text-sm font-semibold text-gray-900">Imagina Audit</span>
+            <span className="text-[13px] font-semibold text-[#333]">Imagina Audit</span>
           )}
         </div>
       </div>
@@ -59,11 +56,11 @@ export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSid
         {navSections.map((section) => (
           <div key={section.title} className="mb-2">
             {!collapsed && (
-              <p className="mb-0.5 px-2 pt-2 text-[11px] font-medium text-gray-400 uppercase tracking-wide">
+              <p className="mb-0.5 px-2 pt-2 text-[11px] font-medium text-[#999] uppercase tracking-wide">
                 {section.title}
               </p>
             )}
-            {collapsed && <div className="my-1 mx-1 border-t border-gray-100" />}
+            {collapsed && <div className="my-1 mx-1 border-t border-[#e5e5e5]" />}
             <div className="space-y-px">
               {section.items.map(({ to, icon: Icon, label }) => {
                 const link = (
@@ -76,8 +73,8 @@ export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSid
                         'group flex items-center rounded text-[13px] transition-colors',
                         collapsed ? 'justify-center p-2' : 'gap-2 px-2 py-1.5',
                         isActive
-                          ? 'bg-gray-100 text-gray-900 font-medium'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          ? 'bg-[#e8e8e8] text-[#111] font-medium'
+                          : 'text-[#555] hover:bg-[#ebebeb] hover:text-[#111]'
                       )
                     }
                   >
@@ -100,28 +97,6 @@ export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSid
           </div>
         ))}
       </nav>
-
-      {/* Logout */}
-      <div className={cn("border-t border-gray-200 py-1.5", collapsed ? "px-1.5" : "px-2")}>
-        {collapsed ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button onClick={logout} className="flex w-full items-center justify-center rounded p-2 text-gray-400 hover:bg-gray-50 hover:text-red-500 transition-colors cursor-pointer">
-                <LogOut className="h-4 w-4" strokeWidth={1.5} />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Cerrar sesión</TooltipContent>
-          </Tooltip>
-        ) : (
-          <button
-            onClick={logout}
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-[13px] text-gray-500 hover:bg-gray-50 hover:text-red-500 transition-colors cursor-pointer"
-          >
-            <LogOut className="h-4 w-4" strokeWidth={1.5} />
-            Cerrar sesión
-          </button>
-        )}
-      </div>
     </div>
   )
 }
