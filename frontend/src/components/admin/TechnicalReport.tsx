@@ -38,6 +38,7 @@ export default function TechnicalReport() {
     <div className="space-y-8 max-w-4xl">
       <ReportHeader result={result} onBack={() => navigate('/admin/leads')} />
       <ExecutiveSummary result={result} criticalCount={criticalMetrics.length} warningCount={warningMetrics.length} />
+      {result.techStack && <TechStackSummary techStack={result.techStack} scanDuration={result.scanDurationMs} />}
       <ActionPlan critical={criticalMetrics} warning={warningMetrics} />
       {result.modules.map(m => (
         <ModuleDetail key={m.id} module={m} />
@@ -145,8 +146,55 @@ function SummaryCard({ label, value, color }: { label: string; value: string; co
   )
 }
 
+function TechStackSummary({ techStack, scanDuration }: { techStack: NonNullable<AuditResult['techStack']>; scanDuration: number }) {
+  const items: Array<{ label: string; value: string }> = []
+  if (techStack.server) items.push({ label: 'Servidor', value: techStack.server })
+  if (techStack.phpVersion) items.push({ label: 'PHP', value: techStack.phpVersion })
+  if (techStack.httpProtocol) items.push({ label: 'Protocolo', value: techStack.httpProtocol })
+  if (techStack.cms) items.push({ label: 'CMS', value: techStack.cms })
+  if (techStack.pageBuilder?.length) items.push({ label: 'Page Builder', value: techStack.pageBuilder.join(', ') })
+  if (techStack.ecommerce?.length) items.push({ label: 'Ecommerce', value: techStack.ecommerce.join(', ') })
+  if (techStack.cachePlugin?.length) items.push({ label: 'Cache', value: techStack.cachePlugin.join(', ') })
+  if (techStack.seoPlugin?.length) items.push({ label: 'SEO Plugin', value: techStack.seoPlugin.join(', ') })
+  if (techStack.securityPlugin?.length) items.push({ label: 'Seguridad', value: techStack.securityPlugin.join(', ') })
+  if (techStack.cdn) items.push({ label: 'CDN', value: techStack.cdn })
+  if (techStack.analytics?.length) items.push({ label: 'Analytics', value: techStack.analytics.join(', ') })
+
+  if (items.length === 0) return null
+
+  return (
+    <div className="rounded-2xl border border-[var(--border-default)] bg-white p-6">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold text-[var(--text-primary)]">Stack Tecnológico</h2>
+        {scanDuration > 0 && <span className="text-xs text-[var(--text-tertiary)]">Escaneo: {(scanDuration / 1000).toFixed(1)}s</span>}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2">
+        {items.map(({ label, value }) => (
+          <div key={label} className="text-sm">
+            <span className="text-[var(--text-tertiary)]">{label}: </span>
+            <span className="font-medium text-[var(--text-primary)]">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function ActionPlan({ critical, warning }: { critical: MetricWithModule[]; warning: MetricWithModule[] }) {
-  if (critical.length === 0 && warning.length === 0) {
+  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const total = critical.length + warning.length
+  const doneCount = checked.size
+
+  const toggle = (key: string) => {
+    setChecked(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  if (total === 0) {
     return (
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
         <h2 className="text-lg font-bold text-emerald-700">Sin problemas detectados</h2>
@@ -157,8 +205,19 @@ function ActionPlan({ critical, warning }: { critical: MetricWithModule[]; warni
 
   return (
     <div className="rounded-2xl border border-[var(--border-default)] bg-white p-6">
-      <h2 className="text-lg font-bold text-[var(--text-primary)] mb-1">Plan de Acción</h2>
-      <p className="text-sm text-[var(--text-secondary)] mb-4">Priorizado por severidad. Corregir primero los críticos.</p>
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-lg font-bold text-[var(--text-primary)]">Plan de Acción</h2>
+        <span className="text-xs font-medium text-[var(--text-tertiary)]">
+          {doneCount}/{total} completados
+          {doneCount > 0 && <span className="ml-2 text-emerald-500">({Math.round(doneCount / total * 100)}%)</span>}
+        </span>
+      </div>
+      {doneCount < total && (
+        <div className="w-full bg-gray-100 rounded-full h-1.5 mb-4">
+          <div className="bg-emerald-500 h-1.5 rounded-full transition-all" style={{ width: `${(doneCount / total) * 100}%` }} />
+        </div>
+      )}
+      {doneCount === total && <p className="text-sm text-emerald-600 mb-4 font-medium">Todas las correcciones completadas.</p>}
 
       {critical.length > 0 && (
         <div className="mb-4">
@@ -167,7 +226,7 @@ function ActionPlan({ critical, warning }: { critical: MetricWithModule[]; warni
           </h3>
           <div className="space-y-2">
             {critical.map((m, i) => (
-              <ActionItem key={m.id + i} index={i + 1} metric={m} />
+              <ActionItem key={m.id + i} index={i + 1} metric={m} checked={checked.has(m.id + i)} onToggle={() => toggle(m.id + i)} />
             ))}
           </div>
         </div>
@@ -180,7 +239,7 @@ function ActionPlan({ critical, warning }: { critical: MetricWithModule[]; warni
           </h3>
           <div className="space-y-2">
             {warning.map((m, i) => (
-              <ActionItem key={m.id + i} index={critical.length + i + 1} metric={m} />
+              <ActionItem key={m.id + i} index={critical.length + i + 1} metric={m} checked={checked.has(m.id + (critical.length + i))} onToggle={() => toggle(m.id + (critical.length + i))} />
             ))}
           </div>
         </div>
@@ -189,21 +248,30 @@ function ActionPlan({ critical, warning }: { critical: MetricWithModule[]; warni
   )
 }
 
-function ActionItem({ index, metric }: { index: number; metric: MetricWithModule }) {
+function ActionItem({ index, metric, checked, onToggle }: { index: number; metric: MetricWithModule; checked: boolean; onToggle: () => void }) {
   return (
-    <div className={`rounded-xl border p-3 ${levelBg(metric.level)}`}>
+    <div className={`rounded-xl border p-3 ${checked ? 'bg-emerald-50/50 border-emerald-200 opacity-70' : levelBg(metric.level)} transition-all`}>
       <div className="flex items-start gap-2">
-        <span className="text-xs font-bold text-[var(--text-tertiary)] mt-0.5 shrink-0 w-5">#{index}</span>
+        <button onClick={onToggle} className="mt-0.5 shrink-0 cursor-pointer">
+          <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-colors ${checked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-300 hover:border-gray-400'}`}>
+            {checked && <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+          </div>
+        </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-[var(--text-primary)]">{metric.name}</span>
+            <span className={`text-sm font-semibold ${checked ? 'line-through text-[var(--text-tertiary)]' : 'text-[var(--text-primary)]'}`}>{metric.name}</span>
             <Badge variant="secondary" className="text-[10px]">{metric.moduleName}</Badge>
+            <span className="text-[10px] text-[var(--text-tertiary)]">#{index}</span>
           </div>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">{metric.description}</p>
-          {metric.recommendation && (
-            <p className="text-sm font-medium text-[var(--text-primary)] mt-2">
-              → {metric.recommendation}
-            </p>
+          {!checked && (
+            <>
+              <p className="text-sm text-[var(--text-secondary)] mt-1">{metric.description}</p>
+              {metric.recommendation && (
+                <p className="text-sm font-medium text-[var(--text-primary)] mt-2">
+                  → {metric.recommendation}
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -284,7 +352,7 @@ function MetricDetail({ metric }: { metric: MetricResult }) {
           <p className="text-sm text-[var(--text-secondary)] mb-2">{metric.description}</p>
 
           {/* Detalles técnicos expandidos */}
-          {renderTechnicalDetails(metric.id, details)}
+          {renderTechnicalDetails(metric.id, details, metric)}
 
           {metric.recommendation && (
             <div className="mt-3 rounded-lg bg-white/80 border border-[var(--border-default)] p-3">
@@ -299,8 +367,128 @@ function MetricDetail({ metric }: { metric: MetricResult }) {
   )
 }
 
-function renderTechnicalDetails(metricId: string, details: Record<string, unknown>) {
+function renderTechnicalDetails(metricId: string, details: Record<string, unknown>, metric?: MetricResult) {
   if (!details || Object.keys(details).length === 0) return null
+
+  // SSL certificate details
+  if (metricId === 'ssl_valid' && (details.issuer || details.validTo)) {
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3 text-xs space-y-1">
+        {details.issuer && <div><span className="font-semibold">Emisor:</span> {String(details.issuer)}</div>}
+        {details.protocol && <div><span className="font-semibold">Protocolo:</span> {String(details.protocol)}</div>}
+        {details.validFrom && <div><span className="font-semibold">Válido desde:</span> {String(details.validFrom)}</div>}
+        {details.validTo && <div><span className="font-semibold">Expira:</span> <span className={Number(details.daysRemaining) < 30 ? 'text-red-600 font-bold' : ''}>{String(details.validTo)} ({String(details.daysRemaining)} días restantes)</span></div>}
+      </div>
+    )
+  }
+
+  // Exposed headers — show what to remove
+  if (metricId === 'exposed_headers' && Array.isArray(details.exposed) && (details.exposed as string[]).length > 0) {
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-amber-200 p-3">
+        <p className="text-xs font-bold text-amber-700 mb-1">HEADERS QUE EXPONEN INFORMACIÓN DEL SERVIDOR</p>
+        <div className="space-y-1 text-xs">
+          {(details.exposed as string[]).map((h, i) => (
+            <div key={i} className="font-mono text-amber-800">{h}</div>
+          ))}
+        </div>
+        <p className="text-xs text-[var(--text-secondary)] mt-2">
+          En .htaccess agregar: <code className="font-mono bg-gray-100 px-1 rounded">Header unset X-Powered-By</code> y <code className="font-mono bg-gray-100 px-1 rounded">ServerTokens Prod</code> en la config de Apache.
+        </p>
+      </div>
+    )
+  }
+
+  // WordPress version — show upgrade target
+  if (metricId === 'wp_version' && details.latestVersion) {
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3 text-xs">
+        <span className="font-semibold">Versión instalada:</span> {String(metric?.value || '?')} →{' '}
+        <span className="font-semibold text-emerald-600">Actualizar a: {String(details.latestVersion)}</span>
+        <p className="text-[var(--text-tertiary)] mt-1">Actualizar desde Dashboard → Actualizaciones. Hacer backup previo.</p>
+      </div>
+    )
+  }
+
+  // Theme info
+  if (metricId === 'wp_theme' && (details.themeName || details.childTheme !== undefined)) {
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3 text-xs space-y-1">
+        {details.themeName && <div><span className="font-semibold">Tema:</span> {String(details.themeName)}</div>}
+        {details.themeVersion && <div><span className="font-semibold">Versión:</span> {String(details.themeVersion)}</div>}
+        <div><span className="font-semibold">Child theme:</span> {details.childTheme ? <span className="text-emerald-600">Sí</span> : <span className="text-amber-600">No — Las personalizaciones se perderán al actualizar el tema</span>}</div>
+      </div>
+    )
+  }
+
+  // REST API exposed users
+  if (metricId === 'rest_api_exposed' && details.users && Array.isArray(details.users)) {
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-red-200 p-3">
+        <p className="text-xs font-bold text-red-600 mb-1">USUARIOS EXPUESTOS VÍA REST API</p>
+        <div className="flex flex-wrap gap-2">
+          {(details.users as string[]).map((u, i) => (
+            <span key={i} className="text-xs font-mono px-2 py-0.5 bg-red-100 rounded text-red-700">{u}</span>
+          ))}
+        </div>
+        <p className="text-xs text-[var(--text-secondary)] mt-2">Bloquear en functions.php o con plugin de seguridad (Wordfence, iThemes).</p>
+      </div>
+    )
+  }
+
+  // User enumeration
+  if (metricId === 'user_enumeration' && details.username) {
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-amber-200 p-3 text-xs">
+        <span className="font-semibold">Username detectado:</span>{' '}
+        <span className="font-mono text-amber-700">{String(details.username)}</span>
+        <p className="text-[var(--text-secondary)] mt-1">Bloquear /?author=N con regla en .htaccess:<br/>
+          <code className="font-mono bg-gray-100 px-1 rounded">RewriteRule ^/?author= - [F,L]</code>
+        </p>
+      </div>
+    )
+  }
+
+  // Images missing alt — show file names
+  if (metricId === 'images_alt' && Array.isArray(details.missingExamples) && (details.missingExamples as string[]).length > 0) {
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3">
+        <p className="text-xs font-bold text-[var(--text-tertiary)] mb-1">IMÁGENES SIN TEXTO ALT ({String(details.withoutAlt)} total)</p>
+        <div className="flex flex-wrap gap-1.5">
+          {(details.missingExamples as string[]).map((f, i) => (
+            <span key={i} className="text-[10px] font-mono px-2 py-0.5 bg-gray-100 rounded text-[var(--text-secondary)]">{f}</span>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Internal links stats
+  if (metricId === 'internal_links' && (details.internal !== undefined || details.external !== undefined)) {
+    return (
+      <div className="mt-2 flex flex-wrap gap-3 text-xs">
+        <span className="px-2 py-1 rounded-lg bg-white/60 border border-[var(--border-default)]">Internos: <b>{String(details.internal ?? 0)}</b></span>
+        <span className="px-2 py-1 rounded-lg bg-white/60 border border-[var(--border-default)]">Externos: <b>{String(details.external ?? 0)}</b></span>
+        {Number(details.nofollow) > 0 && <span className="px-2 py-1 rounded-lg bg-white/60 border border-[var(--border-default)]">Nofollow: <b>{String(details.nofollow)}</b></span>}
+        {Number(details.emptyAnchors) > 0 && <span className="px-2 py-1 rounded-lg bg-amber-50 border border-amber-200">Sin anchor text: <b>{String(details.emptyAnchors)}</b></span>}
+      </div>
+    )
+  }
+
+  // Directory listing
+  if (metricId === 'directory_listing' && Array.isArray(details.exposed)) {
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-red-200 p-3">
+        <p className="text-xs font-bold text-red-600 mb-1">DIRECTORIOS CON LISTADO PÚBLICO</p>
+        <ul className="space-y-1">
+          {(details.exposed as string[]).map((d, i) => (
+            <li key={i} className="text-xs font-mono text-red-700">{d}</li>
+          ))}
+        </ul>
+        <p className="text-xs text-[var(--text-secondary)] mt-2">Agregar <code className="font-mono bg-gray-100 px-1 rounded">Options -Indexes</code> en .htaccess de cada directorio.</p>
+      </div>
+    )
+  }
 
   // Plugins con vulnerabilidades o desactualizados
   if (metricId === 'wp_plugins' && Array.isArray(details.plugins)) {
