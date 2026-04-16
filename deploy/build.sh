@@ -55,14 +55,14 @@ echo "[OK] Archivos copiados a deploy/output/"
 cat > "$DEPLOY_DIR/.htaccess" << 'EOF'
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # IMPORTANTE: Si la app vive en /audit/, cambiar a: RewriteBase /audit/
   RewriteBase /
 
-  # No reescribir archivos reales ni la carpeta api/
+  # No tocar archivos reales ni carpetas que existen en disco
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteCond %{REQUEST_URI} !^/api/
 
-  # Redirigir todo a index.html (React Router)
+  # Redirigir todo lo demás a index.html (React Router)
   RewriteRule ^(.*)$ index.html [L]
 </IfModule>
 
