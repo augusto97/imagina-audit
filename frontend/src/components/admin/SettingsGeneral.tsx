@@ -5,7 +5,6 @@ import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { AccordionItem } from '@/components/ui/accordion'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAdmin } from '@/hooks/useAdmin'
 import api from '@/lib/api'
@@ -186,26 +185,28 @@ export default function SettingsGeneral() {
 
         {/* API Keys */}
         <Card>
-          <CardContent className="p-0">
-            <AccordionItem title={<span className="font-semibold text-[var(--text-primary)]">API Keys</span>}>
-              <div className="px-6 pb-4 space-y-2">
-                <label className="text-xs font-medium text-[var(--text-secondary)]">Google PageSpeed API Key</label>
-                <Input {...register('googlePagespeedApiKey')} placeholder="AIza..." />
-                <p className="text-xs text-[var(--text-tertiary)]">Opcional. Sin key funciona con cuota limitada.</p>
-              </div>
-            </AccordionItem>
+          <CardHeader><CardTitle>API Keys</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-[var(--text-secondary)]">Google PageSpeed API Key</label>
+              <Input {...register('googlePagespeedApiKey')} placeholder="AIza..." />
+              <p className="text-xs text-[var(--text-tertiary)]">Opcional. Sin key funciona con cuota limitada.</p>
+            </div>
           </CardContent>
         </Card>
 
         {/* Cambiar contraseña */}
         <Card>
-          <CardContent className="p-0">
-            <AccordionItem title={<span className="font-semibold text-[var(--text-primary)]">Cambiar Contraseña del Admin</span>}>
-              <div className="px-6 pb-4 space-y-3">
-                <div><label className="text-xs font-medium text-[var(--text-secondary)]">Nueva contraseña</label><Input {...register('newPassword')} type="password" placeholder="Mínimo 8 caracteres" /></div>
-                <div><label className="text-xs font-medium text-[var(--text-secondary)]">Confirmar contraseña</label><Input {...register('confirmPassword')} type="password" /></div>
-              </div>
-            </AccordionItem>
+          <CardHeader><CardTitle>Cambiar Contraseña del Admin</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-[var(--text-secondary)]">Nueva contraseña</label>
+              <Input {...register('newPassword')} type="password" placeholder="Mínimo 8 caracteres" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-[var(--text-secondary)]">Confirmar contraseña</label>
+              <Input {...register('confirmPassword')} type="password" />
+            </div>
           </CardContent>
         </Card>
 
@@ -226,9 +227,11 @@ function WidgetSection() {
   const [widgetColor, setWidgetColor] = useState('#0CC0DF')
   const [widgetPosition, setWidgetPosition] = useState('bottom-right')
   const [widgetLang, setWidgetLang] = useState('es')
+  const [widgetWhatsapp, setWidgetWhatsapp] = useState('')
 
   const baseUrl = window.location.origin
-  const widgetCode = `<script\n  src="${baseUrl}/widget/imagina-audit-widget.js"\n  data-api="${baseUrl}/api"\n  data-color="${widgetColor}"\n  data-position="${widgetPosition}"\n  data-lang="${widgetLang}">\n</script>`
+  const whatsappAttr = widgetWhatsapp ? `\n  data-whatsapp="${widgetWhatsapp}"` : ''
+  const widgetCode = `<script\n  src="${baseUrl}/widget/imagina-audit-widget.js"\n  data-api="${baseUrl}/api"\n  data-color="${widgetColor}"\n  data-position="${widgetPosition}"\n  data-lang="${widgetLang}"${whatsappAttr}>\n</script>`
 
   const copyCode = () => {
     navigator.clipboard.writeText(widgetCode)
@@ -248,7 +251,16 @@ function WidgetSection() {
       </CardHeader>
       <CardContent className="space-y-5">
         {/* Personalizadores */}
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">WhatsApp</label>
+            <Input
+              value={widgetWhatsapp}
+              onChange={(e) => setWidgetWhatsapp(e.target.value)}
+              placeholder="+573001234567"
+            />
+            <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">Si se configura, aparece botón de WhatsApp en el resultado</p>
+          </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Color del botón</label>
             <div className="flex items-center gap-2">

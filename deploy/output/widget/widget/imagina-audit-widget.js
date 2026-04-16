@@ -30,6 +30,7 @@
   var COLOR = script.getAttribute('data-color') || '#0CC0DF';
   var POS = script.getAttribute('data-position') || 'bottom-right';
   var LANG = script.getAttribute('data-lang') || 'es';
+  var WHATSAPP = script.getAttribute('data-whatsapp') || '';
 
   if (!API) { console.error('Imagina Audit Widget: data-api es obligatorio'); return; }
   // Quitar trailing slash
@@ -184,6 +185,7 @@
         '</div>' +
         (issues.length ? '<ul class="ia-is">' + issues.join('') + '</ul>' : '') +
         '<a href="' + resultUrl + '" target="_blank" class="ia-bt" style="display:block;text-align:center;text-decoration:none;color:#fff">' + L.viewFull + '</a>' +
+        (WHATSAPP ? '<a href="https://wa.me/' + WHATSAPP.replace(/[^0-9]/g, '') + '?text=' + encodeURIComponent((LANG === 'en' ? 'Hi! I just scanned my site ' : 'Hola! Acabo de auditar mi sitio ') + data.domain + ' (' + data.globalScore + '/100). ' + (LANG === 'en' ? 'I would like more info.' : 'Me gustaría más información.')) + '" target="_blank" class="ia-bo" style="display:block;text-align:center;text-decoration:none;background:#25D366;color:#fff;border:none">' + L.contact + '</a>' : '') +
         '<button class="ia-bo" id="ia-new">' + (LANG === 'en' ? 'Scan Another Site' : 'Escanear Otro Sitio') + '</button>' +
         '<button class="ia-lk" id="ia-cls2">' + L.close + '</button>' +
       '</div>';
