@@ -32,22 +32,28 @@ class WordPressDetector {
 
         $metrics = [];
 
-        // Métrica: ¿Es WordPress?
-        $metrics[] = Scoring::createMetric(
-            'wp_detected',
-            'Detección de WordPress',
-            $this->isWordPress,
-            $this->isWordPress ? 'WordPress detectado' : 'No es WordPress',
-            $this->isWordPress ? 80 : 50,
-            $this->isWordPress
-                ? 'El sitio está construido con WordPress.'
-                : 'No se detectó WordPress en este sitio. Algunas verificaciones específicas no aplican.',
-            '',
-            'Somos especialistas exclusivos en WordPress con más de 15 años de experiencia.'
-        );
-
         if (!$this->isWordPress) {
-            return $this->buildModuleResult($metrics);
+            $defaults = require dirname(__DIR__) . '/config/defaults.php';
+            return [
+                'id' => 'wordpress',
+                'name' => 'WordPress',
+                'icon' => 'blocks',
+                'score' => null,
+                'level' => 'info',
+                'weight' => $defaults['weight_wordpress'],
+                'metrics' => [Scoring::createMetric(
+                    'wp_detected',
+                    'Detección de WordPress',
+                    false,
+                    'No es WordPress',
+                    null,
+                    'No se detectó WordPress en este sitio. Este módulo no aplica y no afecta la puntuación global.',
+                    '',
+                    'Somos especialistas exclusivos en WordPress con más de 15 años de experiencia.'
+                )],
+                'summary' => 'Este sitio no está construido con WordPress. Este módulo no aplica.',
+                'salesMessage' => $defaults['sales_wordpress'],
+            ];
         }
 
         // Versión de WordPress
