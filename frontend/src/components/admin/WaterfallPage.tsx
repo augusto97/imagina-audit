@@ -87,6 +87,7 @@ export default function WaterfallPage() {
   const [result, setResult] = useState<AuditResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [filterType, setFilterType] = useState('All')
+  const [filterOrigin, setFilterOrigin] = useState<'all' | 'local' | 'external'>('all')
   const [search, setSearch] = useState('')
   const [wptLoading, setWptLoading] = useState(false)
   const [wptStatus, setWptStatus] = useState('')
@@ -156,17 +157,43 @@ export default function WaterfallPage() {
     }).catch(() => setLoading(false))
   }, [id, fetchLeadDetail])
 
+  const siteDomain = result ? new URL(result.url).hostname : ''
+
   const filtered = useMemo(() => {
     let items = requests
     if (filterType !== 'All') {
       items = items.filter(r => (TYPE_LABELS[r.resourceType] || 'Other') === filterType)
+    }
+    if (filterOrigin !== 'all') {
+      items = items.filter(r => {
+        try {
+          const h = new URL(r.url).hostname
+          const isLocal = h === siteDomain || h.endsWith('.' + siteDomain)
+          return filterOrigin === 'local' ? isLocal : !isLocal
+        } catch { return true }
+      })
     }
     if (search) {
       const q = search.toLowerCase()
       items = items.filter(r => r.url.toLowerCase().includes(q))
     }
     return items
-  }, [requests, filterType, search])
+  }, [requests, filterType, filterOrigin, search, siteDomain])
+
+  // Extract performance milestones from audit result
+  const milestones = useMemo(() => {
+    if (!result) return []
+    const marks: Array<{ label: string; time: number; color: string }> = []
+    const perfModule = result.modules.find(m => m.id === 'performance')
+    if (!perfModule) return marks
+    for (const metric of perfModule.metrics) {
+      if (metric.id === 'fcp' && typeof metric.value === 'number') marks.push({ label: 'FCP', time: metric.value, color: '#10B981' })
+      if (metric.id === 'lcp' && typeof metric.value === 'number') marks.push({ label: 'LCP', time: metric.value, color: '#F59E0B' })
+      if (metric.id === 'tbt' && typeof metric.value === 'number') marks.push({ label: 'TBT', time: metric.value, color: '#EF4444' })
+      if (metric.id === 'ttfb' && typeof metric.value === 'number') marks.push({ label: 'TTFB', time: metric.value, color: '#6366F1' })
+    }
+    return marks.filter(m => m.time > 0).sort((a, b) => a.time - b.time)
+  }, [result])
 
   const maxTime = useMemo(() => {
     if (requests.length === 0) return 1
@@ -246,26 +273,52 @@ export default function WaterfallPage() {
         </div>
         <div className="flex gap-1">
           {types.map(t => (
-            <button
-              key={t}
-              onClick={() => setFilterType(t)}
+            <button key={t} onClick={() => setFilterType(t)}
               className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${filterType === t ? 'text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'}`}
-              style={filterType === t ? { backgroundColor: t === 'All' ? '#404040' : (TYPE_COLORS[Object.keys(TYPE_LABELS).find(k => TYPE_LABELS[k] === t) || ''] || '#404040') } : {}}
-            >
+              style={filterType === t ? { backgroundColor: t === 'All' ? '#404040' : (TYPE_COLORS[Object.keys(TYPE_LABELS).find(k => TYPE_LABELS[k] === t) || ''] || '#404040') } : {}}>
               {t}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1 border-l border-gray-200 pl-2">
+          {([['all', 'Todos'], ['local', 'Local'], ['external', 'Externo']] as const).map(([v, label]) => (
+            <button key={v} onClick={() => setFilterOrigin(v)}
+              className={`px-2.5 py-1 rounded text-xs font-medium cursor-pointer ${filterOrigin === v ? 'bg-gray-700 text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'}`}>
+              {label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Time scale header */}
+      {/* Time scale + milestone markers */}
       {maxTime > 1 && (
         <div className="flex items-end px-1">
-          <div style={{ width: '280px' }} className="shrink-0" />
-          <div className="flex-1 flex justify-between text-[10px] text-gray-400 border-b border-gray-200 pb-1">
-            {[0, 0.25, 0.5, 0.75, 1].map(pct => (
-              <span key={pct}>{(maxTime * pct / 1000).toFixed(1)}s</span>
-            ))}
+          <div style={{ width: '240px' }} className="shrink-0" />
+          <div className="flex-1 relative">
+            {/* Time ticks */}
+            <div className="flex justify-between text-[10px] text-gray-400 pb-0.5">
+              {Array.from({ length: 6 }, (_, i) => i / 5).map(pct => (
+                <span key={pct} className="tabular-nums">{maxTime * pct < 1000 ? `${(maxTime * pct).toFixed(0)}ms` : `${(maxTime * pct / 1000).toFixed(1)}s`}</span>
+              ))}
+            </div>
+            {/* Tick lines */}
+            <div className="flex justify-between h-2 border-b border-gray-200">
+              {Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className="w-px bg-gray-300 h-full" />
+              ))}
+            </div>
+            {/* Milestone markers */}
+            {milestones.map(m => {
+              const pct = Math.min((m.time / maxTime) * 100, 100)
+              return (
+                <div key={m.label} className="absolute top-0 bottom-0 pointer-events-none" style={{ left: `${pct}%` }}>
+                  <div className="w-px h-full opacity-50" style={{ backgroundColor: m.color }} />
+                  <span className="absolute -top-4 -translate-x-1/2 text-[9px] font-bold px-1 rounded" style={{ color: m.color }}>
+                    {m.label} {m.time < 1000 ? `${m.time.toFixed(0)}ms` : `${(m.time / 1000).toFixed(1)}s`}
+                  </span>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -281,7 +334,7 @@ export default function WaterfallPage() {
         </div>
 
         {/* Rows */}
-        <div className="max-h-[70vh] overflow-y-auto">
+        <div>
           {filtered.map((req, i) => {
             const barLeft = Math.min((req.startTime / maxTime) * 100, 99)
             const barWidth = Math.min(Math.max(((req.endTime - req.startTime) / maxTime) * 100, 0.5), 100 - barLeft)
@@ -312,9 +365,16 @@ export default function WaterfallPage() {
                 </div>
 
                 {/* Timeline bar */}
-                <div className="px-2 py-1.5 flex items-center">
-                  <div className="relative w-full h-5"
-                    title={`${req.url}\n${req.resourceType} · ${req.statusCode} · ${formatSize(req.transferSize)}\nStart: ${(req.startTime / 1000).toFixed(2)}s\nDuration: ${duration < 1000 ? duration.toFixed(0) + 'ms' : (duration / 1000).toFixed(2) + 's'}\nProtocol: ${req.protocol || '—'}`}
+                <div className="px-2 py-1 flex items-center">
+                  <div className="relative w-full h-5 cursor-pointer"
+                    title={[
+                      req.url,
+                      `Tipo: ${req.resourceType} · Status: ${req.statusCode} · Protocolo: ${req.protocol || '—'}`,
+                      `Tamaño: ${formatSize(req.transferSize)} (${formatSize(req.resourceSize)} sin comprimir)`,
+                      `Inicio: ${req.startTime < 1000 ? req.startTime.toFixed(0) + 'ms' : (req.startTime / 1000).toFixed(2) + 's'}`,
+                      `Fin: ${req.endTime < 1000 ? req.endTime.toFixed(0) + 'ms' : (req.endTime / 1000).toFixed(2) + 's'}`,
+                      `Duración: ${duration < 1000 ? duration.toFixed(0) + 'ms' : (duration / 1000).toFixed(2) + 's'}`,
+                    ].join('\n')}
                   >
                     <div
                       className="absolute h-full rounded-sm opacity-80 group-hover:opacity-100 transition-opacity"
@@ -326,11 +386,16 @@ export default function WaterfallPage() {
                       }}
                     />
                     <span
-                      className="absolute text-[10px] text-gray-400 top-0.5 hidden group-hover:inline"
-                      style={{ left: `${barLeft + barWidth + 0.5}%` }}
+                      className="absolute text-[10px] font-medium top-0 hidden group-hover:inline whitespace-nowrap"
+                      style={{ left: `${Math.min(barLeft + barWidth + 0.5, 85)}%`, color }}
                     >
                       {duration < 1000 ? `${duration.toFixed(0)}ms` : `${(duration / 1000).toFixed(2)}s`}
                     </span>
+                    {/* Milestone vertical lines */}
+                    {milestones.map(m => {
+                      const mPct = Math.min((m.time / maxTime) * 100, 100)
+                      return <div key={m.label} className="absolute top-0 w-px h-full opacity-20" style={{ left: `${mPct}%`, backgroundColor: m.color }} />
+                    })}
                   </div>
                 </div>
               </div>
@@ -442,7 +507,7 @@ function DeepAnalysisResults({ data }: { data: WptResult }) {
           <div className="px-3 py-2">Timeline (DNS / Connect / SSL / TTFB / Download)</div>
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto">
+        <div>
           {filtered.map((req, i) => {
             const barLeft = (req.startTime / maxTime) * 100
             const totalDur = req.endTime - req.startTime
