@@ -405,22 +405,10 @@ class PerformanceAnalyzer {
             ];
         }
 
-        // Si no hay timing data, asignar tiempos simulados basados en orden y tamaño
-        $hasRealTiming = false;
-        foreach ($result['networkRequests'] as $req) {
-            if ($req['startTime'] > 0) { $hasRealTiming = true; break; }
-        }
-        if (!$hasRealTiming && !empty($result['networkRequests'])) {
-            $cursor = 0;
-            foreach ($result['networkRequests'] as &$req) {
-                $duration = max(10, $req['transferSize'] / 50);
-                $req['startTime'] = round($cursor, 1);
-                $req['endTime'] = round($cursor + $duration, 1);
-                // Simular carga parcialmente paralela
-                $cursor += $duration * 0.3;
-            }
-            unset($req);
-        }
+        // Filtrar requests sin timing real
+        $result['networkRequests'] = array_values(array_filter($result['networkRequests'], function ($req) {
+            return $req['startTime'] > 0 || $req['endTime'] > 0;
+        }));
 
         return $result;
     }
