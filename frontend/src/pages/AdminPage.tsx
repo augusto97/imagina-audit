@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
+import { Component, type ReactNode } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import AdminLogin from '@/components/admin/AdminLogin'
 import AdminLayout from '@/components/admin/AdminLayout'
@@ -13,6 +14,21 @@ import SettingsScoring from '@/components/admin/SettingsScoring'
 import VulnerabilityManager from '@/components/admin/VulnerabilityManager'
 import TechnicalReport from '@/components/admin/TechnicalReport'
 import WaterfallPage from '@/components/admin/WaterfallPage'
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
+  state = { error: null as string | null }
+  static getDerivedStateFromError(error: Error) { return { error: error.message } }
+  render() {
+    if (this.state.error) return (
+      <div className="p-8 text-center">
+        <p className="text-red-600 font-bold">Error en el panel</p>
+        <pre className="mt-2 text-xs text-left bg-red-50 p-4 rounded overflow-auto max-h-64">{this.state.error}</pre>
+        <button onClick={() => window.location.reload()} className="mt-4 text-blue-600 underline">Recargar</button>
+      </div>
+    )
+    return this.props.children
+  }
+}
 
 export default function AdminPage() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -31,6 +47,7 @@ export default function AdminPage() {
 
   return (
     <AdminLayout>
+      <ErrorBoundary>
       <Routes>
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="leads" element={<LeadsTable />} />
@@ -44,6 +61,7 @@ export default function AdminPage() {
         <Route path="vulnerabilities" element={<VulnerabilityManager />} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Routes>
+      </ErrorBoundary>
     </AdminLayout>
   )
 }

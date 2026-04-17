@@ -9,6 +9,18 @@ import { useAdmin } from '@/hooks/useAdmin'
 import api from '@/lib/api'
 import type { AuditResult } from '@/types/audit'
 
+interface NetworkRequest {
+  url: string
+  resourceType: string
+  startTime: number
+  endTime: number
+  transferSize: number
+  resourceSize: number
+  statusCode: number
+  mimeType: string
+  protocol: string
+}
+
 interface WptRequest extends NetworkRequest {
   dns: number
   connect: number
@@ -23,18 +35,6 @@ interface WptResult {
   summary: { loadTime: number; fullyLoaded: number; ttfb: number; bytesIn: number; requests: number }
   waterfall: WptRequest[]
   webpagetestUrl: string
-}
-
-interface NetworkRequest {
-  url: string
-  resourceType: string
-  startTime: number
-  endTime: number
-  transferSize: number
-  resourceSize: number
-  statusCode: number
-  mimeType: string
-  protocol: string
 }
 
 const TYPE_COLORS: Record<string, string> = {
