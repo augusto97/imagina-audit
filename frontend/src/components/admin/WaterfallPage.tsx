@@ -21,6 +21,17 @@ interface NetworkRequest {
   protocol: string
 }
 
+interface CruxMetric {
+  id: string; label: string; percentile: number | null; category: string | null
+  distributions: Array<{ min: number; max?: number; proportion: number }>
+}
+interface CruxData { overallCategory: string | null; metrics: CruxMetric[] }
+interface ResourceBreakdownItem { resourceType: string; label: string; requestCount: number; transferSize: number }
+interface LighthouseAudit {
+  id: string; title: string; description: string; score: number | null
+  impact: string; displayValue: string; group: string; weight: number
+}
+
 interface WptRequest extends NetworkRequest {
   dns: number
   connect: number
@@ -142,20 +153,22 @@ export default function WaterfallPage() {
   }, [])
 
   const [requests, setRequests] = useState<NetworkRequest[]>([])
+  const [cruxData, setCruxData] = useState<CruxData | null>(null)
+  const [resourceBreakdown, setResourceBreakdown] = useState<ResourceBreakdownItem[]>([])
+  const [lighthouseAudits, setLighthouseAudits] = useState<LighthouseAudit[]>([])
 
   useEffect(() => {
     if (!id) return
     // Load audit result and waterfall data in parallel
     Promise.all([
       fetchLeadDetail(id),
-      api.get('/admin/waterfall.php', { params: { id } }).then(r => r.data?.data).catch(() => [])
-    ]).then(([audit, waterfallData]: [AuditResult, NetworkRequest[]]) => {
+      api.get('/admin/waterfall.php', { params: { id } }).then(r => r.data?.data).catch(() => null)
+    ]).then(([audit, perfData]: [AuditResult, { waterfall?: NetworkRequest[]; crux?: CruxData; resourceBreakdown?: ResourceBreakdownItem[]; lighthouseAudits?: LighthouseAudit[] } | null]) => {
       setResult(audit)
-      // Try dedicated waterfall endpoint first, fall back to inline data
-      const wf = (waterfallData && waterfallData.length > 0)
-        ? waterfallData
-        : ((audit as unknown as Record<string, unknown>).waterfall as NetworkRequest[]) || []
-      setRequests(wf)
+      setRequests(perfData?.waterfall || [])
+      setCruxData(perfData?.crux || null)
+      setResourceBreakdown(perfData?.resourceBreakdown || [])
+      setLighthouseAudits(perfData?.lighthouseAudits || [])
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [id, fetchLeadDetail])
@@ -459,6 +472,15 @@ export default function WaterfallPage() {
         ))}
       </div>
 
+      {/* Page Details — resource breakdown */}
+      {resourceBreakdown.length > 0 && <PageDetailsSection data={resourceBreakdown} />}
+
+      {/* CrUX — real user metrics */}
+      {cruxData && cruxData.metrics.length > 0 && <CruxSection data={cruxData} />}
+
+      {/* Structure — Lighthouse audits */}
+      {lighthouseAudits.length > 0 && <StructureAuditsSection audits={lighthouseAudits} />}
+
       {/* WebPageTest Deep Analysis Results */}
       {wptResult && <DeepAnalysisResults data={wptResult} />}
     </div>
@@ -610,6 +632,207 @@ function SortHeader({ label, field, current, dir, onSort, className = '' }: {
     >
       {label}
       {active && <span className="text-[10px]">{dir === 'asc' ? '▲' : '▼'}</span>}
+    </div>
+  )
+}
+
+/* === Page Details — Resource Breakdown === */
+
+const BREAKDOWN_COLORS: Record<string, string> = {
+  script: '#FFC107', stylesheet: '#2196F3', image: '#9C27B0', font: '#E91E63',
+  document: '#4CAF50', other: '#9E9E9E', total: '#404040', 'third-party': '#FF5722',
+  media: '#FF5722',
+}
+
+function PageDetailsSection({ data }: { data: ResourceBreakdownItem[] }) {
+  const total = data.find(d => d.resourceType === 'total')
+  const items = data.filter(d => d.resourceType !== 'total' && d.transferSize > 0)
+  const maxSize = Math.max(...items.map(d => d.transferSize), 1)
+  const totalSize = total?.transferSize || items.reduce((s, d) => s + d.transferSize, 0)
+  const totalReqs = total?.requestCount || items.reduce((s, d) => s + d.requestCount, 0)
+
+  return (
+    <div className="mt-8 space-y-4">
+      <h2 className="text-lg font-bold text-gray-900">Page Details</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        {/* Size by type */}
+        <div>
+          <div className="flex items-baseline justify-between mb-3">
+            <span className="text-sm font-medium text-gray-700">Total Page Size</span>
+            <span className="text-lg font-bold text-gray-900">{formatSize(totalSize)}</span>
+          </div>
+          {/* Stacked bar */}
+          <div className="flex h-6 rounded overflow-hidden mb-3">
+            {items.map(d => (
+              <div key={d.resourceType} title={`${d.label}: ${formatSize(d.transferSize)}`}
+                style={{ width: `${(d.transferSize / totalSize) * 100}%`, backgroundColor: BREAKDOWN_COLORS[d.resourceType] || '#9E9E9E' }}
+                className="h-full" />
+            ))}
+          </div>
+          <div className="space-y-1.5">
+            {items.sort((a, b) => b.transferSize - a.transferSize).map(d => (
+              <div key={d.resourceType} className="flex items-center gap-2 text-xs">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: BREAKDOWN_COLORS[d.resourceType] || '#9E9E9E' }} />
+                <span className="w-16 text-gray-500 capitalize">{d.label}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-2">
+                  <div className="h-full rounded-full" style={{ width: `${(d.transferSize / maxSize) * 100}%`, backgroundColor: BREAKDOWN_COLORS[d.resourceType] || '#9E9E9E' }} />
+                </div>
+                <span className="w-16 text-right text-gray-700 font-medium tabular-nums">{formatSize(d.transferSize)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Requests by type */}
+        <div>
+          <div className="flex items-baseline justify-between mb-3">
+            <span className="text-sm font-medium text-gray-700">Total Page Requests</span>
+            <span className="text-lg font-bold text-gray-900">{totalReqs}</span>
+          </div>
+          <div className="flex h-6 rounded overflow-hidden mb-3">
+            {items.map(d => (
+              <div key={d.resourceType} title={`${d.label}: ${d.requestCount}`}
+                style={{ width: `${(d.requestCount / totalReqs) * 100}%`, backgroundColor: BREAKDOWN_COLORS[d.resourceType] || '#9E9E9E' }}
+                className="h-full" />
+            ))}
+          </div>
+          <div className="space-y-1.5">
+            {items.sort((a, b) => b.requestCount - a.requestCount).map(d => (
+              <div key={d.resourceType} className="flex items-center gap-2 text-xs">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: BREAKDOWN_COLORS[d.resourceType] || '#9E9E9E' }} />
+                <span className="w-16 text-gray-500 capitalize">{d.label}</span>
+                <span className="text-gray-700 font-medium">{d.requestCount} <span className="text-gray-400">({((d.requestCount / totalReqs) * 100).toFixed(0)}%)</span></span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* === CrUX — Real User Metrics === */
+
+const CRUX_COLORS: Record<string, string> = { FAST: '#0CCE6B', AVERAGE: '#FFA400', SLOW: '#FF4E42' }
+
+function CruxSection({ data }: { data: CruxData }) {
+  const catLabel = data.overallCategory === 'FAST' ? 'Passed' : data.overallCategory === 'AVERAGE' ? 'Needs Improvement' : 'Poor'
+  const catColor = CRUX_COLORS[data.overallCategory || ''] || '#999'
+
+  return (
+    <div className="mt-8 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-gray-900">Core Web Vitals (Real Users)</h2>
+        <span className="text-sm font-bold px-3 py-1 rounded-full" style={{ color: catColor, backgroundColor: catColor + '15' }}>
+          {catLabel}
+        </span>
+      </div>
+      <p className="text-xs text-gray-500">Based on Chrome User Experience Report (CrUX) — real data from the last 28 days.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {data.metrics.map(m => {
+          const val = m.percentile
+          const color = CRUX_COLORS[m.category || ''] || '#999'
+          const fmtVal = m.label === 'CLS' ? (val !== null ? (val / 100).toFixed(2) : '—') : (val !== null ? (val < 1000 ? `${val}ms` : `${(val / 1000).toFixed(1)}s`) : '—')
+          const catText = m.category === 'FAST' ? 'Good' : m.category === 'AVERAGE' ? 'Needs Improvement' : 'Poor'
+
+          return (
+            <div key={m.id} className="border border-gray-200 rounded-lg p-4">
+              <div className="text-xs text-gray-500 mb-1">{m.label}</div>
+              <div className="text-2xl font-bold tabular-nums" style={{ color }}>{fmtVal}</div>
+              <div className="text-xs font-medium mt-1 px-2 py-0.5 rounded inline-block" style={{ color, backgroundColor: color + '15' }}>{catText}</div>
+              {/* Distribution bar */}
+              {m.distributions.length === 3 && (
+                <div className="flex h-2 rounded-full overflow-hidden mt-3">
+                  <div style={{ width: `${m.distributions[0].proportion * 100}%` }} className="bg-[#0CCE6B]" title={`Good: ${(m.distributions[0].proportion * 100).toFixed(0)}%`} />
+                  <div style={{ width: `${m.distributions[1].proportion * 100}%` }} className="bg-[#FFA400]" title={`Needs Improvement: ${(m.distributions[1].proportion * 100).toFixed(0)}%`} />
+                  <div style={{ width: `${m.distributions[2].proportion * 100}%` }} className="bg-[#FF4E42]" title={`Poor: ${(m.distributions[2].proportion * 100).toFixed(0)}%`} />
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/* === Structure — Lighthouse Audits === */
+
+const IMPACT_COLORS: Record<string, { bg: string; text: string; label: string }> = {
+  high: { bg: 'bg-red-100', text: 'text-red-700', label: 'High' },
+  medium: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Med' },
+  low: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Low' },
+  info: { bg: 'bg-gray-100', text: 'text-gray-500', label: 'N/A' },
+  none: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'None' },
+}
+
+function StructureAuditsSection({ audits }: { audits: LighthouseAudit[] }) {
+  const [expandedAudit, setExpandedAudit] = useState<string | null>(null)
+  const [showNone, setShowNone] = useState(false)
+
+  const withImpact = audits.filter(a => a.impact !== 'none' && a.impact !== 'info')
+  const noImpact = audits.filter(a => a.impact === 'none' || a.impact === 'info')
+
+  return (
+    <div className="mt-8 space-y-4">
+      <h2 className="text-lg font-bold text-gray-900">Structure Audits</h2>
+      <p className="text-xs text-gray-500">Lighthouse performance audits sorted by impact. Click to expand.</p>
+
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        {/* Header */}
+        <div className="grid grid-cols-[60px_1fr_auto] gap-0 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
+          <div className="px-3 py-2">Impact</div>
+          <div className="px-3 py-2">Audit</div>
+          <div className="px-3 py-2 text-right">Value</div>
+        </div>
+
+        {/* Audits with impact */}
+        {withImpact.map(a => {
+          const style = IMPACT_COLORS[a.impact] || IMPACT_COLORS.none
+          const isOpen = expandedAudit === a.id
+          return (
+            <div key={a.id}>
+              <div
+                className={`grid grid-cols-[60px_1fr_auto] gap-0 border-b border-gray-100 text-xs cursor-pointer ${isOpen ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                onClick={() => setExpandedAudit(isOpen ? null : a.id)}
+              >
+                <div className="px-3 py-2.5">
+                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${style.bg} ${style.text}`}>{style.label}</span>
+                </div>
+                <div className="px-3 py-2.5 text-gray-700">{a.title}</div>
+                <div className="px-3 py-2.5 text-right text-gray-500">{a.displayValue}</div>
+              </div>
+              {isOpen && (
+                <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 text-xs text-gray-600">
+                  <p className="whitespace-pre-line">{a.description.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')}</p>
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Toggle for no-impact audits */}
+        {noImpact.length > 0 && (
+          <div
+            className="px-3 py-2 text-xs text-center text-gray-400 cursor-pointer hover:bg-gray-50 border-b border-gray-100"
+            onClick={() => setShowNone(!showNone)}
+          >
+            {showNone ? 'Hide' : 'Show'} {noImpact.length} passed audits {showNone ? '▲' : '▼'}
+          </div>
+        )}
+
+        {showNone && noImpact.map(a => {
+          const style = IMPACT_COLORS[a.impact] || IMPACT_COLORS.none
+          return (
+            <div key={a.id} className="grid grid-cols-[60px_1fr_auto] gap-0 border-b border-gray-100 text-xs">
+              <div className="px-3 py-2">
+                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${style.bg} ${style.text}`}>{style.label}</span>
+              </div>
+              <div className="px-3 py-2 text-gray-500">{a.title}</div>
+              <div className="px-3 py-2 text-right text-gray-400">{a.displayValue}</div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

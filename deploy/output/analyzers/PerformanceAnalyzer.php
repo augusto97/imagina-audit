@@ -410,6 +410,83 @@ class PerformanceAnalyzer {
             return $req['startTime'] > 0 || $req['endTime'] > 0;
         }));
 
+        // CrUX data (real-user metrics from Chrome User Experience Report)
+        $crux = $data['loadingExperience'] ?? [];
+        if (!empty($crux['metrics'])) {
+            $result['crux'] = [
+                'overallCategory' => $crux['overall_category'] ?? null,
+                'metrics' => [],
+            ];
+            $cruxMetricNames = [
+                'LARGEST_CONTENTFUL_PAINT_MS' => 'LCP',
+                'INTERACTION_TO_NEXT_PAINT' => 'INP',
+                'CUMULATIVE_LAYOUT_SHIFT_SCORE' => 'CLS',
+                'FIRST_CONTENTFUL_PAINT_MS' => 'FCP',
+                'EXPERIMENTAL_TIME_TO_FIRST_BYTE' => 'TTFB',
+            ];
+            foreach ($cruxMetricNames as $key => $label) {
+                $m = $crux['metrics'][$key] ?? null;
+                if ($m) {
+                    $result['crux']['metrics'][] = [
+                        'id' => $key,
+                        'label' => $label,
+                        'percentile' => $m['percentile'] ?? null,
+                        'category' => $m['category'] ?? null,
+                        'distributions' => $m['distributions'] ?? [],
+                    ];
+                }
+            }
+        }
+
+        // Resource breakdown (from resource-summary audit)
+        $resourceSummary = $audits['resource-summary']['details']['items'] ?? [];
+        $result['resourceBreakdown'] = [];
+        foreach ($resourceSummary as $item) {
+            if (($item['transferSize'] ?? 0) > 0 || ($item['requestCount'] ?? 0) > 0) {
+                $result['resourceBreakdown'][] = [
+                    'resourceType' => $item['resourceType'] ?? $item['label'] ?? 'Other',
+                    'label' => $item['label'] ?? $item['resourceType'] ?? 'Other',
+                    'requestCount' => (int)($item['requestCount'] ?? 0),
+                    'transferSize' => (int)($item['transferSize'] ?? 0),
+                ];
+            }
+        }
+
+        // All Lighthouse audits with scores (for Structure tab)
+        $result['lighthouseAudits'] = [];
+        $auditCategories = [
+            'performance' => $data['lighthouseResult']['categories']['performance']['auditRefs'] ?? [],
+        ];
+        foreach ($auditCategories['performance'] as $ref) {
+            $auditId = $ref['id'] ?? '';
+            $audit = $audits[$auditId] ?? null;
+            if (!$audit || !isset($audit['score'])) continue;
+            $score = $audit['score'];
+            // Skip informational audits (score = null) and perfect scores unless they have details
+            $impact = 'none';
+            if ($score === null) $impact = 'info';
+            elseif ($score < 0.5) $impact = 'high';
+            elseif ($score < 0.9) $impact = 'medium';
+            elseif ($score < 1) $impact = 'low';
+
+            $result['lighthouseAudits'][] = [
+                'id' => $auditId,
+                'title' => $audit['title'] ?? $auditId,
+                'description' => $audit['description'] ?? '',
+                'score' => $score,
+                'impact' => $impact,
+                'displayValue' => $audit['displayValue'] ?? '',
+                'metricSavings' => $ref['relevantAudits'] ?? [],
+                'group' => $ref['group'] ?? '',
+                'weight' => $ref['weight'] ?? 0,
+            ];
+        }
+        // Sort by impact: high first, then medium, low, none
+        usort($result['lighthouseAudits'], function ($a, $b) {
+            $order = ['high' => 0, 'medium' => 1, 'low' => 2, 'info' => 3, 'none' => 4];
+            return ($order[$a['impact']] ?? 5) - ($order[$b['impact']] ?? 5);
+        });
+
         return $result;
     }
 
@@ -439,6 +516,17 @@ class PerformanceAnalyzer {
      */
     public function getNetworkRequests(): array {
         return $this->mobileData['networkRequests'] ?? [];
+    }
+
+    /**
+     * Retorna datos extendidos de rendimiento (CrUX, resource breakdown, audits)
+     */
+    public function getExtendedData(): array {
+        return [
+            'crux' => $this->mobileData['crux'] ?? null,
+            'resourceBreakdown' => $this->mobileData['resourceBreakdown'] ?? [],
+            'lighthouseAudits' => $this->mobileData['lighthouseAudits'] ?? [],
+        ];
     }
 
     /**

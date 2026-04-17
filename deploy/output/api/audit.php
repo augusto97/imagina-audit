@@ -137,12 +137,19 @@ try {
 try {
     $db = Database::getInstance();
 
-    // Separar waterfall del result principal
+    // Separar waterfall + extended perf del result principal
     $waterfallData = $result['waterfall'] ?? [];
+    $extendedPerf = $result['extendedPerf'] ?? [];
     $resultForStorage = $result;
-    unset($resultForStorage['waterfall']);
+    unset($resultForStorage['waterfall'], $resultForStorage['extendedPerf']);
     $resultJson = json_encode($resultForStorage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    $waterfallJson = !empty($waterfallData) ? json_encode($waterfallData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null;
+    $perfData = [
+        'waterfall' => $waterfallData,
+        'crux' => $extendedPerf['crux'] ?? null,
+        'resourceBreakdown' => $extendedPerf['resourceBreakdown'] ?? [],
+        'lighthouseAudits' => $extendedPerf['lighthouseAudits'] ?? [],
+    ];
+    $waterfallJson = json_encode($perfData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
     // Asegurar que la columna waterfall_json existe (auto-migración)
     try {
