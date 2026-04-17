@@ -123,31 +123,28 @@ export default function ResultsPage() {
   return (
     <Layout showFooter={false}>
       {/* Header sticky */}
-      <div className="sticky top-16 z-40 border-b border-[var(--border-default)] bg-white/90 backdrop-blur-lg">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-[var(--text-primary)]">{result.domain}</span>
-            <span className="text-xs text-[var(--text-tertiary)]">
+      <div className="sticky top-14 z-40 border-b border-[var(--border-default)] bg-white/90 backdrop-blur-lg">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-3 py-2 sm:px-6 sm:py-3 overflow-hidden">
+          <div className="flex items-center gap-2 min-w-0 shrink">
+            <span className="text-sm font-semibold text-[var(--text-primary)] truncate">{result.domain}</span>
+            <span className="text-xs text-[var(--text-tertiary)] hidden sm:inline whitespace-nowrap">
               {new Date(result.timestamp).toLocaleDateString('es-CO')}
             </span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center shrink-0">
             <PdfReport result={result} />
-            <Button variant="ghost" size="sm" onClick={shareWhatsApp} title="Compartir por WhatsApp">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={shareWhatsApp} title="WhatsApp">
               <Share2 className="h-4 w-4" strokeWidth={1.5} />
-              <span className="hidden lg:inline">WhatsApp</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={copyLink} title="Copiar link del informe">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyLink} title="Copiar link">
               <LinkIcon className="h-4 w-4" strokeWidth={1.5} />
             </Button>
-            <Button variant="outline" size="sm" onClick={rescan}>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={rescan} title="Re-escanear">
               <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
-              <span className="hidden sm:inline">Re-escanear</span>
             </Button>
             <Link to="/">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="icon" className="h-8 w-8" title="Nueva auditoría">
                 <RotateCw className="h-4 w-4" strokeWidth={1.5} />
-                <span className="hidden sm:inline">Nueva</span>
               </Button>
             </Link>
           </div>

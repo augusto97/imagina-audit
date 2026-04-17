@@ -119,6 +119,9 @@ class AuditOrchestrator {
             Logger::warning('TechDetector falló: ' . $e->getMessage());
         }
 
+        // 9b. Extraer waterfall data
+        $waterfall = $performanceAnalyzer ? $performanceAnalyzer->getNetworkRequests() : [];
+
         // 10. Calcular resultados globales
         $globalScore = Scoring::calculateGlobalScore($modules);
         $globalLevel = Scoring::getLevel($globalScore);
@@ -147,6 +150,7 @@ class AuditOrchestrator {
             'economicImpact' => $economicImpact,
             'solutionMap' => $solutionMap,
             'techStack' => $techStack,
+            'waterfall' => $waterfall,
         ];
     }
 

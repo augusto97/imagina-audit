@@ -262,12 +262,12 @@ export default function PdfReport({ result }: PdfReportProps) {
   }, [result])
 
   return (
-    <Button variant="outline" size="sm" onClick={generatePdf} disabled={generating}>
+    <Button variant="outline" size="sm" onClick={generatePdf} disabled={generating} title="Descargar PDF" className="h-8 px-2 sm:px-3">
       {generating
         ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
         : <Download className="h-4 w-4" strokeWidth={1.5} />
       }
-      {generating ? 'Generando...' : 'Descargar PDF'}
+      <span className="hidden sm:inline">{generating ? 'Generando...' : 'Descargar PDF'}</span>
     </Button>
   )
 }

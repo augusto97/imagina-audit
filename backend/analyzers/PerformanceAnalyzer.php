@@ -369,6 +369,26 @@ class PerformanceAnalyzer {
             }
         }
 
+        // Extraer network-requests para waterfall
+        $networkItems = $audits['network-requests']['details']['items'] ?? [];
+        $result['networkRequests'] = [];
+        foreach ($networkItems as $item) {
+            if (empty($item['url']) || ($item['transferSize'] ?? 0) == 0 && ($item['resourceSize'] ?? 0) == 0) {
+                continue;
+            }
+            $result['networkRequests'][] = [
+                'url' => $item['url'] ?? '',
+                'resourceType' => $item['resourceType'] ?? 'Other',
+                'startTime' => round($item['startTime'] ?? 0, 1),
+                'endTime' => round($item['endTime'] ?? 0, 1),
+                'transferSize' => $item['transferSize'] ?? 0,
+                'resourceSize' => $item['resourceSize'] ?? 0,
+                'statusCode' => $item['statusCode'] ?? 0,
+                'mimeType' => $item['mimeType'] ?? '',
+                'protocol' => $item['protocol'] ?? '',
+            ];
+        }
+
         return $result;
     }
 
@@ -391,6 +411,13 @@ class PerformanceAnalyzer {
      */
     public function getLcp(): ?float {
         return $this->lcp;
+    }
+
+    /**
+     * Retorna los network requests del waterfall (mobile)
+     */
+    public function getNetworkRequests(): array {
+        return $this->mobileData['networkRequests'] ?? [];
     }
 
     /**

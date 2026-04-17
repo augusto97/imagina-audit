@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Eye, MessageCircle, Trash2, Copy, ChevronLeft, ChevronRight, SearchX, Download, FileText } from 'lucide-react'
+import { Search, Eye, MessageCircle, Trash2, Copy, ChevronLeft, ChevronRight, SearchX, Download, FileText, BarChart3 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -190,6 +190,7 @@ export default function LeadsTable() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600" onClick={() => navigate(`/admin/leads/${l.id}/report`)}><FileText className="h-4 w-4" strokeWidth={1.5} /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-purple-500" onClick={() => navigate(`/admin/leads/${l.id}/waterfall`)}><BarChart3 className="h-4 w-4" strokeWidth={1.5} /></Button>
                           </TooltipTrigger>
                           <TooltipContent>Reporte técnico</TooltipContent>
                         </Tooltip>
