@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS audits (
     is_wordpress INTEGER NOT NULL DEFAULT 0,
     scan_duration_ms INTEGER NOT NULL DEFAULT 0,
     result_json TEXT NOT NULL,
+    waterfall_json TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     ip_address TEXT
 );

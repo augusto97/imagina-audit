@@ -140,18 +140,24 @@ export default function WaterfallPage() {
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [])
 
+  const [requests, setRequests] = useState<NetworkRequest[]>([])
+
   useEffect(() => {
     if (!id) return
-    fetchLeadDetail(id).then((data: AuditResult) => {
-      setResult(data)
+    // Load audit result and waterfall data in parallel
+    Promise.all([
+      fetchLeadDetail(id),
+      api.get('/admin/waterfall.php', { params: { id } }).then(r => r.data?.data).catch(() => [])
+    ]).then(([audit, waterfallData]: [AuditResult, NetworkRequest[]]) => {
+      setResult(audit)
+      // Try dedicated waterfall endpoint first, fall back to inline data
+      const wf = (waterfallData && waterfallData.length > 0)
+        ? waterfallData
+        : ((audit as unknown as Record<string, unknown>).waterfall as NetworkRequest[]) || []
+      setRequests(wf)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [id, fetchLeadDetail])
-
-  const requests: NetworkRequest[] = useMemo(() => {
-    if (!result) return []
-    return ((result as unknown as Record<string, unknown>).waterfall as NetworkRequest[]) || []
-  }, [result])
 
   const filtered = useMemo(() => {
     let items = requests

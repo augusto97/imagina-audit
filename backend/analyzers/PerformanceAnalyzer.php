@@ -372,21 +372,35 @@ class PerformanceAnalyzer {
         // Extraer network-requests para waterfall
         $networkItems = $audits['network-requests']['details']['items'] ?? [];
         $result['networkRequests'] = [];
+        $requestIndex = 0;
         foreach ($networkItems as $item) {
-            if (empty($item['url']) || ($item['transferSize'] ?? 0) == 0 && ($item['resourceSize'] ?? 0) == 0) {
-                continue;
+            $url = $item['url'] ?? '';
+            if (empty($url)) continue;
+            // Filtrar data URIs y recursos vacíos
+            if (str_starts_with($url, 'data:')) continue;
+
+            $startTime = (float)($item['startTime'] ?? 0);
+            $endTime = (float)($item['endTime'] ?? 0);
+            // Si endTime <= startTime, estimar duración mínima basada en tamaño
+            if ($endTime <= $startTime) {
+                $transferSize = (int)($item['transferSize'] ?? 0);
+                $endTime = $startTime + max(1, $transferSize / 100);
             }
+
             $result['networkRequests'][] = [
-                'url' => $item['url'] ?? '',
+                'url' => $url,
                 'resourceType' => $item['resourceType'] ?? 'Other',
-                'startTime' => round($item['startTime'] ?? 0, 1),
-                'endTime' => round($item['endTime'] ?? 0, 1),
-                'transferSize' => $item['transferSize'] ?? 0,
-                'resourceSize' => $item['resourceSize'] ?? 0,
-                'statusCode' => $item['statusCode'] ?? 0,
+                'startTime' => round($startTime, 1),
+                'endTime' => round($endTime, 1),
+                'transferSize' => (int)($item['transferSize'] ?? 0),
+                'resourceSize' => (int)($item['resourceSize'] ?? 0),
+                'statusCode' => (int)($item['statusCode'] ?? 0),
                 'mimeType' => $item['mimeType'] ?? '',
                 'protocol' => $item['protocol'] ?? '',
+                'priority' => $item['priority'] ?? '',
+                'experimentalFromMainFrame' => $item['experimentalFromMainFrame'] ?? false,
             ];
+            $requestIndex++;
         }
 
         return $result;
