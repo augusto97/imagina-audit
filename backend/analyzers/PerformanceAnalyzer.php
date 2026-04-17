@@ -372,19 +372,24 @@ class PerformanceAnalyzer {
         // Extraer network-requests para waterfall
         $networkItems = $audits['network-requests']['details']['items'] ?? [];
         $result['networkRequests'] = [];
-        $requestIndex = 0;
         foreach ($networkItems as $item) {
             $url = $item['url'] ?? '';
-            if (empty($url)) continue;
-            // Filtrar data URIs y recursos vacíos
-            if (str_starts_with($url, 'data:')) continue;
+            if (empty($url) || str_starts_with($url, 'data:')) continue;
 
-            $startTime = (float)($item['startTime'] ?? 0);
-            $endTime = (float)($item['endTime'] ?? 0);
-            // Si endTime <= startTime, estimar duración mínima basada en tamaño
+            // PageSpeed startTime/endTime son en ms relativos a timeOrigin
+            $startTime = (float)($item['startTime'] ?? $item['networkRequestTime'] ?? 0);
+            $endTime = (float)($item['endTime'] ?? $item['networkEndTime'] ?? 0);
+
+            // Si los valores son < 100, probablemente están en segundos — convertir a ms
+            if ($startTime > 0 && $startTime < 100) {
+                $startTime *= 1000;
+                $endTime *= 1000;
+            }
+
+            // Si endTime sigue inválido, estimar
             if ($endTime <= $startTime) {
                 $transferSize = (int)($item['transferSize'] ?? 0);
-                $endTime = $startTime + max(1, $transferSize / 100);
+                $endTime = $startTime + max(5, $transferSize / 50);
             }
 
             $result['networkRequests'][] = [
@@ -397,10 +402,24 @@ class PerformanceAnalyzer {
                 'statusCode' => (int)($item['statusCode'] ?? 0),
                 'mimeType' => $item['mimeType'] ?? '',
                 'protocol' => $item['protocol'] ?? '',
-                'priority' => $item['priority'] ?? '',
-                'experimentalFromMainFrame' => $item['experimentalFromMainFrame'] ?? false,
             ];
-            $requestIndex++;
+        }
+
+        // Si no hay timing data, asignar tiempos simulados basados en orden y tamaño
+        $hasRealTiming = false;
+        foreach ($result['networkRequests'] as $req) {
+            if ($req['startTime'] > 0) { $hasRealTiming = true; break; }
+        }
+        if (!$hasRealTiming && !empty($result['networkRequests'])) {
+            $cursor = 0;
+            foreach ($result['networkRequests'] as &$req) {
+                $duration = max(10, $req['transferSize'] / 50);
+                $req['startTime'] = round($cursor, 1);
+                $req['endTime'] = round($cursor + $duration, 1);
+                // Simular carga parcialmente paralela
+                $cursor += $duration * 0.3;
+            }
+            unset($req);
         }
 
         return $result;

@@ -149,3 +149,28 @@ body {
 .animate-grid-move {
   animation: grid-move 3s ease-in-out infinite alternate;
 }
+
+/* === Print styles === */
+@media print {
+  /* Ocultar sidebar, topbar, botones de acción */
+  aside, header, button, .no-print { display: none !important; }
+  /* Contenido ocupa todo */
+  main, [data-slot="card"], .space-y-8 > * {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* Cada módulo en nueva página si no cabe */
+  .space-y-8 > div {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 12px;
+  }
+  body { font-size: 11px; color: #000; background: #fff; }
+  * { box-shadow: none !important; }
+  [data-slot="card"] { border: 1px solid #ddd; }
+  /* Expandir todo */
+  main { overflow: visible !important; max-height: none !important; }
+  .overflow-y-auto { overflow: visible !important; max-height: none !important; }
+  /* Márgenes de página */
+  @page { margin: 1.5cm; }
+}

@@ -12,6 +12,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 set_time_limit(120);
 ini_set('memory_limit', '256M');
 
+// Liberar el lock de sesión para no bloquear otras peticiones durante el scan
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
+
 $body = Response::getJsonBody();
 
 // Validar URL
