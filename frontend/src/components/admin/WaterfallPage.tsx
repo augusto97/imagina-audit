@@ -90,6 +90,9 @@ export default function WaterfallPage() {
   const [filterOrigin, setFilterOrigin] = useState<'all' | 'local' | 'external'>('all')
   const [search, setSearch] = useState('')
   const [expandedRow, setExpandedRow] = useState<number | null>(null)
+  const [cursorX, setCursorX] = useState<number | null>(null)
+  const [cursorTime, setCursorTime] = useState<number | null>(null)
+  const timelineRef = useRef<HTMLDivElement>(null)
   const [wptLoading, setWptLoading] = useState(false)
   const [wptStatus, setWptStatus] = useState('')
   const [wptResult, setWptResult] = useState<WptResult | null>(null)
@@ -325,7 +328,41 @@ export default function WaterfallPage() {
       )}
 
       {/* Table */}
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div
+        className="border border-gray-200 rounded-lg overflow-hidden relative"
+        ref={timelineRef}
+        onMouseMove={(e) => {
+          if (!timelineRef.current) return
+          // Find the timeline column position by checking the 4th column header
+          const rect = timelineRef.current.getBoundingClientRect()
+          const tableWidth = rect.width
+          // The grid is [1fr_45px_55px_3fr]. Calculate the start of the 3fr column.
+          // Total fixed = 45+55=100px, remaining = tableWidth-100, 1fr = remaining/4, 3fr start = 100 + remaining/4
+          const remaining = tableWidth - 100
+          const colStart = 100 + remaining / 4
+          const colWidth = (remaining / 4) * 3
+          const mouseX = e.clientX - rect.left
+          if (mouseX >= colStart && mouseX <= colStart + colWidth) {
+            const pct = (mouseX - colStart) / colWidth
+            setCursorX(mouseX - rect.left)
+            setCursorTime(pct * maxTime)
+          } else {
+            setCursorX(null)
+            setCursorTime(null)
+          }
+        }}
+        onMouseLeave={() => { setCursorX(null); setCursorTime(null) }}
+      >
+        {/* Cursor line */}
+        {cursorX !== null && cursorTime !== null && (
+          <div className="absolute z-10 pointer-events-none" style={{ left: cursorX, top: 0, bottom: 0 }}>
+            <div className="w-px h-full bg-red-400 opacity-60" />
+            <div className="absolute -top-5 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap tabular-nums">
+              {cursorTime < 1000 ? `${cursorTime.toFixed(0)}ms` : `${(cursorTime / 1000).toFixed(2)}s`}
+            </div>
+          </div>
+        )}
+
         {/* Table header */}
         <div className="grid grid-cols-[minmax(140px,1fr)_45px_55px_3fr] gap-0 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
           <div className="px-3 py-2">URL</div>
