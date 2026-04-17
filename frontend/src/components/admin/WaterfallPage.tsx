@@ -79,9 +79,6 @@ function extractFilename(url: string): string {
   }
 }
 
-function extractDomain(url: string): string {
-  try { return new URL(url).hostname } catch { return '' }
-}
 
 export default function WaterfallPage() {
   const { id } = useParams<{ id: string }>()
@@ -261,14 +258,25 @@ export default function WaterfallPage() {
         </div>
       </div>
 
+      {/* Time scale header */}
+      {maxTime > 1 && (
+        <div className="flex items-end px-1">
+          <div style={{ width: '280px' }} className="shrink-0" />
+          <div className="flex-1 flex justify-between text-[10px] text-gray-400 border-b border-gray-200 pb-1">
+            {[0, 0.25, 0.5, 0.75, 1].map(pct => (
+              <span key={pct}>{(maxTime * pct / 1000).toFixed(1)}s</span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="border border-gray-200 rounded-lg overflow-hidden">
         {/* Table header */}
-        <div className="grid grid-cols-[minmax(200px,2fr)_60px_minmax(100px,1fr)_70px_1fr] gap-0 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
+        <div className="grid grid-cols-[minmax(140px,1fr)_45px_55px_3fr] gap-0 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
           <div className="px-3 py-2">URL</div>
-          <div className="px-2 py-2">Status</div>
-          <div className="px-2 py-2 hidden md:block">Domain</div>
-          <div className="px-2 py-2 text-right">Size</div>
+          <div className="px-1 py-2">Status</div>
+          <div className="px-1 py-2 text-right">Size</div>
           <div className="px-3 py-2">Timeline</div>
         </div>
 
@@ -283,35 +291,31 @@ export default function WaterfallPage() {
             return (
               <div
                 key={i}
-                className="grid grid-cols-[minmax(200px,2fr)_60px_minmax(100px,1fr)_70px_1fr] gap-0 border-b border-gray-100 hover:bg-blue-50/30 text-xs group"
-                title={`${req.url}\n${req.resourceType} · ${req.statusCode} · ${formatSize(req.transferSize)}\nStart: ${req.startTime.toFixed(0)}ms · Duration: ${duration.toFixed(0)}ms`}
+                className="grid grid-cols-[minmax(140px,1fr)_45px_55px_3fr] gap-0 border-b border-gray-100 hover:bg-blue-50/30 text-xs group cursor-default"
               >
                 {/* URL */}
-                <div className="px-3 py-1.5 flex items-center gap-1.5 min-w-0">
+                <div className="px-3 py-1.5 flex items-center gap-1.5 min-w-0" title={req.url}>
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
                   <span className="truncate text-gray-700">{extractFilename(req.url)}</span>
                 </div>
 
                 {/* Status */}
-                <div className="px-2 py-1.5 flex items-center">
-                  <span className={`${req.statusCode >= 400 ? 'text-red-600 font-medium' : req.statusCode >= 300 ? 'text-amber-600' : 'text-gray-500'}`}>
+                <div className="px-1 py-1.5 flex items-center">
+                  <span className={`${req.statusCode >= 400 ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                     {req.statusCode || '—'}
                   </span>
                 </div>
 
-                {/* Domain */}
-                <div className="px-2 py-1.5 text-gray-400 truncate hidden md:block">
-                  {extractDomain(req.url)}
-                </div>
-
                 {/* Size */}
-                <div className="px-2 py-1.5 text-right text-gray-500 tabular-nums">
+                <div className="px-1 py-1.5 text-right text-gray-500 tabular-nums">
                   {formatSize(req.transferSize)}
                 </div>
 
                 {/* Timeline bar */}
-                <div className="px-3 py-1.5 flex items-center">
-                  <div className="relative w-full h-4">
+                <div className="px-2 py-1.5 flex items-center">
+                  <div className="relative w-full h-5"
+                    title={`${req.url}\n${req.resourceType} · ${req.statusCode} · ${formatSize(req.transferSize)}\nStart: ${(req.startTime / 1000).toFixed(2)}s\nDuration: ${duration < 1000 ? duration.toFixed(0) + 'ms' : (duration / 1000).toFixed(2) + 's'}\nProtocol: ${req.protocol || '—'}`}
+                  >
                     <div
                       className="absolute h-full rounded-sm opacity-80 group-hover:opacity-100 transition-opacity"
                       style={{
@@ -335,11 +339,10 @@ export default function WaterfallPage() {
         </div>
 
         {/* Footer */}
-        <div className="grid grid-cols-[minmax(200px,2fr)_60px_minmax(100px,1fr)_70px_1fr] gap-0 bg-gray-50 border-t border-gray-200 text-xs font-medium text-gray-600">
+        <div className="grid grid-cols-[minmax(140px,1fr)_45px_55px_3fr] gap-0 bg-gray-50 border-t border-gray-200 text-xs font-medium text-gray-600">
           <div className="px-3 py-2">{filtered.length} Requests</div>
-          <div className="px-2 py-2"></div>
-          <div className="px-2 py-2 hidden md:block"></div>
-          <div className="px-2 py-2 text-right">{formatSize(totalSize)}</div>
+          <div className="px-1 py-2"></div>
+          <div className="px-1 py-2 text-right">{formatSize(totalSize)}</div>
           <div className="px-3 py-2">{(totalDuration / 1000).toFixed(2)}s</div>
         </div>
       </div>
