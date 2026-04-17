@@ -89,6 +89,7 @@ export default function WaterfallPage() {
   const [filterType, setFilterType] = useState('All')
   const [filterOrigin, setFilterOrigin] = useState<'all' | 'local' | 'external'>('all')
   const [search, setSearch] = useState('')
+  const [expandedRow, setExpandedRow] = useState<number | null>(null)
   const [wptLoading, setWptLoading] = useState(false)
   const [wptStatus, setWptStatus] = useState('')
   const [wptResult, setWptResult] = useState<WptResult | null>(null)
@@ -340,64 +341,61 @@ export default function WaterfallPage() {
             const barWidth = Math.min(Math.max(((req.endTime - req.startTime) / maxTime) * 100, 0.5), 100 - barLeft)
             const color = TYPE_COLORS[req.resourceType] || TYPE_COLORS.Other
             const duration = req.endTime - req.startTime
+            const isExpanded = expandedRow === i
+            const fmtTime = (ms: number) => ms < 1000 ? `${ms.toFixed(0)}ms` : `${(ms / 1000).toFixed(2)}s`
 
             return (
-              <div
-                key={i}
-                className="grid grid-cols-[minmax(140px,1fr)_45px_55px_3fr] gap-0 border-b border-gray-100 hover:bg-blue-50/30 text-xs group cursor-default"
-              >
-                {/* URL */}
-                <div className="px-3 py-1.5 flex items-center gap-1.5 min-w-0" title={req.url}>
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                  <span className="truncate text-gray-700">{extractFilename(req.url)}</span>
-                </div>
-
-                {/* Status */}
-                <div className="px-1 py-1.5 flex items-center">
-                  <span className={`${req.statusCode >= 400 ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
-                    {req.statusCode || '—'}
-                  </span>
-                </div>
-
-                {/* Size */}
-                <div className="px-1 py-1.5 text-right text-gray-500 tabular-nums">
-                  {formatSize(req.transferSize)}
-                </div>
-
-                {/* Timeline bar */}
-                <div className="px-2 py-1 flex items-center">
-                  <div className="relative w-full h-5 cursor-pointer"
-                    title={[
-                      req.url,
-                      `Tipo: ${req.resourceType} · Status: ${req.statusCode} · Protocolo: ${req.protocol || '—'}`,
-                      `Tamaño: ${formatSize(req.transferSize)} (${formatSize(req.resourceSize)} sin comprimir)`,
-                      `Inicio: ${req.startTime < 1000 ? req.startTime.toFixed(0) + 'ms' : (req.startTime / 1000).toFixed(2) + 's'}`,
-                      `Fin: ${req.endTime < 1000 ? req.endTime.toFixed(0) + 'ms' : (req.endTime / 1000).toFixed(2) + 's'}`,
-                      `Duración: ${duration < 1000 ? duration.toFixed(0) + 'ms' : (duration / 1000).toFixed(2) + 's'}`,
-                    ].join('\n')}
-                  >
-                    <div
-                      className="absolute h-full rounded-sm opacity-80 group-hover:opacity-100 transition-opacity"
-                      style={{
-                        left: `${barLeft}%`,
-                        width: `${barWidth}%`,
-                        backgroundColor: color,
-                        minWidth: '2px',
-                      }}
-                    />
-                    <span
-                      className="absolute text-[10px] font-medium top-0 hidden group-hover:inline whitespace-nowrap"
-                      style={{ left: `${Math.min(barLeft + barWidth + 0.5, 85)}%`, color }}
-                    >
-                      {duration < 1000 ? `${duration.toFixed(0)}ms` : `${(duration / 1000).toFixed(2)}s`}
-                    </span>
-                    {/* Milestone vertical lines */}
-                    {milestones.map(m => {
-                      const mPct = Math.min((m.time / maxTime) * 100, 100)
-                      return <div key={m.label} className="absolute top-0 w-px h-full opacity-20" style={{ left: `${mPct}%`, backgroundColor: m.color }} />
-                    })}
+              <div key={i}>
+                <div
+                  className={`grid grid-cols-[minmax(140px,1fr)_45px_55px_3fr] gap-0 border-b border-gray-100 text-xs cursor-pointer select-none ${isExpanded ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                  onClick={() => setExpandedRow(isExpanded ? null : i)}
+                >
+                  {/* URL */}
+                  <div className="px-3 py-1.5 flex items-center gap-1.5 min-w-0">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                    <span className="truncate text-gray-700">{extractFilename(req.url)}</span>
+                  </div>
+                  {/* Status */}
+                  <div className="px-1 py-1.5">
+                    <span className={req.statusCode >= 400 ? 'text-red-600 font-medium' : 'text-gray-500'}>{req.statusCode || '—'}</span>
+                  </div>
+                  {/* Size */}
+                  <div className="px-1 py-1.5 text-right text-gray-500 tabular-nums">{formatSize(req.transferSize)}</div>
+                  {/* Timeline bar */}
+                  <div className="px-2 py-1 flex items-center">
+                    <div className="relative w-full h-5">
+                      <div className="absolute h-full rounded-sm" style={{ left: `${barLeft}%`, width: `${barWidth}%`, backgroundColor: color, minWidth: '2px', opacity: 0.85 }} />
+                      {/* Always show time at end of bar */}
+                      <span className="absolute text-[10px] font-medium top-0.5 whitespace-nowrap tabular-nums" style={{ left: `${Math.min(barLeft + barWidth + 0.5, 88)}%`, color }}>
+                        {fmtTime(duration)}
+                      </span>
+                      {/* Milestone lines */}
+                      {milestones.map(m => (
+                        <div key={m.label} className="absolute top-0 w-px h-full opacity-15" style={{ left: `${Math.min((m.time / maxTime) * 100, 100)}%`, backgroundColor: m.color }} />
+                      ))}
+                    </div>
                   </div>
                 </div>
+
+                {/* Expanded detail panel */}
+                {isExpanded && (
+                  <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 text-xs">
+                    <div className="mb-2">
+                      <a href={req.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all text-[11px]">{req.url}</a>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5 text-gray-600">
+                      <div><span className="text-gray-400">Tipo:</span> <span className="font-medium">{req.resourceType}</span></div>
+                      <div><span className="text-gray-400">Status:</span> <span className="font-medium">{req.statusCode}</span></div>
+                      <div><span className="text-gray-400">Protocolo:</span> <span className="font-medium">{req.protocol || '—'}</span></div>
+                      <div><span className="text-gray-400">MIME:</span> <span className="font-medium">{req.mimeType || '—'}</span></div>
+                      <div><span className="text-gray-400">Tamaño:</span> <span className="font-medium">{formatSize(req.transferSize)}</span></div>
+                      <div><span className="text-gray-400">Sin comprimir:</span> <span className="font-medium">{formatSize(req.resourceSize)}</span></div>
+                      <div><span className="text-gray-400">Inicio:</span> <span className="font-medium">{fmtTime(req.startTime)}</span></div>
+                      <div><span className="text-gray-400">Fin:</span> <span className="font-medium">{fmtTime(req.endTime)}</span></div>
+                      <div><span className="text-gray-400">Duración:</span> <span className="font-medium text-gray-900">{fmtTime(duration)}</span></div>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
