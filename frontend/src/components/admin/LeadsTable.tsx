@@ -160,7 +160,10 @@ export default function LeadsTable() {
                 {leads.map((l) => (
                   <TableRow key={l.id}>
                     <TableCell className="text-xs text-[var(--text-tertiary)] whitespace-nowrap">
-                      {new Date(l.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                      <div>
+                        <span>{new Date(l.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
+                        <span className="block text-[10px] text-gray-400">{new Date(l.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
                     </TableCell>
                     <TableCell className="font-medium">
                       <a href={l.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{l.domain}</a>
@@ -190,9 +193,14 @@ export default function LeadsTable() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600" onClick={() => navigate(`/admin/leads/${l.id}/report`)}><FileText className="h-4 w-4" strokeWidth={1.5} /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-purple-500" onClick={() => navigate(`/admin/leads/${l.id}/waterfall`)}><BarChart3 className="h-4 w-4" strokeWidth={1.5} /></Button>
                           </TooltipTrigger>
                           <TooltipContent>Reporte técnico</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-purple-500" onClick={() => navigate(`/admin/leads/${l.id}/waterfall`)}><BarChart3 className="h-4 w-4" strokeWidth={1.5} /></Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Waterfall</TooltipContent>
                         </Tooltip>
                         {l.leadEmail && (
                           <Tooltip>

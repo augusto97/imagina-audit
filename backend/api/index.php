@@ -110,6 +110,10 @@ switch ($endpoint) {
         require __DIR__ . '/admin/webpagetest.php';
         break;
 
+    case 'admin/waterfall':
+        require __DIR__ . '/admin/waterfall.php';
+        break;
+
     default:
         Response::error('Endpoint no encontrado', 404);
 }

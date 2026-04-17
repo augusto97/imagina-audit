@@ -373,21 +373,42 @@ class PerformanceAnalyzer {
         $networkItems = $audits['network-requests']['details']['items'] ?? [];
         $result['networkRequests'] = [];
         foreach ($networkItems as $item) {
-            if (empty($item['url']) || ($item['transferSize'] ?? 0) == 0 && ($item['resourceSize'] ?? 0) == 0) {
-                continue;
+            $url = $item['url'] ?? '';
+            if (empty($url) || str_starts_with($url, 'data:')) continue;
+
+            // PageSpeed startTime/endTime son en ms relativos a timeOrigin
+            $startTime = (float)($item['startTime'] ?? $item['networkRequestTime'] ?? 0);
+            $endTime = (float)($item['endTime'] ?? $item['networkEndTime'] ?? 0);
+
+            // Si los valores son < 100, probablemente están en segundos — convertir a ms
+            if ($startTime > 0 && $startTime < 100) {
+                $startTime *= 1000;
+                $endTime *= 1000;
             }
+
+            // Si endTime sigue inválido, estimar
+            if ($endTime <= $startTime) {
+                $transferSize = (int)($item['transferSize'] ?? 0);
+                $endTime = $startTime + max(5, $transferSize / 50);
+            }
+
             $result['networkRequests'][] = [
-                'url' => $item['url'] ?? '',
+                'url' => $url,
                 'resourceType' => $item['resourceType'] ?? 'Other',
-                'startTime' => round($item['startTime'] ?? 0, 1),
-                'endTime' => round($item['endTime'] ?? 0, 1),
-                'transferSize' => $item['transferSize'] ?? 0,
-                'resourceSize' => $item['resourceSize'] ?? 0,
-                'statusCode' => $item['statusCode'] ?? 0,
+                'startTime' => round($startTime, 1),
+                'endTime' => round($endTime, 1),
+                'transferSize' => (int)($item['transferSize'] ?? 0),
+                'resourceSize' => (int)($item['resourceSize'] ?? 0),
+                'statusCode' => (int)($item['statusCode'] ?? 0),
                 'mimeType' => $item['mimeType'] ?? '',
                 'protocol' => $item['protocol'] ?? '',
             ];
         }
+
+        // Filtrar requests sin timing real
+        $result['networkRequests'] = array_values(array_filter($result['networkRequests'], function ($req) {
+            return $req['startTime'] > 0 || $req['endTime'] > 0;
+        }));
 
         return $result;
     }

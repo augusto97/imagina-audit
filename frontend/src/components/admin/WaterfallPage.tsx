@@ -140,18 +140,24 @@ export default function WaterfallPage() {
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [])
 
+  const [requests, setRequests] = useState<NetworkRequest[]>([])
+
   useEffect(() => {
     if (!id) return
-    fetchLeadDetail(id).then((data: AuditResult) => {
-      setResult(data)
+    // Load audit result and waterfall data in parallel
+    Promise.all([
+      fetchLeadDetail(id),
+      api.get('/admin/waterfall.php', { params: { id } }).then(r => r.data?.data).catch(() => [])
+    ]).then(([audit, waterfallData]: [AuditResult, NetworkRequest[]]) => {
+      setResult(audit)
+      // Try dedicated waterfall endpoint first, fall back to inline data
+      const wf = (waterfallData && waterfallData.length > 0)
+        ? waterfallData
+        : ((audit as unknown as Record<string, unknown>).waterfall as NetworkRequest[]) || []
+      setRequests(wf)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [id, fetchLeadDetail])
-
-  const requests: NetworkRequest[] = useMemo(() => {
-    if (!result) return []
-    return ((result as unknown as Record<string, unknown>).waterfall as NetworkRequest[]) || []
-  }, [result])
 
   const filtered = useMemo(() => {
     let items = requests
@@ -167,7 +173,10 @@ export default function WaterfallPage() {
 
   const maxTime = useMemo(() => {
     if (requests.length === 0) return 1
-    return Math.max(...requests.map(r => r.endTime), 1)
+    // Use p95 endTime to prevent one outlier from crushing all bars
+    const sorted = [...requests].sort((a, b) => a.endTime - b.endTime)
+    const p95Index = Math.floor(sorted.length * 0.95)
+    return Math.max(sorted[p95Index]?.endTime ?? 1, 1)
   }, [requests])
 
   const types = useMemo(() => {
@@ -178,7 +187,11 @@ export default function WaterfallPage() {
   const totalSize = useMemo(() => filtered.reduce((s, r) => s + r.transferSize, 0), [filtered])
   const totalDuration = useMemo(() => {
     if (filtered.length === 0) return 0
-    return Math.max(...filtered.map(r => r.endTime)) - Math.min(...filtered.map(r => r.startTime))
+    // Also use p95 for the displayed total
+    const sorted = [...filtered].sort((a, b) => a.endTime - b.endTime)
+    const p95Index = Math.floor(sorted.length * 0.95)
+    const minStart = Math.min(...filtered.map(r => r.startTime))
+    return (sorted[p95Index]?.endTime ?? 0) - minStart
   }, [filtered])
 
   if (loading) {
@@ -262,8 +275,8 @@ export default function WaterfallPage() {
         {/* Rows */}
         <div className="max-h-[70vh] overflow-y-auto">
           {filtered.map((req, i) => {
-            const barLeft = (req.startTime / maxTime) * 100
-            const barWidth = Math.max(((req.endTime - req.startTime) / maxTime) * 100, 0.5)
+            const barLeft = Math.min((req.startTime / maxTime) * 100, 99)
+            const barWidth = Math.min(Math.max(((req.endTime - req.startTime) / maxTime) * 100, 0.5), 100 - barLeft)
             const color = TYPE_COLORS[req.resourceType] || TYPE_COLORS.Other
             const duration = req.endTime - req.startTime
 
