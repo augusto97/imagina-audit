@@ -90,9 +90,6 @@ export default function WaterfallPage() {
   const [filterOrigin, setFilterOrigin] = useState<'all' | 'local' | 'external'>('all')
   const [search, setSearch] = useState('')
   const [expandedRow, setExpandedRow] = useState<number | null>(null)
-  const [cursorX, setCursorX] = useState<number | null>(null)
-  const [cursorTime, setCursorTime] = useState<number | null>(null)
-  const timelineRef = useRef<HTMLDivElement>(null)
   const [wptLoading, setWptLoading] = useState(false)
   const [wptStatus, setWptStatus] = useState('')
   const [wptResult, setWptResult] = useState<WptResult | null>(null)
@@ -207,6 +204,25 @@ export default function WaterfallPage() {
     return Math.max(sorted[p95Index]?.endTime ?? 1, 1)
   }, [requests])
 
+  // Calculate grid ticks dynamically based on maxTime
+  const gridTicks = useMemo(() => {
+    if (maxTime <= 1) return []
+    // Choose a nice interval
+    const intervals = [50, 100, 200, 250, 500, 1000, 2000, 5000, 10000, 20000, 50000]
+    const targetCount = 8
+    let interval = intervals[0]
+    for (const iv of intervals) {
+      if (maxTime / iv <= targetCount) { interval = iv; break }
+    }
+    const ticks: number[] = []
+    for (let t = 0; t <= maxTime; t += interval) {
+      ticks.push(t)
+    }
+    return ticks
+  }, [maxTime])
+
+  const fmtTick = (ms: number) => ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
+
   const types = useMemo(() => {
     const set = new Set(requests.map(r => TYPE_LABELS[r.resourceType] || 'Other'))
     return ['All', ...Array.from(set)]
@@ -294,75 +310,29 @@ export default function WaterfallPage() {
         </div>
       </div>
 
-      {/* Time scale + milestone markers */}
-      {maxTime > 1 && (
-        <div className="flex items-end px-1">
-          <div style={{ width: '240px' }} className="shrink-0" />
-          <div className="flex-1 relative">
-            {/* Time ticks */}
-            <div className="flex justify-between text-[10px] text-gray-400 pb-0.5">
-              {Array.from({ length: 6 }, (_, i) => i / 5).map(pct => (
-                <span key={pct} className="tabular-nums">{maxTime * pct < 1000 ? `${(maxTime * pct).toFixed(0)}ms` : `${(maxTime * pct / 1000).toFixed(1)}s`}</span>
-              ))}
-            </div>
-            {/* Tick lines */}
-            <div className="flex justify-between h-2 border-b border-gray-200">
-              {Array.from({ length: 6 }, (_, i) => (
-                <div key={i} className="w-px bg-gray-300 h-full" />
-              ))}
-            </div>
-            {/* Milestone markers */}
-            {milestones.map(m => {
-              const pct = Math.min((m.time / maxTime) * 100, 100)
-              return (
-                <div key={m.label} className="absolute top-0 bottom-0 pointer-events-none" style={{ left: `${pct}%` }}>
-                  <div className="w-px h-full opacity-50" style={{ backgroundColor: m.color }} />
-                  <span className="absolute -top-4 -translate-x-1/2 text-[9px] font-bold px-1 rounded" style={{ color: m.color }}>
-                    {m.label} {m.time < 1000 ? `${m.time.toFixed(0)}ms` : `${(m.time / 1000).toFixed(1)}s`}
-                  </span>
-                </div>
-              )
-            })}
+      {/* Time scale with milestone markers */}
+      {gridTicks.length > 0 && (
+        <div className="flex items-end">
+          <div style={{ minWidth: '240px' }} className="shrink-0" />
+          <div className="flex-1 relative h-8">
+            {/* Tick labels */}
+            {gridTicks.map(t => (
+              <span key={t} className="absolute bottom-0 -translate-x-1/2 text-[10px] text-gray-400 tabular-nums" style={{ left: `${(t / maxTime) * 100}%` }}>
+                {fmtTick(t)}
+              </span>
+            ))}
+            {/* Milestone labels above ticks */}
+            {milestones.map(m => (
+              <span key={m.label} className="absolute top-0 -translate-x-1/2 text-[9px] font-bold tabular-nums" style={{ left: `${Math.min((m.time / maxTime) * 100, 98)}%`, color: m.color }}>
+                {m.label} {fmtTick(m.time)}
+              </span>
+            ))}
           </div>
         </div>
       )}
 
       {/* Table */}
-      <div
-        className="border border-gray-200 rounded-lg overflow-hidden relative"
-        ref={timelineRef}
-        onMouseMove={(e) => {
-          if (!timelineRef.current) return
-          // Find the timeline column position by checking the 4th column header
-          const rect = timelineRef.current.getBoundingClientRect()
-          const tableWidth = rect.width
-          // The grid is [1fr_45px_55px_3fr]. Calculate the start of the 3fr column.
-          // Total fixed = 45+55=100px, remaining = tableWidth-100, 1fr = remaining/4, 3fr start = 100 + remaining/4
-          const remaining = tableWidth - 100
-          const colStart = 100 + remaining / 4
-          const colWidth = (remaining / 4) * 3
-          const mouseX = e.clientX - rect.left
-          if (mouseX >= colStart && mouseX <= colStart + colWidth) {
-            const pct = (mouseX - colStart) / colWidth
-            setCursorX(mouseX - rect.left)
-            setCursorTime(pct * maxTime)
-          } else {
-            setCursorX(null)
-            setCursorTime(null)
-          }
-        }}
-        onMouseLeave={() => { setCursorX(null); setCursorTime(null) }}
-      >
-        {/* Cursor line */}
-        {cursorX !== null && cursorTime !== null && (
-          <div className="absolute z-10 pointer-events-none" style={{ left: cursorX, top: 0, bottom: 0 }}>
-            <div className="w-px h-full bg-red-400 opacity-60" />
-            <div className="absolute -top-5 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap tabular-nums">
-              {cursorTime < 1000 ? `${cursorTime.toFixed(0)}ms` : `${(cursorTime / 1000).toFixed(2)}s`}
-            </div>
-          </div>
-        )}
-
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
         {/* Table header */}
         <div className="grid grid-cols-[minmax(140px,1fr)_45px_55px_3fr] gap-0 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
           <div className="px-3 py-2">URL</div>
@@ -398,18 +368,23 @@ export default function WaterfallPage() {
                   </div>
                   {/* Size */}
                   <div className="px-1 py-1.5 text-right text-gray-500 tabular-nums">{formatSize(req.transferSize)}</div>
-                  {/* Timeline bar */}
-                  <div className="px-2 py-1 flex items-center">
+                  {/* Timeline bar with grid */}
+                  <div className="py-1 flex items-center">
                     <div className="relative w-full h-5">
-                      <div className="absolute h-full rounded-sm" style={{ left: `${barLeft}%`, width: `${barWidth}%`, backgroundColor: color, minWidth: '2px', opacity: 0.85 }} />
-                      {/* Always show time at end of bar */}
-                      <span className="absolute text-[10px] font-medium top-0.5 whitespace-nowrap tabular-nums" style={{ left: `${Math.min(barLeft + barWidth + 0.5, 88)}%`, color }}>
-                        {fmtTime(duration)}
-                      </span>
+                      {/* Grid lines */}
+                      {gridTicks.map(t => (
+                        <div key={t} className="absolute top-0 w-px h-full bg-gray-100" style={{ left: `${(t / maxTime) * 100}%` }} />
+                      ))}
                       {/* Milestone lines */}
                       {milestones.map(m => (
-                        <div key={m.label} className="absolute top-0 w-px h-full opacity-15" style={{ left: `${Math.min((m.time / maxTime) * 100, 100)}%`, backgroundColor: m.color }} />
+                        <div key={m.label} className="absolute top-0 w-px h-full opacity-30" style={{ left: `${Math.min((m.time / maxTime) * 100, 100)}%`, backgroundColor: m.color }} />
                       ))}
+                      {/* Bar */}
+                      <div className="absolute h-full rounded-sm z-[1]" style={{ left: `${barLeft}%`, width: `${barWidth}%`, backgroundColor: color, minWidth: '2px', opacity: 0.85 }} />
+                      {/* Duration label */}
+                      <span className="absolute text-[10px] font-medium top-0.5 whitespace-nowrap tabular-nums z-[2]" style={{ left: `${Math.min(barLeft + barWidth + 0.5, 88)}%`, color }}>
+                        {fmtTime(duration)}
+                      </span>
                     </div>
                   </div>
                 </div>
