@@ -20,13 +20,14 @@ return [
     'threshold_critical' => 30,
 
     // Pesos de módulos (deben sumar 1.0)
-    'weight_wordpress' => 0.15,
-    'weight_security' => 0.25,
-    'weight_performance' => 0.20,
-    'weight_seo' => 0.15,
+    'weight_wordpress' => 0.12,
+    'weight_security' => 0.20,
+    'weight_performance' => 0.18,
+    'weight_seo' => 0.13,
     'weight_mobile' => 0.07,
     'weight_infrastructure' => 0.08,
     'weight_conversion' => 0.10,
+    'weight_page_health' => 0.12,
 
     // Mensajes de venta por módulo
     'sales_wordpress' => 'Con nuestros planes de soporte, mantenemos tu WordPress actualizado y seguro. Actualizamos core, plugins y temas cada semana con testing previo para evitar problemas de compatibilidad.',
@@ -36,6 +37,7 @@ return [
     'sales_mobile' => 'Aseguramos que tu sitio se vea perfecto en móviles: responsive design, optimización de velocidad móvil y experiencia de usuario adaptada a pantallas táctiles.',
     'sales_infrastructure' => 'Recomendamos y migramos tu sitio al hosting más adecuado, configuramos CDN, HTTP/2, compresión y todas las optimizaciones de servidor necesarias.',
     'sales_conversion' => 'Instalamos y configuramos las herramientas esenciales: Google Analytics, chat en vivo, formularios optimizados, píxeles de tracking y cumplimiento legal (cookies, GDPR).',
+    'sales_page_health' => 'Corregimos todos los errores técnicos de tu sitio: recursos rotos, contenido mixto, errores HTML, problemas de codificación y todo lo que afecta la salud técnica de tus páginas.',
     'sales_backups' => 'Configuramos backups automáticos diarios con retención de 30 días, almacenados fuera del servidor. Incluimos restauración gratuita en caso de emergencia.',
 
     // CTA

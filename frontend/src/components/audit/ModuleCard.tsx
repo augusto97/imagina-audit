@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import {
   Shield, Gauge, Search, Smartphone, Server,
-  BarChart3, HardDrive, Blocks,
+  BarChart3, HardDrive, Blocks, HeartPulse,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -15,6 +15,7 @@ import type { ModuleResult } from '@/types/audit'
 const iconMap: Record<string, React.ElementType> = {
   shield: Shield, gauge: Gauge, search: Search, smartphone: Smartphone,
   server: Server, 'bar-chart-3': BarChart3, 'hard-drive': HardDrive, blocks: Blocks,
+  'heart-pulse': HeartPulse,
 }
 
 const levelBadgeVariant: Record<string, 'destructive' | 'warning' | 'success' | 'secondary'> = {

@@ -5,7 +5,7 @@ import ScanningAnimation from '@/components/audit/ScanningAnimation'
 import { useAuditStore } from '@/store/auditStore'
 import { MODULE_EMOJIS, MODULE_NAMES } from '@/lib/constants'
 
-const moduleIds = ['security', 'performance', 'seo', 'wordpress', 'mobile', 'infrastructure', 'conversion']
+const moduleIds = ['security', 'performance', 'seo', 'wordpress', 'mobile', 'infrastructure', 'conversion', 'page_health']
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -68,7 +68,7 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="mb-8 text-center text-xl font-bold text-[var(--text-primary)] sm:text-2xl"
           >
-            Analizamos <span className="highlight-yellow">7 áreas clave</span> de tu sitio
+            Analizamos <span className="highlight-yellow">8 áreas clave</span> de tu sitio
           </motion.h2>
 
           <motion.div

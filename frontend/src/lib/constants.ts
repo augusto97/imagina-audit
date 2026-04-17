@@ -42,6 +42,7 @@ export const MODULE_NAMES: Record<string, string> = {
   mobile: 'Móvil',
   infrastructure: 'Infraestructura',
   conversion: 'Conversión',
+  page_health: 'Salud de Página',
 }
 
 /** Emojis de módulos para el feature grid */
@@ -53,6 +54,7 @@ export const MODULE_EMOJIS: Record<string, string> = {
   mobile: '📱',
   infrastructure: '🖥️',
   conversion: '📊',
+  page_health: '🩺',
 }
 
 /** Pasos simulados del escaneo */
@@ -64,6 +66,7 @@ export const SCAN_STEPS = [
   { id: 'seo', label: 'Verificando SEO...', duration: 3000 },
   { id: 'mobile', label: 'Evaluando compatibilidad móvil...', duration: 2000 },
   { id: 'infrastructure', label: 'Analizando infraestructura...', duration: 2000 },
+  { id: 'page_health', label: 'Verificando salud de página...', duration: 2000 },
   { id: 'conversion', label: 'Detectando herramientas de marketing...', duration: 2000 },
   { id: 'compile', label: 'Compilando resultados...', duration: 2000 },
 ]
