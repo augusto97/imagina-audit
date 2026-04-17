@@ -160,7 +160,10 @@ export default function LeadsTable() {
                 {leads.map((l) => (
                   <TableRow key={l.id}>
                     <TableCell className="text-xs text-[var(--text-tertiary)] whitespace-nowrap">
-                      {new Date(l.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                      <div>
+                        <span>{new Date(l.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
+                        <span className="block text-[10px] text-gray-400">{new Date(l.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
                     </TableCell>
                     <TableCell className="font-medium">
                       <a href={l.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{l.domain}</a>

@@ -113,6 +113,10 @@ try {
 }
 
 // Ejecutar auditoría
+// Cerrar sesión PHP ANTES del scan para no bloquear otras peticiones del admin
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
 try {
     $orchestrator = new AuditOrchestrator($url, [
         'leadName' => $body['leadName'] ?? '',
@@ -132,10 +136,20 @@ try {
 // Guardar en base de datos
 try {
     $db = Database::getInstance();
-    // Separar waterfall del result principal para no bloatear result_json
+
+    // Separar waterfall del result principal
     $waterfallData = $result['waterfall'] ?? [];
     $resultForStorage = $result;
     unset($resultForStorage['waterfall']);
+    $resultJson = json_encode($resultForStorage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $waterfallJson = !empty($waterfallData) ? json_encode($waterfallData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null;
+
+    // Asegurar que la columna waterfall_json existe (auto-migración)
+    try {
+        $db->execute("ALTER TABLE audits ADD COLUMN waterfall_json TEXT");
+    } catch (Throwable $e) {
+        // Columna ya existe — ignorar
+    }
 
     $db->execute(
         "INSERT INTO audits (id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_wordpress, scan_duration_ms, result_json, waterfall_json, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -151,8 +165,8 @@ try {
             $result['globalLevel'],
             $result['isWordPress'] ? 1 : 0,
             $result['scanDurationMs'],
-            json_encode($resultForStorage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            !empty($waterfallData) ? json_encode($waterfallData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
+            $resultJson,
+            $waterfallJson,
             $ip,
         ]
     );
