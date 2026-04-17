@@ -90,6 +90,8 @@ export default function WaterfallPage() {
   const [filterOrigin, setFilterOrigin] = useState<'all' | 'local' | 'external'>('all')
   const [search, setSearch] = useState('')
   const [expandedRow, setExpandedRow] = useState<number | null>(null)
+  const [sortBy, setSortBy] = useState<'default' | 'url' | 'status' | 'size' | 'duration' | 'start'>('default')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [wptLoading, setWptLoading] = useState(false)
   const [wptStatus, setWptStatus] = useState('')
   const [wptResult, setWptResult] = useState<WptResult | null>(null)
@@ -178,8 +180,22 @@ export default function WaterfallPage() {
       const q = search.toLowerCase()
       items = items.filter(r => r.url.toLowerCase().includes(q))
     }
+    // Sort
+    if (sortBy !== 'default') {
+      items = [...items].sort((a, b) => {
+        let va: number | string = 0, vb: number | string = 0
+        if (sortBy === 'url') { va = a.url.toLowerCase(); vb = b.url.toLowerCase() }
+        else if (sortBy === 'status') { va = a.statusCode; vb = b.statusCode }
+        else if (sortBy === 'size') { va = a.transferSize; vb = b.transferSize }
+        else if (sortBy === 'duration') { va = a.endTime - a.startTime; vb = b.endTime - b.startTime }
+        else if (sortBy === 'start') { va = a.startTime; vb = b.startTime }
+        if (va < vb) return sortDir === 'asc' ? -1 : 1
+        if (va > vb) return sortDir === 'asc' ? 1 : -1
+        return 0
+      })
+    }
     return items
-  }, [requests, filterType, filterOrigin, search, siteDomain])
+  }, [requests, filterType, filterOrigin, search, siteDomain, sortBy, sortDir])
 
   // Extract performance milestones from audit result
   const milestones = useMemo(() => {
@@ -237,6 +253,17 @@ export default function WaterfallPage() {
     const minStart = Math.min(...filtered.map(r => r.startTime))
     return (sorted[p95Index]?.endTime ?? 0) - minStart
   }, [filtered])
+
+  const handleSort = (field: typeof sortBy) => {
+    if (field === sortBy) {
+      if (sortDir === 'asc') setSortDir('desc')
+      else { setSortBy('default'); setSortDir('asc') } // third click resets
+    } else {
+      setSortBy(field)
+      setSortDir(field === 'size' || field === 'duration' ? 'desc' : 'asc') // size/duration default desc
+    }
+    setExpandedRow(null)
+  }
 
   if (loading) {
     return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-96 rounded-lg" /></div>
@@ -334,11 +361,11 @@ export default function WaterfallPage() {
       {/* Table */}
       <div className="border border-gray-200 rounded-lg overflow-hidden">
         {/* Table header */}
-        <div className="grid grid-cols-[minmax(140px,1fr)_45px_55px_3fr] gap-0 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
-          <div className="px-3 py-2">URL</div>
-          <div className="px-1 py-2">Status</div>
-          <div className="px-1 py-2 text-right">Size</div>
-          <div className="px-3 py-2">Timeline</div>
+        <div className="grid grid-cols-[minmax(140px,1fr)_45px_55px_3fr] gap-0 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider select-none">
+          <SortHeader label="URL" field="url" current={sortBy} dir={sortDir} onSort={handleSort} className="px-3 py-2" />
+          <SortHeader label="Status" field="status" current={sortBy} dir={sortDir} onSort={handleSort} className="px-1 py-2" />
+          <SortHeader label="Size" field="size" current={sortBy} dir={sortDir} onSort={handleSort} className="px-1 py-2 text-right justify-end" />
+          <SortHeader label="Timeline" field="start" current={sortBy} dir={sortDir} onSort={handleSort} className="px-3 py-2" />
         </div>
 
         {/* Rows */}
@@ -563,6 +590,26 @@ function DeepAnalysisResults({ data }: { data: WptResult }) {
           })}
         </div>
       </div>
+    </div>
+  )
+}
+
+function SortHeader({ label, field, current, dir, onSort, className = '' }: {
+  label: string
+  field: string
+  current: string
+  dir: 'asc' | 'desc'
+  onSort: (f: 'default' | 'url' | 'status' | 'size' | 'duration' | 'start') => void
+  className?: string
+}) {
+  const active = current === field
+  return (
+    <div
+      className={`flex items-center gap-1 cursor-pointer hover:text-gray-700 ${active ? 'text-gray-700' : ''} ${className}`}
+      onClick={() => onSort(field as 'url' | 'status' | 'size' | 'duration' | 'start')}
+    >
+      {label}
+      {active && <span className="text-[10px]">{dir === 'asc' ? '▲' : '▼'}</span>}
     </div>
   )
 }
