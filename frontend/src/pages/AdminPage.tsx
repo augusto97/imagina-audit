@@ -12,6 +12,7 @@ import SettingsPlans from '@/components/admin/SettingsPlans'
 import SettingsScoring from '@/components/admin/SettingsScoring'
 import VulnerabilityManager from '@/components/admin/VulnerabilityManager'
 import TechnicalReport from '@/components/admin/TechnicalReport'
+import WaterfallPage from '@/components/admin/WaterfallPage'
 
 export default function AdminPage() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -35,6 +36,7 @@ export default function AdminPage() {
         <Route path="leads" element={<LeadsTable />} />
         <Route path="leads/:id" element={<LeadDetail />} />
         <Route path="leads/:id/report" element={<TechnicalReport />} />
+        <Route path="leads/:id/waterfall" element={<WaterfallPage />} />
         <Route path="settings" element={<SettingsGeneral />} />
         <Route path="messages" element={<SettingsMessages />} />
         <Route path="plans" element={<SettingsPlans />} />
