@@ -79,9 +79,6 @@ function extractFilename(url: string): string {
   }
 }
 
-function extractDomain(url: string): string {
-  try { return new URL(url).hostname } catch { return '' }
-}
 
 export default function WaterfallPage() {
   const { id } = useParams<{ id: string }>()
@@ -90,7 +87,12 @@ export default function WaterfallPage() {
   const [result, setResult] = useState<AuditResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [filterType, setFilterType] = useState('All')
+  const [filterOrigin, setFilterOrigin] = useState<'all' | 'local' | 'external'>('all')
   const [search, setSearch] = useState('')
+  const [expandedRow, setExpandedRow] = useState<number | null>(null)
+  const [cursorX, setCursorX] = useState<number | null>(null)
+  const [cursorTime, setCursorTime] = useState<number | null>(null)
+  const timelineRef = useRef<HTMLDivElement>(null)
   const [wptLoading, setWptLoading] = useState(false)
   const [wptStatus, setWptStatus] = useState('')
   const [wptResult, setWptResult] = useState<WptResult | null>(null)
@@ -159,17 +161,43 @@ export default function WaterfallPage() {
     }).catch(() => setLoading(false))
   }, [id, fetchLeadDetail])
 
+  const siteDomain = result ? new URL(result.url).hostname : ''
+
   const filtered = useMemo(() => {
     let items = requests
     if (filterType !== 'All') {
       items = items.filter(r => (TYPE_LABELS[r.resourceType] || 'Other') === filterType)
+    }
+    if (filterOrigin !== 'all') {
+      items = items.filter(r => {
+        try {
+          const h = new URL(r.url).hostname
+          const isLocal = h === siteDomain || h.endsWith('.' + siteDomain)
+          return filterOrigin === 'local' ? isLocal : !isLocal
+        } catch { return true }
+      })
     }
     if (search) {
       const q = search.toLowerCase()
       items = items.filter(r => r.url.toLowerCase().includes(q))
     }
     return items
-  }, [requests, filterType, search])
+  }, [requests, filterType, filterOrigin, search, siteDomain])
+
+  // Extract performance milestones from audit result
+  const milestones = useMemo(() => {
+    if (!result) return []
+    const marks: Array<{ label: string; time: number; color: string }> = []
+    const perfModule = result.modules.find(m => m.id === 'performance')
+    if (!perfModule) return marks
+    for (const metric of perfModule.metrics) {
+      if (metric.id === 'fcp' && typeof metric.value === 'number') marks.push({ label: 'FCP', time: metric.value, color: '#10B981' })
+      if (metric.id === 'lcp' && typeof metric.value === 'number') marks.push({ label: 'LCP', time: metric.value, color: '#F59E0B' })
+      if (metric.id === 'tbt' && typeof metric.value === 'number') marks.push({ label: 'TBT', time: metric.value, color: '#EF4444' })
+      if (metric.id === 'ttfb' && typeof metric.value === 'number') marks.push({ label: 'TTFB', time: metric.value, color: '#6366F1' })
+    }
+    return marks.filter(m => m.time > 0).sort((a, b) => a.time - b.time)
+  }, [result])
 
   const maxTime = useMemo(() => {
     if (requests.length === 0) return 1
@@ -249,97 +277,172 @@ export default function WaterfallPage() {
         </div>
         <div className="flex gap-1">
           {types.map(t => (
-            <button
-              key={t}
-              onClick={() => setFilterType(t)}
+            <button key={t} onClick={() => setFilterType(t)}
               className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${filterType === t ? 'text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'}`}
-              style={filterType === t ? { backgroundColor: t === 'All' ? '#404040' : (TYPE_COLORS[Object.keys(TYPE_LABELS).find(k => TYPE_LABELS[k] === t) || ''] || '#404040') } : {}}
-            >
+              style={filterType === t ? { backgroundColor: t === 'All' ? '#404040' : (TYPE_COLORS[Object.keys(TYPE_LABELS).find(k => TYPE_LABELS[k] === t) || ''] || '#404040') } : {}}>
               {t}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1 border-l border-gray-200 pl-2">
+          {([['all', 'Todos'], ['local', 'Local'], ['external', 'Externo']] as const).map(([v, label]) => (
+            <button key={v} onClick={() => setFilterOrigin(v)}
+              className={`px-2.5 py-1 rounded text-xs font-medium cursor-pointer ${filterOrigin === v ? 'bg-gray-700 text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'}`}>
+              {label}
             </button>
           ))}
         </div>
       </div>
 
+      {/* Time scale + milestone markers */}
+      {maxTime > 1 && (
+        <div className="flex items-end px-1">
+          <div style={{ width: '240px' }} className="shrink-0" />
+          <div className="flex-1 relative">
+            {/* Time ticks */}
+            <div className="flex justify-between text-[10px] text-gray-400 pb-0.5">
+              {Array.from({ length: 6 }, (_, i) => i / 5).map(pct => (
+                <span key={pct} className="tabular-nums">{maxTime * pct < 1000 ? `${(maxTime * pct).toFixed(0)}ms` : `${(maxTime * pct / 1000).toFixed(1)}s`}</span>
+              ))}
+            </div>
+            {/* Tick lines */}
+            <div className="flex justify-between h-2 border-b border-gray-200">
+              {Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className="w-px bg-gray-300 h-full" />
+              ))}
+            </div>
+            {/* Milestone markers */}
+            {milestones.map(m => {
+              const pct = Math.min((m.time / maxTime) * 100, 100)
+              return (
+                <div key={m.label} className="absolute top-0 bottom-0 pointer-events-none" style={{ left: `${pct}%` }}>
+                  <div className="w-px h-full opacity-50" style={{ backgroundColor: m.color }} />
+                  <span className="absolute -top-4 -translate-x-1/2 text-[9px] font-bold px-1 rounded" style={{ color: m.color }}>
+                    {m.label} {m.time < 1000 ? `${m.time.toFixed(0)}ms` : `${(m.time / 1000).toFixed(1)}s`}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Table */}
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div
+        className="border border-gray-200 rounded-lg overflow-hidden relative"
+        ref={timelineRef}
+        onMouseMove={(e) => {
+          if (!timelineRef.current) return
+          // Find the timeline column position by checking the 4th column header
+          const rect = timelineRef.current.getBoundingClientRect()
+          const tableWidth = rect.width
+          // The grid is [1fr_45px_55px_3fr]. Calculate the start of the 3fr column.
+          // Total fixed = 45+55=100px, remaining = tableWidth-100, 1fr = remaining/4, 3fr start = 100 + remaining/4
+          const remaining = tableWidth - 100
+          const colStart = 100 + remaining / 4
+          const colWidth = (remaining / 4) * 3
+          const mouseX = e.clientX - rect.left
+          if (mouseX >= colStart && mouseX <= colStart + colWidth) {
+            const pct = (mouseX - colStart) / colWidth
+            setCursorX(mouseX - rect.left)
+            setCursorTime(pct * maxTime)
+          } else {
+            setCursorX(null)
+            setCursorTime(null)
+          }
+        }}
+        onMouseLeave={() => { setCursorX(null); setCursorTime(null) }}
+      >
+        {/* Cursor line */}
+        {cursorX !== null && cursorTime !== null && (
+          <div className="absolute z-10 pointer-events-none" style={{ left: cursorX, top: 0, bottom: 0 }}>
+            <div className="w-px h-full bg-red-400 opacity-60" />
+            <div className="absolute -top-5 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap tabular-nums">
+              {cursorTime < 1000 ? `${cursorTime.toFixed(0)}ms` : `${(cursorTime / 1000).toFixed(2)}s`}
+            </div>
+          </div>
+        )}
+
         {/* Table header */}
-        <div className="grid grid-cols-[minmax(200px,2fr)_60px_minmax(100px,1fr)_70px_1fr] gap-0 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
+        <div className="grid grid-cols-[minmax(140px,1fr)_45px_55px_3fr] gap-0 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
           <div className="px-3 py-2">URL</div>
-          <div className="px-2 py-2">Status</div>
-          <div className="px-2 py-2 hidden md:block">Domain</div>
-          <div className="px-2 py-2 text-right">Size</div>
+          <div className="px-1 py-2">Status</div>
+          <div className="px-1 py-2 text-right">Size</div>
           <div className="px-3 py-2">Timeline</div>
         </div>
 
         {/* Rows */}
-        <div className="max-h-[70vh] overflow-y-auto">
+        <div>
           {filtered.map((req, i) => {
             const barLeft = Math.min((req.startTime / maxTime) * 100, 99)
             const barWidth = Math.min(Math.max(((req.endTime - req.startTime) / maxTime) * 100, 0.5), 100 - barLeft)
             const color = TYPE_COLORS[req.resourceType] || TYPE_COLORS.Other
             const duration = req.endTime - req.startTime
+            const isExpanded = expandedRow === i
+            const fmtTime = (ms: number) => ms < 1000 ? `${ms.toFixed(0)}ms` : `${(ms / 1000).toFixed(2)}s`
 
             return (
-              <div
-                key={i}
-                className="grid grid-cols-[minmax(200px,2fr)_60px_minmax(100px,1fr)_70px_1fr] gap-0 border-b border-gray-100 hover:bg-blue-50/30 text-xs group"
-                title={`${req.url}\n${req.resourceType} · ${req.statusCode} · ${formatSize(req.transferSize)}\nStart: ${req.startTime.toFixed(0)}ms · Duration: ${duration.toFixed(0)}ms`}
-              >
-                {/* URL */}
-                <div className="px-3 py-1.5 flex items-center gap-1.5 min-w-0">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                  <span className="truncate text-gray-700">{extractFilename(req.url)}</span>
-                </div>
-
-                {/* Status */}
-                <div className="px-2 py-1.5 flex items-center">
-                  <span className={`${req.statusCode >= 400 ? 'text-red-600 font-medium' : req.statusCode >= 300 ? 'text-amber-600' : 'text-gray-500'}`}>
-                    {req.statusCode || '—'}
-                  </span>
-                </div>
-
-                {/* Domain */}
-                <div className="px-2 py-1.5 text-gray-400 truncate hidden md:block">
-                  {extractDomain(req.url)}
-                </div>
-
-                {/* Size */}
-                <div className="px-2 py-1.5 text-right text-gray-500 tabular-nums">
-                  {formatSize(req.transferSize)}
-                </div>
-
-                {/* Timeline bar */}
-                <div className="px-3 py-1.5 flex items-center">
-                  <div className="relative w-full h-4">
-                    <div
-                      className="absolute h-full rounded-sm opacity-80 group-hover:opacity-100 transition-opacity"
-                      style={{
-                        left: `${barLeft}%`,
-                        width: `${barWidth}%`,
-                        backgroundColor: color,
-                        minWidth: '2px',
-                      }}
-                    />
-                    <span
-                      className="absolute text-[10px] text-gray-400 top-0.5 hidden group-hover:inline"
-                      style={{ left: `${barLeft + barWidth + 0.5}%` }}
-                    >
-                      {duration < 1000 ? `${duration.toFixed(0)}ms` : `${(duration / 1000).toFixed(2)}s`}
-                    </span>
+              <div key={i}>
+                <div
+                  className={`grid grid-cols-[minmax(140px,1fr)_45px_55px_3fr] gap-0 border-b border-gray-100 text-xs cursor-pointer select-none ${isExpanded ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                  onClick={() => setExpandedRow(isExpanded ? null : i)}
+                >
+                  {/* URL */}
+                  <div className="px-3 py-1.5 flex items-center gap-1.5 min-w-0">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                    <span className="truncate text-gray-700">{extractFilename(req.url)}</span>
+                  </div>
+                  {/* Status */}
+                  <div className="px-1 py-1.5">
+                    <span className={req.statusCode >= 400 ? 'text-red-600 font-medium' : 'text-gray-500'}>{req.statusCode || '—'}</span>
+                  </div>
+                  {/* Size */}
+                  <div className="px-1 py-1.5 text-right text-gray-500 tabular-nums">{formatSize(req.transferSize)}</div>
+                  {/* Timeline bar */}
+                  <div className="px-2 py-1 flex items-center">
+                    <div className="relative w-full h-5">
+                      <div className="absolute h-full rounded-sm" style={{ left: `${barLeft}%`, width: `${barWidth}%`, backgroundColor: color, minWidth: '2px', opacity: 0.85 }} />
+                      {/* Always show time at end of bar */}
+                      <span className="absolute text-[10px] font-medium top-0.5 whitespace-nowrap tabular-nums" style={{ left: `${Math.min(barLeft + barWidth + 0.5, 88)}%`, color }}>
+                        {fmtTime(duration)}
+                      </span>
+                      {/* Milestone lines */}
+                      {milestones.map(m => (
+                        <div key={m.label} className="absolute top-0 w-px h-full opacity-15" style={{ left: `${Math.min((m.time / maxTime) * 100, 100)}%`, backgroundColor: m.color }} />
+                      ))}
+                    </div>
                   </div>
                 </div>
+
+                {/* Expanded detail panel */}
+                {isExpanded && (
+                  <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 text-xs">
+                    <div className="mb-2">
+                      <a href={req.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all text-[11px]">{req.url}</a>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5 text-gray-600">
+                      <div><span className="text-gray-400">Tipo:</span> <span className="font-medium">{req.resourceType}</span></div>
+                      <div><span className="text-gray-400">Status:</span> <span className="font-medium">{req.statusCode}</span></div>
+                      <div><span className="text-gray-400">Protocolo:</span> <span className="font-medium">{req.protocol || '—'}</span></div>
+                      <div><span className="text-gray-400">MIME:</span> <span className="font-medium">{req.mimeType || '—'}</span></div>
+                      <div><span className="text-gray-400">Tamaño:</span> <span className="font-medium">{formatSize(req.transferSize)}</span></div>
+                      <div><span className="text-gray-400">Sin comprimir:</span> <span className="font-medium">{formatSize(req.resourceSize)}</span></div>
+                      <div><span className="text-gray-400">Inicio:</span> <span className="font-medium">{fmtTime(req.startTime)}</span></div>
+                      <div><span className="text-gray-400">Fin:</span> <span className="font-medium">{fmtTime(req.endTime)}</span></div>
+                      <div><span className="text-gray-400">Duración:</span> <span className="font-medium text-gray-900">{fmtTime(duration)}</span></div>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
 
         {/* Footer */}
-        <div className="grid grid-cols-[minmax(200px,2fr)_60px_minmax(100px,1fr)_70px_1fr] gap-0 bg-gray-50 border-t border-gray-200 text-xs font-medium text-gray-600">
+        <div className="grid grid-cols-[minmax(140px,1fr)_45px_55px_3fr] gap-0 bg-gray-50 border-t border-gray-200 text-xs font-medium text-gray-600">
           <div className="px-3 py-2">{filtered.length} Requests</div>
-          <div className="px-2 py-2"></div>
-          <div className="px-2 py-2 hidden md:block"></div>
-          <div className="px-2 py-2 text-right">{formatSize(totalSize)}</div>
+          <div className="px-1 py-2"></div>
+          <div className="px-1 py-2 text-right">{formatSize(totalSize)}</div>
           <div className="px-3 py-2">{(totalDuration / 1000).toFixed(2)}s</div>
         </div>
       </div>
@@ -439,7 +542,7 @@ function DeepAnalysisResults({ data }: { data: WptResult }) {
           <div className="px-3 py-2">Timeline (DNS / Connect / SSL / TTFB / Download)</div>
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto">
+        <div>
           {filtered.map((req, i) => {
             const barLeft = (req.startTime / maxTime) * 100
             const totalDur = req.endTime - req.startTime
