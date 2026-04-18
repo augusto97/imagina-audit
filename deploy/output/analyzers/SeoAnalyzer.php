@@ -23,6 +23,7 @@ class SeoAnalyzer {
     public function analyze(): array {
         $metrics = [];
 
+        $metrics[] = $this->checkSerpPreview();
         $metrics[] = $this->checkTitle();
         $metrics[] = $this->checkMetaDescription();
         $metrics[] = $this->checkMetaRobots();
@@ -39,7 +40,6 @@ class SeoAnalyzer {
         $metrics[] = $this->checkLanguage();
         $metrics[] = $this->checkHreflang();
         $metrics[] = $this->checkContent();
-        $metrics[] = $this->checkInternalLinks();
         $metrics[] = $this->checkUrlStructure();
         $metrics[] = $this->checkKeywordDensity();
         $metrics[] = $this->checkRssFeeds();
@@ -58,6 +58,45 @@ class SeoAnalyzer {
             'summary' => "Tu sitio tiene una puntuación SEO de $score/100.",
             'salesMessage' => $defaults['sales_seo'],
         ];
+    }
+
+    private function checkSerpPreview(): array {
+        $title = $this->parser->getTitle() ?? '';
+        $desc = $this->parser->getMeta('description') ?? '';
+        $favicon = $this->parser->getLinkByRel('icon') ?? $this->parser->getLinkByRel('shortcut icon');
+        $domain = parse_url($this->url, PHP_URL_HOST) ?: $this->url;
+
+        $titleLen = mb_strlen($title);
+        $descLen = mb_strlen($desc);
+        $issues = [];
+
+        if ($titleLen === 0) $issues[] = 'Sin título';
+        elseif ($titleLen > 70) $issues[] = 'Título será truncado en Google (>' . $titleLen . ' car.)';
+        if ($descLen === 0) $issues[] = 'Sin meta description';
+        elseif ($descLen > 160) $issues[] = 'Description será truncada (>' . $descLen . ' car.)';
+        if (!$favicon) $issues[] = 'Sin favicon';
+
+        $score = 100 - (count($issues) * 20);
+
+        return Scoring::createMetric(
+            'serp_preview', 'Vista previa en Google', empty($issues),
+            empty($issues) ? 'Completa' : count($issues) . ' problemas',
+            Scoring::clamp($score),
+            empty($issues)
+                ? 'Tu resultado en Google se verá completo con título, descripción y favicon.'
+                : 'Problemas en la vista previa: ' . implode('. ', $issues) . '.',
+            !empty($issues) ? 'Optimizar título (30-70 car.), description (120-160 car.) y agregar favicon.' : '',
+            'Optimizamos cómo se ve tu sitio en los resultados de Google.',
+            [
+                'title' => $title,
+                'description' => $desc,
+                'url' => $this->url,
+                'domain' => $domain,
+                'favicon' => $favicon,
+                'titleLength' => $titleLen,
+                'descriptionLength' => $descLen,
+            ]
+        );
     }
 
     private function checkTitle(): array {

@@ -28,14 +28,8 @@ class InfrastructureAnalyzer {
         // Protocolo HTTP
         $metrics[] = $this->checkProtocol();
 
-        // TTFB
-        $metrics[] = $this->checkTtfb();
-
         // CDN
         $metrics[] = $this->checkCdn();
-
-        // Compresión
-        $metrics[] = $this->checkCompression();
 
         // PHP expuesto
         $metrics[] = $this->checkPhpExposed();

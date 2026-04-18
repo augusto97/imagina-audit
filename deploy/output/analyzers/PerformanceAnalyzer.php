@@ -452,6 +452,40 @@ class PerformanceAnalyzer {
             }
         }
 
+        // LCP element
+        $lcpElement = $audits['largest-contentful-paint-element']['details']['items'][0] ?? null;
+        if ($lcpElement) {
+            $node = $lcpElement['node'] ?? [];
+            $result['lcpElement'] = [
+                'selector' => $node['selector'] ?? '',
+                'snippet' => $node['snippet'] ?? '',
+                'nodeLabel' => $node['nodeLabel'] ?? '',
+            ];
+        }
+
+        // CLS elements
+        $clsItems = $audits['layout-shift-elements']['details']['items'] ?? [];
+        $result['clsElements'] = [];
+        foreach (array_slice($clsItems, 0, 5) as $item) {
+            $node = $item['node'] ?? [];
+            $result['clsElements'][] = [
+                'selector' => $node['selector'] ?? '',
+                'snippet' => $node['snippet'] ?? '',
+                'nodeLabel' => $node['nodeLabel'] ?? '',
+                'score' => $item['score'] ?? 0,
+            ];
+        }
+
+        // Main thread work breakdown
+        $mainThread = $audits['mainthread-work-breakdown']['details']['items'] ?? [];
+        $result['mainThreadWork'] = [];
+        foreach (array_slice($mainThread, 0, 8) as $item) {
+            $result['mainThreadWork'][] = [
+                'group' => $item['groupLabel'] ?? $item['group'] ?? '',
+                'duration' => round($item['duration'] ?? 0),
+            ];
+        }
+
         // All Lighthouse audits with scores (for Structure tab)
         $result['lighthouseAudits'] = [];
         $auditCategories = [
@@ -526,6 +560,9 @@ class PerformanceAnalyzer {
             'crux' => $this->mobileData['crux'] ?? null,
             'resourceBreakdown' => $this->mobileData['resourceBreakdown'] ?? [],
             'lighthouseAudits' => $this->mobileData['lighthouseAudits'] ?? [],
+            'lcpElement' => $this->mobileData['lcpElement'] ?? null,
+            'clsElements' => $this->mobileData['clsElements'] ?? [],
+            'mainThreadWork' => $this->mobileData['mainThreadWork'] ?? [],
         ];
     }
 

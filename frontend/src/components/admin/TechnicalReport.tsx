@@ -676,6 +676,55 @@ function renderTechnicalDetails(metricId: string, details: Record<string, unknow
   }
 
   // Heading hierarchy
+  // SERP preview
+  if (metricId === 'serp_preview' && details.title) {
+    const title = String(details.title)
+    const desc = String(details.description || '')
+    const domain = String(details.domain || '')
+    return (
+      <div className="mt-2 space-y-3">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 max-w-lg">
+          <p className="text-xs text-gray-500 mb-1">Vista previa en escritorio</p>
+          <div className="text-xs text-emerald-700 mb-0.5">{domain}</div>
+          <div className="text-blue-700 text-base hover:underline cursor-pointer leading-snug">{title.length > 70 ? title.substring(0, 67) + '...' : title}</div>
+          <div className="text-xs text-gray-600 mt-1 leading-relaxed">{desc.length > 160 ? desc.substring(0, 157) + '...' : desc || 'Sin meta description'}</div>
+        </div>
+        <div className="flex gap-4 text-[10px] text-gray-400">
+          <span>Title: {String(details.titleLength)} car.</span>
+          <span>Description: {String(details.descriptionLength)} car.</span>
+        </div>
+      </div>
+    )
+  }
+
+  // Link stats with detail table
+  if (metricId === 'link_stats' && Array.isArray(details.links)) {
+    const links = details.links as Array<{ href: string; anchor: string; type: string; follow: string }>
+    if (links.length === 0) return null
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] overflow-hidden max-h-56 overflow-y-auto">
+        <table className="w-full text-[11px]">
+          <thead><tr className="bg-gray-50 sticky top-0">
+            <th className="text-left px-2 py-1 font-semibold">Anchor Text</th>
+            <th className="text-left px-2 py-1 font-semibold">URL</th>
+            <th className="px-2 py-1 font-semibold">Tipo</th>
+            <th className="px-2 py-1 font-semibold">Follow</th>
+          </tr></thead>
+          <tbody>
+            {links.map((l, i) => (
+              <tr key={i} className="border-t border-gray-100">
+                <td className="px-2 py-1 text-gray-700 max-w-[150px] truncate">{l.anchor}</td>
+                <td className="px-2 py-1 text-gray-500 font-mono max-w-[200px] truncate">{l.href}</td>
+                <td className="px-2 py-1 text-center"><span className={`text-[9px] px-1.5 py-0.5 rounded ${l.type === 'internal' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>{l.type === 'internal' ? 'Int' : 'Ext'}</span></td>
+                <td className="px-2 py-1 text-center"><span className={`text-[9px] ${l.follow === 'nofollow' ? 'text-red-500' : 'text-gray-400'}`}>{l.follow}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   // Keyword density
   if (metricId === 'keyword_density' && (details.topWords || details.topPhrases)) {
     const words = (details.topWords || {}) as Record<string, number>

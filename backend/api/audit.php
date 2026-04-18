@@ -148,6 +148,9 @@ try {
         'crux' => $extendedPerf['crux'] ?? null,
         'resourceBreakdown' => $extendedPerf['resourceBreakdown'] ?? [],
         'lighthouseAudits' => $extendedPerf['lighthouseAudits'] ?? [],
+        'lcpElement' => $extendedPerf['lcpElement'] ?? null,
+        'clsElements' => $extendedPerf['clsElements'] ?? [],
+        'mainThreadWork' => $extendedPerf['mainThreadWork'] ?? [],
     ];
     $waterfallJson = json_encode($perfData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
