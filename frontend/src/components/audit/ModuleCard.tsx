@@ -9,7 +9,7 @@ import { Accordion, AccordionRadixItem, AccordionTrigger, AccordionContent } fro
 import { Separator } from '@/components/ui/separator'
 import ScoreGauge from './ScoreGauge'
 import SemaphoreIcon from './SemaphoreIcon'
-import { getLevelLabel } from '@/lib/utils'
+import { getLevelLabel, getLevelColor } from '@/lib/utils'
 import type { ModuleResult } from '@/types/audit'
 
 const iconMap: Record<string, React.ElementType> = {
@@ -42,19 +42,24 @@ export default function ModuleCard({ module, index }: ModuleCardProps) {
       <Card>
         <CardContent className="pt-6">
           {/* Module header */}
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--accent-primary)]/10">
-                <Icon className="h-5 w-5 text-[var(--accent-primary)]" strokeWidth={1.5} />
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-primary)]/10">
+                <Icon className="h-4.5 w-4.5 text-[var(--accent-primary)]" strokeWidth={1.5} />
               </div>
-              <div>
-                <h3 className="text-base font-semibold text-[var(--text-primary)]">{module.name}</h3>
-                <Badge variant={levelBadgeVariant[module.level] || 'secondary'} className="mt-0.5">
-                  {getLevelLabel(module.level)}
-                </Badge>
+              <div className="min-w-0">
+                <h3 className="text-sm sm:text-base font-semibold text-[var(--text-primary)] truncate">{module.name}</h3>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <Badge variant={levelBadgeVariant[module.level] || 'secondary'}>
+                    {getLevelLabel(module.level)}
+                  </Badge>
+                  <span className="text-sm font-bold sm:hidden" style={{ color: getLevelColor(module.level) }}>{module.score ?? '—'}</span>
+                </div>
               </div>
             </div>
-            <ScoreGauge score={module.score ?? 0} level={module.level} size="sm" showLabel={false} />
+            <div className="hidden sm:block shrink-0">
+              <ScoreGauge score={module.score ?? 0} level={module.level} size="sm" showLabel={false} />
+            </div>
           </div>
 
           <p className="text-sm text-[var(--text-secondary)] mb-4">{module.summary}</p>

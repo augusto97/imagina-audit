@@ -514,7 +514,7 @@ function renderTechnicalDetails(metricId: string, details: Record<string, unknow
         <p className="text-xs font-bold text-[var(--text-tertiary)] mb-1">IMÁGENES SIN TEXTO ALT ({String(details.withoutAlt)} total)</p>
         <div className="flex flex-wrap gap-1.5">
           {(details.missingExamples as string[]).map((f, i) => (
-            <span key={i} className="text-[10px] font-mono px-2 py-0.5 bg-gray-100 rounded text-[var(--text-secondary)]">{f}</span>
+            <span key={i} className="text-[10px] font-mono px-2 py-0.5 bg-gray-100 rounded text-[var(--text-secondary)] break-all">{f}</span>
           ))}
         </div>
       </div>
@@ -718,25 +718,17 @@ function renderTechnicalDetails(metricId: string, details: Record<string, unknow
     const links = details.links as Array<{ href: string; anchor: string; type: string; follow: string }>
     if (links.length === 0) return null
     return (
-      <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] overflow-hidden max-h-56 overflow-y-auto">
-        <table className="w-full text-[11px]">
-          <thead><tr className="bg-gray-50 sticky top-0">
-            <th className="text-left px-2 py-1 font-semibold">Anchor Text</th>
-            <th className="text-left px-2 py-1 font-semibold">URL</th>
-            <th className="px-2 py-1 font-semibold">Tipo</th>
-            <th className="px-2 py-1 font-semibold">Follow</th>
-          </tr></thead>
-          <tbody>
-            {links.map((l, i) => (
-              <tr key={i} className="border-t border-gray-100">
-                <td className="px-2 py-1 text-gray-700 max-w-[150px] truncate">{l.anchor}</td>
-                <td className="px-2 py-1 text-gray-500 font-mono max-w-[200px] truncate">{l.href}</td>
-                <td className="px-2 py-1 text-center"><span className={`text-[9px] px-1.5 py-0.5 rounded ${l.type === 'internal' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>{l.type === 'internal' ? 'Int' : 'Ext'}</span></td>
-                <td className="px-2 py-1 text-center"><span className={`text-[9px] ${l.follow === 'nofollow' ? 'text-red-500' : 'text-gray-400'}`}>{l.follow}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-2 max-h-56 overflow-y-auto space-y-1">
+        {links.map((l, i) => (
+          <div key={i} className="text-[11px] border-b border-gray-100 pb-1 last:border-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className={`text-[9px] px-1.5 py-0.5 rounded ${l.type === 'internal' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>{l.type === 'internal' ? 'Int' : 'Ext'}</span>
+              <span className={`text-[9px] ${l.follow === 'nofollow' ? 'text-red-500' : 'text-gray-400'}`}>{l.follow}</span>
+              <span className="text-gray-700 font-medium">{l.anchor}</span>
+            </div>
+            <div className="text-gray-400 font-mono text-[10px] break-all">{l.href}</div>
+          </div>
+        ))}
       </div>
     )
   }
@@ -775,19 +767,14 @@ function renderTechnicalDetails(metricId: string, details: Record<string, unknow
   if (metricId === 'url_resolution' && Array.isArray(details.results)) {
     const results = details.results as Array<{ variant: string; redirectsTo: string; matches: boolean; status: number }>
     return (
-      <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] overflow-hidden">
-        <table className="w-full text-xs">
-          <thead><tr className="bg-gray-50"><th className="text-left px-3 py-1.5 font-semibold">Variante</th><th className="text-left px-3 py-1.5 font-semibold">Redirige a</th><th className="px-3 py-1.5 font-semibold">OK</th></tr></thead>
-          <tbody>
-            {results.map((r, i) => (
-              <tr key={i} className="border-t border-gray-100">
-                <td className="px-3 py-1.5 font-mono">{r.variant}</td>
-                <td className="px-3 py-1.5 font-mono truncate max-w-[200px]">{r.redirectsTo}</td>
-                <td className="px-3 py-1.5 text-center">{r.matches ? '✓' : '✗'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-2 space-y-1.5">
+        {results.map((r, i) => (
+          <div key={i} className="rounded-lg bg-white/60 border border-[var(--border-default)] p-2 text-xs">
+            <div className="font-mono text-gray-600 break-all">{r.variant}</div>
+            <div className="font-mono text-gray-500 break-all mt-0.5">→ {r.redirectsTo}</div>
+            <span className={`text-[10px] font-medium ${r.matches ? 'text-emerald-600' : 'text-red-500'}`}>{r.matches ? '✓ Correcto' : '✗ No coincide'}</span>
+          </div>
+        ))}
       </div>
     )
   }
