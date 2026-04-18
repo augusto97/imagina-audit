@@ -610,26 +610,42 @@ function renderTechnicalDetails(metricId: string, details: Record<string, unknow
   if (metricId === 'plugin_vulnerabilities' && Array.isArray(details.vulnerabilities)) {
     const vulns = details.vulnerabilities as Array<Record<string, unknown>>
     if (vulns.length === 0) return null
+
+    const cvssColor = (score: number) => {
+      if (score >= 9) return 'bg-red-600 text-white'
+      if (score >= 7) return 'bg-red-500 text-white'
+      if (score >= 4) return 'bg-amber-500 text-white'
+      return 'bg-yellow-400 text-gray-900'
+    }
+
     return (
-      <div className="mt-2 rounded-lg bg-white/60 border border-red-200 overflow-hidden">
-        <table className="w-full text-xs">
-          <thead><tr className="bg-red-50">
-            <th className="text-left px-3 py-1.5 font-semibold">Plugin</th>
-            <th className="text-left px-3 py-1.5 font-semibold">CVE</th>
-            <th className="text-left px-3 py-1.5 font-semibold">Severidad</th>
-            <th className="text-left px-3 py-1.5 font-semibold">Fix</th>
-          </tr></thead>
-          <tbody>
-            {vulns.map((v, i) => (
-              <tr key={i} className="border-t border-red-100">
-                <td className="px-3 py-1.5 font-medium">{String(v.pluginName || v.plugin)}</td>
-                <td className="px-3 py-1.5 font-mono">{String(v.cveId || '—')}</td>
-                <td className="px-3 py-1.5"><Badge variant={v.severity === 'critical' ? 'destructive' : 'warning'} className="text-[10px]">{String(v.severity)}</Badge></td>
-                <td className="px-3 py-1.5 text-emerald-600 font-semibold">{String(v.fixedInVersion || 'Actualizar')}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-2 space-y-2">
+        {vulns.map((v, i) => (
+          <div key={i} className="rounded-lg border border-red-200 bg-red-50/50 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-sm text-gray-900">{String(v.pluginName || v.plugin)}</span>
+                  {v.cveId != null && <span className="text-[10px] font-mono text-gray-500">{String(v.cveId)}</span>}
+                </div>
+                {v.name != null && <p className="text-xs text-gray-600 mt-1">{String(v.name)}</p>}
+                <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-500">
+                  {v.fixedInVersion != null && !v.unfixed && <span>Fix: <span className="font-semibold text-emerald-600">v{String(v.fixedInVersion)}</span></span>}
+                  {v.unfixed === true && <span className="font-semibold text-red-600">Sin corrección disponible</span>}
+                  {v.affectedVersions != null && <span>Afecta: {String(v.affectedVersions)}</span>}
+                </div>
+              </div>
+              {v.cvssScore != null && Number(v.cvssScore) > 0 && (
+                <div className="shrink-0 text-center">
+                  <div className={`inline-block px-2.5 py-1 rounded-md text-sm font-bold ${cvssColor(Number(v.cvssScore))}`}>
+                    {Number(v.cvssScore).toFixed(1)}
+                  </div>
+                  <div className="text-[9px] text-gray-400 mt-0.5">CVSS</div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     )
   }

@@ -37,7 +37,7 @@ if ($method === 'POST') {
 
     $apiKey = getWptKey();
     if (empty($apiKey)) {
-        Response::error('WebPageTest API key no configurada. Obtén una gratis en webpagetest.org/getkey.php y configúrala en Ajustes.', 400);
+        Response::error('WebPageTest API key no configurada. WebPageTest (ahora Catchpoint) requiere un plan de pago para acceso a la API. Configura tu key en Ajustes > API Keys si tienes una.', 400);
     }
 
     // Submit test
