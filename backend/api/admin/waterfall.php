@@ -1,7 +1,7 @@
 <?php
 /**
  * GET /api/admin/waterfall.php?id=AUDIT_ID
- * Retorna los datos del waterfall de una auditoría específica
+ * Retorna waterfall + CrUX + resource breakdown + lighthouse audits
  */
 
 require_once __DIR__ . '/../bootstrap.php';
@@ -19,6 +19,17 @@ if (!$row) {
     Response::error('Auditoría no encontrada', 404);
 }
 
-$waterfall = $row['waterfall_json'] ? json_decode($row['waterfall_json'], true) : [];
+$data = $row['waterfall_json'] ? json_decode($row['waterfall_json'], true) : [];
 
-Response::success($waterfall ?: []);
+// Handle old format (array of requests) vs new format (object with waterfall + crux + etc)
+if (isset($data['waterfall'])) {
+    Response::success($data);
+} else {
+    // Old format: waterfall_json was just the array of requests
+    Response::success([
+        'waterfall' => $data,
+        'crux' => null,
+        'resourceBreakdown' => [],
+        'lighthouseAudits' => [],
+    ]);
+}

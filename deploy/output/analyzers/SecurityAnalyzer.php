@@ -51,6 +51,12 @@ class SecurityAnalyzer {
         // Headers expuestos
         $metrics[] = $this->checkExposedHeaders();
 
+        // Email expuesto en texto plano
+        $metrics[] = $this->checkExposedEmail();
+
+        // DMARC record
+        $metrics[] = $this->checkDmarc();
+
         $isWordPress = $this->wpData['isWordPress'] ?? str_contains($this->html, '/wp-content/');
 
         if ($isWordPress) {
@@ -633,6 +639,56 @@ class SecurityAnalyzer {
             'Actualizar el tema a la última versión o reemplazarlo.',
             'Mantenemos tu tema actualizado y protegido contra vulnerabilidades.',
             ['vulnerabilities' => $vulnerable, 'details' => $detailsList]
+        );
+    }
+
+    private function checkExposedEmail(): array {
+        preg_match_all('/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/', $this->html, $matches);
+        $emails = array_unique($matches[0] ?? []);
+        // Filtrar emails que son parte de schemas o scripts
+        $realEmails = array_filter($emails, fn($e) => !str_contains($e, 'example.com') && !str_contains($e, 'wixpress') && !str_contains($e, 'schema.org'));
+        $realEmails = array_values($realEmails);
+        $count = count($realEmails);
+
+        return Scoring::createMetric(
+            'exposed_email', 'Email expuesto en texto plano', $count,
+            $count === 0 ? 'No detectado' : "$count email(s) expuesto(s)",
+            $count === 0 ? 100 : 50,
+            $count === 0
+                ? 'No se detectaron direcciones de email en texto plano. Correcto.'
+                : "Se encontraron $count email(s) en texto plano: " . implode(', ', array_slice($realEmails, 0, 3)) . '. Los bots de spam rastrean la web buscando emails expuestos.',
+            $count > 0 ? 'Ocultar los emails usando formularios de contacto o codificación JavaScript.' : '',
+            'Protegemos los emails de contacto contra bots de spam.',
+            ['emails' => array_slice($realEmails, 0, 5)]
+        );
+    }
+
+    private function checkDmarc(): array {
+        $records = @dns_get_record('_dmarc.' . $this->host, DNS_TXT);
+        $hasDmarc = false;
+        $dmarcValue = '';
+
+        if ($records) {
+            foreach ($records as $r) {
+                $txt = $r['txt'] ?? '';
+                if (stripos($txt, 'v=DMARC1') !== false) {
+                    $hasDmarc = true;
+                    $dmarcValue = $txt;
+                    break;
+                }
+            }
+        }
+
+        return Scoring::createMetric(
+            'dmarc', 'Registro DMARC', $hasDmarc,
+            $hasDmarc ? 'Configurado' : 'No encontrado',
+            $hasDmarc ? 100 : 40,
+            $hasDmarc
+                ? 'DMARC está configurado para este dominio. Protege contra suplantación de identidad por email.'
+                : 'No se encontró registro DMARC. Sin DMARC, cualquiera puede enviar emails suplantando tu dominio (phishing/spoofing).',
+            $hasDmarc ? '' : 'Configurar un registro DMARC en el DNS del dominio para proteger contra suplantación de email.',
+            'Configuramos DMARC, SPF y DKIM para proteger tu dominio contra phishing.',
+            ['value' => $dmarcValue]
         );
     }
 }

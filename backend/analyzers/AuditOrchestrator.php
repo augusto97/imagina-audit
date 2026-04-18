@@ -110,6 +110,15 @@ class AuditOrchestrator {
             $modules[] = $this->createFailedModule('conversion', 'Conversión y Marketing', 'bar-chart-3');
         }
 
+        // 8b. Page Health Analyzer
+        try {
+            $pageHealthAnalyzer = new PageHealthAnalyzer($finalUrl, $html, array_merge($headers, ['_status_code' => $fetchResult['statusCode']]));
+            $modules[] = $pageHealthAnalyzer->analyze();
+        } catch (Throwable $e) {
+            Logger::error('PageHealthAnalyzer falló: ' . $e->getMessage());
+            $modules[] = $this->createFailedModule('page_health', 'Salud de Página', 'heart-pulse');
+        }
+
         // 9. Detectar stack tecnológico (informativo, no afecta score)
         $techStack = [];
         try {
@@ -119,8 +128,9 @@ class AuditOrchestrator {
             Logger::warning('TechDetector falló: ' . $e->getMessage());
         }
 
-        // 9b. Extraer waterfall data
+        // 9b. Extraer waterfall data + extended performance data
         $waterfall = $performanceAnalyzer ? $performanceAnalyzer->getNetworkRequests() : [];
+        $extendedPerf = $performanceAnalyzer ? $performanceAnalyzer->getExtendedData() : [];
 
         // 10. Calcular resultados globales
         $globalScore = Scoring::calculateGlobalScore($modules);
@@ -151,6 +161,7 @@ class AuditOrchestrator {
             'solutionMap' => $solutionMap,
             'techStack' => $techStack,
             'waterfall' => $waterfall,
+            'extendedPerf' => $extendedPerf,
         ];
     }
 
