@@ -41,6 +41,8 @@ class SeoAnalyzer {
         $metrics[] = $this->checkContent();
         $metrics[] = $this->checkInternalLinks();
         $metrics[] = $this->checkUrlStructure();
+        $metrics[] = $this->checkKeywordDensity();
+        $metrics[] = $this->checkRssFeeds();
 
         $defaults = require dirname(__DIR__) . '/config/defaults.php';
         $score = Scoring::calculateModuleScore($metrics);
@@ -317,7 +319,15 @@ class SeoAnalyzer {
             Scoring::clamp($score), $desc,
             !empty($issues) ? 'Corregir la jerarquía: H1 → H2 → H3 sin saltar niveles. Usar H2 para secciones principales.' : '',
             'Estructuramos el contenido con una jerarquía de encabezados optimizada para SEO.',
-            ['counts' => $counts, 'skipsLevel' => $skipsLevel]
+            [
+                'counts' => $counts,
+                'skipsLevel' => $skipsLevel,
+                'headings' => array_map(fn($h) => [
+                    'level' => $h['level'],
+                    'tag' => 'H' . $h['level'],
+                    'text' => mb_substr($h['text'], 0, 100),
+                ], array_slice($headings, 0, 30)),
+            ]
         );
     }
 
@@ -937,6 +947,107 @@ class SeoAnalyzer {
             !empty($issues) ? implode(' ', array_map(fn($i) => str_replace('.', ',', $i), $issues)) : '',
             'Optimizamos las URLs para que sean cortas, descriptivas y amigables para SEO.',
             ['isHttps' => $isHttps, 'hasWww' => $hasWww, 'urlLength' => $urlLength]
+        );
+    }
+
+    private function checkKeywordDensity(): array {
+        $text = $this->parser->getTextContent();
+        $words = preg_split('/\s+/', mb_strtolower($text));
+        $words = array_filter($words, fn($w) => mb_strlen($w) > 3);
+        $totalWords = count($words);
+
+        if ($totalWords < 20) {
+            return Scoring::createMetric(
+                'keyword_density', 'Análisis de palabras clave', 0, 'Contenido insuficiente', 30,
+                'No hay suficiente contenido para analizar palabras clave.',
+                'Agregar más contenido relevante a la página.',
+                'Desarrollamos estrategia de contenido con keywords objetivo.'
+            );
+        }
+
+        // Count single words
+        $freq = array_count_values($words);
+        arsort($freq);
+
+        // Count 2-word phrases
+        $bigrams = [];
+        for ($i = 0; $i < count($words) - 1; $i++) {
+            $phrase = $words[$i] . ' ' . $words[$i + 1];
+            $bigrams[$phrase] = ($bigrams[$phrase] ?? 0) + 1;
+        }
+        arsort($bigrams);
+
+        // Filter stopwords
+        $stopwords = ['para', 'como', 'este', 'esta', 'esta', 'pero', 'más', 'todo', 'todos', 'tiene', 'puede', 'hace', 'cada', 'entre', 'desde', 'hasta', 'sobre', 'también', 'cuando', 'donde', 'the', 'and', 'for', 'that', 'with', 'are', 'from', 'your', 'this', 'have', 'will', 'been', 'more', 'which', 'their', 'they', 'what', 'than', 'other', 'into', 'could', 'would', 'make', 'like', 'just', 'some'];
+        $topWords = [];
+        foreach ($freq as $word => $count) {
+            if (count($topWords) >= 10) break;
+            if (in_array($word, $stopwords) || mb_strlen($word) < 4) continue;
+            $topWords[$word] = $count;
+        }
+
+        $topPhrases = [];
+        foreach ($bigrams as $phrase => $count) {
+            if (count($topPhrases) >= 5) break;
+            if ($count < 2) continue;
+            $topPhrases[$phrase] = $count;
+        }
+
+        $title = $this->parser->getTitle() ?? '';
+        $h1s = array_filter($this->parser->getHeadings(), fn($h) => $h['level'] === 1);
+        $h1Text = !empty($h1s) ? mb_strtolower($h1s[0]['text'] ?? '') : '';
+
+        // Check if top keywords appear in title and H1
+        $topKeyword = array_key_first($topWords);
+        $inTitle = $topKeyword && str_contains(mb_strtolower($title), $topKeyword);
+        $inH1 = $topKeyword && str_contains($h1Text, $topKeyword);
+
+        $score = 70;
+        if ($inTitle && $inH1) $score = 100;
+        elseif ($inTitle || $inH1) $score = 85;
+
+        $keywordList = array_map(fn($w, $c) => "$w ($c)", array_keys($topWords), array_values($topWords));
+        $phraseList = array_map(fn($p, $c) => "$p ($c)", array_keys($topPhrases), array_values($topPhrases));
+
+        $desc = 'Palabras más frecuentes: ' . implode(', ', array_slice($keywordList, 0, 5)) . '.';
+        if (!empty($phraseList)) $desc .= ' Frases: ' . implode(', ', array_slice($phraseList, 0, 3)) . '.';
+        if ($topKeyword) {
+            $desc .= $inTitle ? " \"$topKeyword\" aparece en el título." : " \"$topKeyword\" NO aparece en el título.";
+            $desc .= $inH1 ? " Aparece en H1." : " NO aparece en H1.";
+        }
+
+        return Scoring::createMetric(
+            'keyword_density', 'Análisis de palabras clave', count($topWords),
+            $topKeyword ? "\"$topKeyword\" ({$topWords[$topKeyword]}x)" : 'Sin datos',
+            $score, $desc,
+            (!$inTitle || !$inH1) ? 'Incluir la keyword principal en el título y H1 de la página.' : '',
+            'Optimizamos el contenido con las keywords más relevantes para tu negocio.',
+            ['topWords' => $topWords, 'topPhrases' => $topPhrases, 'inTitle' => $inTitle, 'inH1' => $inH1]
+        );
+    }
+
+    private function checkRssFeeds(): array {
+        $feeds = [];
+        // Check <link> tags for RSS/Atom feeds
+        preg_match_all('/<link[^>]+type=["\']application\/(rss|atom)\+xml["\'][^>]*>/i', $this->html, $matches, PREG_SET_ORDER);
+        foreach ($matches as $m) {
+            if (preg_match('/href=["\']([^"\']+)/i', $m[0], $href)) {
+                $type = stripos($m[0], 'atom') !== false ? 'Atom' : 'RSS';
+                $feeds[] = ['url' => $href[1], 'type' => $type];
+            }
+        }
+
+        $count = count($feeds);
+        return Scoring::createMetric(
+            'rss_feeds', 'Web Feeds (RSS/Atom)', $count,
+            $count === 0 ? 'No detectados' : "$count feed(s) detectados",
+            $count > 0 ? 100 : 60,
+            $count > 0
+                ? "Se detectaron $count feeds: " . implode(', ', array_map(fn($f) => $f['type'] . ': ' . basename($f['url']), $feeds)) . '. Los feeds permiten a los usuarios suscribirse a las actualizaciones del sitio.'
+                : 'No se detectaron feeds RSS o Atom. Los feeds permiten que los usuarios se suscriban a tu contenido.',
+            $count === 0 ? 'Agregar un feed RSS para que los usuarios y agregadores puedan seguir tu contenido.' : '',
+            'Configuramos feeds RSS optimizados para distribución de contenido.',
+            ['feeds' => $feeds]
         );
     }
 }

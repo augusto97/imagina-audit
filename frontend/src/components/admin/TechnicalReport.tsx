@@ -676,15 +676,79 @@ function renderTechnicalDetails(metricId: string, details: Record<string, unknow
   }
 
   // Heading hierarchy
-  if (metricId === 'heading_hierarchy' && details.counts) {
-    const counts = details.counts as Record<string, number>
+  // Keyword density
+  if (metricId === 'keyword_density' && (details.topWords || details.topPhrases)) {
+    const words = (details.topWords || {}) as Record<string, number>
+    const phrases = (details.topPhrases || {}) as Record<string, number>
     return (
-      <div className="mt-2 flex gap-3 text-xs">
-        {Object.entries(counts).filter(([, v]) => v > 0).map(([tag, count]) => (
-          <span key={tag} className="px-2 py-1 rounded-lg bg-white/60 border border-[var(--border-default)] font-mono">
-            {tag.toUpperCase()}: {count}
-          </span>
-        ))}
+      <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3 text-xs space-y-2">
+        {Object.keys(words).length > 0 && (
+          <div>
+            <p className="font-bold text-[var(--text-tertiary)] mb-1">PALABRAS MÁS FRECUENTES</p>
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(words).map(([w, c]) => (
+                <span key={w} className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">{w} <b>{String(c)}</b></span>
+              ))}
+            </div>
+          </div>
+        )}
+        {Object.keys(phrases).length > 0 && (
+          <div>
+            <p className="font-bold text-[var(--text-tertiary)] mb-1">FRASES FRECUENTES</p>
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(phrases).map(([p, c]) => (
+                <span key={p} className="px-2 py-0.5 rounded bg-blue-50 text-blue-700">{p} <b>{String(c)}</b></span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // URL resolution
+  if (metricId === 'url_resolution' && Array.isArray(details.results)) {
+    const results = details.results as Array<{ variant: string; redirectsTo: string; matches: boolean; status: number }>
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] overflow-hidden">
+        <table className="w-full text-xs">
+          <thead><tr className="bg-gray-50"><th className="text-left px-3 py-1.5 font-semibold">Variante</th><th className="text-left px-3 py-1.5 font-semibold">Redirige a</th><th className="px-3 py-1.5 font-semibold">OK</th></tr></thead>
+          <tbody>
+            {results.map((r, i) => (
+              <tr key={i} className="border-t border-gray-100">
+                <td className="px-3 py-1.5 font-mono">{r.variant}</td>
+                <td className="px-3 py-1.5 font-mono truncate max-w-[200px]">{r.redirectsTo}</td>
+                <td className="px-3 py-1.5 text-center">{r.matches ? '✓' : '✗'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  if (metricId === 'heading_hierarchy') {
+    const counts = (details.counts || {}) as Record<string, number>
+    const headings = (details.headings || []) as Array<{ level: number; tag: string; text: string }>
+    return (
+      <div className="mt-2 space-y-2">
+        <div className="flex gap-3 text-xs">
+          {Object.entries(counts).filter(([, v]) => v > 0).map(([tag, count]) => (
+            <span key={tag} className="px-2 py-1 rounded-lg bg-white/60 border border-[var(--border-default)] font-mono">
+              {tag.toUpperCase()}: {count}
+            </span>
+          ))}
+        </div>
+        {headings.length > 0 && (
+          <div className="rounded-lg bg-white/60 border border-[var(--border-default)] p-3 text-xs space-y-1 max-h-64 overflow-y-auto">
+            {headings.map((h, i) => (
+              <div key={i} className="flex items-start gap-2" style={{ paddingLeft: `${(h.level - 1) * 16}px` }}>
+                <span className="shrink-0 font-mono font-bold text-[var(--accent-primary)]">{h.tag}</span>
+                <span className="text-gray-700">{h.text || '(vacío)'}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     )
   }

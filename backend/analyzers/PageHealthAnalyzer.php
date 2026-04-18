@@ -38,6 +38,8 @@ class PageHealthAnalyzer {
         $metrics[] = $this->checkUrlHealth();
         $metrics[] = $this->checkDoctype();
         $metrics[] = $this->checkOpenGraphComplete();
+        $metrics[] = $this->checkCustom404();
+        $metrics[] = $this->checkUrlResolution();
 
         $defaults = require dirname(__DIR__) . '/config/defaults.php';
         $score = Scoring::calculateModuleScore($metrics);
@@ -410,6 +412,90 @@ class PageHealthAnalyzer {
             $found < $total ? 'Completar las etiquetas Open Graph y Twitter Cards faltantes para mejor presentación al compartir.' : '',
             'Configuramos todas las etiquetas sociales para una presentación profesional.',
             ['ogPresent' => $ogPresent, 'ogTotal' => count($requiredOg), 'twPresent' => $twPresent, 'twTotal' => count($requiredTw)]
+        );
+    }
+
+    private function checkCustom404(): array {
+        // Fetch a URL that shouldn't exist
+        $testUrl = $this->url . '/imagina-audit-test-404-' . time();
+        $response = Fetcher::get($testUrl, 5, false, 0);
+        $status = $response['statusCode'];
+        $hasCustom = $status === 404;
+        $returns200 = $status === 200;
+
+        if ($hasCustom) {
+            return Scoring::createMetric(
+                'custom_404', 'Página 404 personalizada', true, 'Configurada (HTTP 404)',
+                100, 'El servidor devuelve código 404 para páginas inexistentes. Correcto.',
+                '', 'Configuramos páginas 404 personalizadas con enlaces útiles.'
+            );
+        }
+
+        return Scoring::createMetric(
+            'custom_404', 'Página 404 personalizada', false,
+            $returns200 ? 'Devuelve 200 en vez de 404' : "Devuelve $status",
+            $returns200 ? 30 : 50,
+            $returns200
+                ? 'El servidor devuelve código 200 para URLs inexistentes en vez de 404. Esto causa "soft 404" que confunde a Google y desperdicia crawl budget.'
+                : "El servidor devuelve código $status para páginas inexistentes.",
+            'Configurar el servidor para devolver código HTTP 404 en páginas inexistentes y mostrar una página útil con enlaces.',
+            'Configuramos páginas 404 personalizadas que ayudan a los usuarios a navegar.'
+        );
+    }
+
+    private function checkUrlResolution(): array {
+        $parsed = parse_url($this->url);
+        $host = $parsed['host'] ?? '';
+        $scheme = $parsed['scheme'] ?? 'https';
+
+        // Build 4 URL variants
+        $variants = [
+            "http://$host/",
+            "https://$host/",
+        ];
+        // Add www/non-www variant
+        if (str_starts_with($host, 'www.')) {
+            $bare = substr($host, 4);
+            $variants[] = "http://$bare/";
+            $variants[] = "https://$bare/";
+        } else {
+            $variants[] = "http://www.$host/";
+            $variants[] = "https://www.$host/";
+        }
+
+        $results = [];
+        $allResolve = true;
+        $targetUrl = rtrim($this->url, '/') . '/';
+
+        foreach ($variants as $v) {
+            try {
+                $resp = Fetcher::get($v, 5, false, 0);
+                $finalUrl = $resp['finalUrl'] ?? $v;
+                // Follow redirects manually (check Location header)
+                if (in_array($resp['statusCode'], [301, 302, 307, 308])) {
+                    $finalUrl = $resp['headers']['location'] ?? $finalUrl;
+                }
+                $matches = rtrim(strtolower($finalUrl), '/') === rtrim(strtolower($targetUrl), '/');
+                $results[] = ['variant' => $v, 'redirectsTo' => $finalUrl, 'matches' => $matches, 'status' => $resp['statusCode']];
+                if (!$matches) $allResolve = false;
+            } catch (Throwable $e) {
+                $results[] = ['variant' => $v, 'redirectsTo' => 'Error', 'matches' => false, 'status' => 0];
+                $allResolve = false;
+            }
+        }
+
+        $score = $allResolve ? 100 : 60;
+        $desc = $allResolve
+            ? 'Todas las variantes del dominio (http/https, www/sin-www) redirigen correctamente a la URL principal.'
+            : 'No todas las variantes del dominio redirigen al mismo destino. Esto puede causar contenido duplicado.';
+
+        return Scoring::createMetric(
+            'url_resolution', 'Resolución de URL (www/https)', $allResolve,
+            $allResolve ? 'Todas redirigen correctamente' : 'Inconsistencias detectadas',
+            $score, $desc,
+            $allResolve ? '' : 'Configurar redirecciones 301 para que http, https, www y sin-www apunten a la misma URL.',
+            'Configuramos las redirecciones correctas para evitar contenido duplicado.',
+            ['results' => $results]
         );
     }
 }
