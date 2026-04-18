@@ -57,11 +57,50 @@ class SecurityAnalyzer {
         // DMARC record
         $metrics[] = $this->checkDmarc();
 
+        // Google Safe Browsing
+        $metrics[] = $this->checkSafeBrowsing();
+
+        // SPF record (complemento de DMARC)
+        $metrics[] = $this->checkSpf();
+
+        // Source code exposure (.git/.svn)
+        $metrics[] = $this->checkSourceCodeExposure();
+
+        // HSTS preload
+        $metrics[] = $this->checkHstsPreload();
+
+        // Subresource Integrity
+        $metrics[] = $this->checkSubresourceIntegrity();
+
+        // DNSSEC
+        $metrics[] = $this->checkDnssec();
+
+        // Weak TLS versions
+        $metrics[] = $this->checkWeakTlsVersions();
+
         $isWordPress = $this->wpData['isWordPress'] ?? str_contains($this->html, '/wp-content/');
 
         if ($isWordPress) {
             // Directory listing
             $metrics[] = $this->checkDirectoryListing();
+
+            // WP version leak files
+            $metrics[] = $this->checkWpInfoFiles();
+
+            // Install/upgrade files accessible
+            $metrics[] = $this->checkWpInstallFiles();
+
+            // PHP in uploads (malware indicator)
+            $metrics[] = $this->checkPhpInUploads();
+
+            // REST API enumeration (extras)
+            $metrics[] = $this->checkRestApiEnumerationExtra();
+
+            // Default admin user
+            $metrics[] = $this->checkDefaultAdminUser();
+
+            // Security plugin detected (positive)
+            $metrics[] = $this->checkSecurityPlugin();
 
             // Vulnerabilidades de WordPress core
             $coreMetric = $this->checkCoreVulnerabilities();
@@ -689,6 +728,470 @@ class SecurityAnalyzer {
             $hasDmarc ? '' : 'Configurar un registro DMARC en el DNS del dominio para proteger contra suplantación de email.',
             'Configuramos DMARC, SPF y DKIM para proteger tu dominio contra phishing.',
             ['value' => $dmarcValue]
+        );
+    }
+
+    private function checkSafeBrowsing(): array {
+        // Try Google Safe Browsing Lookup API (requires API key)
+        $apiKey = env('GOOGLE_PAGESPEED_API_KEY', '');
+        if (empty($apiKey)) {
+            try {
+                $db = Database::getInstance();
+                $row = $db->queryOne("SELECT value FROM settings WHERE key = 'google_pagespeed_api_key'");
+                if ($row && !empty($row['value'])) $apiKey = $row['value'];
+            } catch (Throwable $e) {}
+        }
+
+        if (empty($apiKey)) {
+            return Scoring::createMetric(
+                'safe_browsing', 'Google Safe Browsing', null, 'Sin API key',
+                null, // Informativo
+                'No se pudo verificar Google Safe Browsing (requiere API key de Google). La misma key de PageSpeed funciona.',
+                '', 'Monitoreamos que tu sitio no aparezca en listas negras de Google.'
+            );
+        }
+
+        $url = 'https://safebrowsing.googleapis.com/v4/threatMatches:find?key=' . urlencode($apiKey);
+        $requestBody = [
+            'client' => ['clientId' => 'imagina-audit', 'clientVersion' => '1.0'],
+            'threatInfo' => [
+                'threatTypes' => ['MALWARE', 'SOCIAL_ENGINEERING', 'UNWANTED_SOFTWARE', 'POTENTIALLY_HARMFUL_APPLICATION'],
+                'platformTypes' => ['ANY_PLATFORM'],
+                'threatEntryTypes' => ['URL'],
+                'threatEntries' => [['url' => $this->url]],
+            ],
+        ];
+
+        try {
+            $response = Fetcher::post($url, $requestBody, 5);
+
+            if ($response['statusCode'] !== 200) {
+                return Scoring::createMetric(
+                    'safe_browsing', 'Google Safe Browsing', null, 'Error en API',
+                    null,
+                    'No se pudo consultar Google Safe Browsing (error ' . $response['statusCode'] . ').',
+                    '', 'Monitoreamos que tu sitio no aparezca en listas negras.'
+                );
+            }
+
+            $data = json_decode($response['body'], true);
+            $threats = $data['matches'] ?? [];
+            $isSafe = empty($threats);
+
+            if ($isSafe) {
+                return Scoring::createMetric(
+                    'safe_browsing', 'Google Safe Browsing', true, 'Sitio seguro',
+                    100,
+                    'El sitio NO aparece en la lista negra de Google Safe Browsing. No se detectó malware, phishing ni software no deseado.',
+                    '', 'Monitoreamos continuamente que tu sitio no sea marcado como peligroso.'
+                );
+            }
+
+            $threatTypes = array_map(fn($t) => $t['threatType'] ?? 'Unknown', $threats);
+            $threatLabels = [
+                'MALWARE' => 'Malware',
+                'SOCIAL_ENGINEERING' => 'Phishing/Ingeniería social',
+                'UNWANTED_SOFTWARE' => 'Software no deseado',
+                'POTENTIALLY_HARMFUL_APPLICATION' => 'Aplicación peligrosa',
+            ];
+            $labels = array_map(fn($t) => $threatLabels[$t] ?? $t, $threatTypes);
+
+            return Scoring::createMetric(
+                'safe_browsing', 'Google Safe Browsing', false,
+                'EN LISTA NEGRA',
+                0,
+                'ALERTA: El sitio está marcado como peligroso por Google: ' . implode(', ', $labels) . '. Google muestra una advertencia roja a los usuarios que intentan visitarlo.',
+                'Limpiar el sitio de malware/contenido malicioso y solicitar una revisión en Google Search Console.',
+                'Limpiamos sitios infectados y solicitamos la remoción de la lista negra de Google.',
+                ['threats' => $threats, 'threatTypes' => $threatTypes]
+            );
+        } catch (Throwable $e) {
+            return Scoring::createMetric(
+                'safe_browsing', 'Google Safe Browsing', null, 'Error',
+                null,
+                'No se pudo verificar: ' . $e->getMessage(),
+                '', 'Monitoreamos que tu sitio no aparezca en listas negras.'
+            );
+        }
+    }
+
+    private function checkSpf(): array {
+        $records = @dns_get_record($this->host, DNS_TXT);
+        $hasSpf = false;
+        $spfValue = '';
+
+        if ($records) {
+            foreach ($records as $r) {
+                $txt = $r['txt'] ?? '';
+                if (stripos($txt, 'v=spf1') !== false) {
+                    $hasSpf = true;
+                    $spfValue = $txt;
+                    break;
+                }
+            }
+        }
+
+        return Scoring::createMetric(
+            'spf', 'Registro SPF', $hasSpf,
+            $hasSpf ? 'Configurado' : 'No encontrado',
+            $hasSpf ? 100 : 50,
+            $hasSpf
+                ? 'SPF configurado. Especifica qué servidores pueden enviar email en nombre del dominio.'
+                : 'No se encontró SPF. Cualquiera puede enviar email suplantando tu dominio.',
+            $hasSpf ? '' : 'Configurar un registro SPF (TXT) que liste los servidores autorizados a enviar email.',
+            'Configuramos SPF, DKIM y DMARC para proteger tu dominio.',
+            ['value' => $spfValue]
+        );
+    }
+
+    private function checkSourceCodeExposure(): array {
+        $paths = ['/.git/config', '/.git/HEAD', '/.svn/entries', '/.hg/hgrc', '/.DS_Store'];
+        $found = [];
+        foreach ($paths as $p) {
+            $resp = Fetcher::head($this->url . $p, 3);
+            if ($resp['statusCode'] === 200) $found[] = $p;
+        }
+        $count = count($found);
+        return Scoring::createMetric(
+            'source_code_exposure', 'Exposición de código fuente', $count,
+            $count === 0 ? 'Protegido' : "$count archivos expuestos",
+            $count === 0 ? 100 : 0,
+            $count === 0
+                ? 'No se detectaron archivos de control de versiones expuestos (.git, .svn). Correcto.'
+                : 'CRÍTICO: Archivos de control de versiones accesibles: ' . implode(', ', $found) . '. Un atacante puede descargar todo el código fuente incluyendo credenciales.',
+            $count > 0 ? 'Bloquear acceso a /.git/, /.svn/, etc. en .htaccess o eliminar estos directorios del servidor web.' : '',
+            'Protegemos contra fugas de código fuente y archivos de sistema.',
+            ['files' => $found]
+        );
+    }
+
+    private function checkHstsPreload(): array {
+        $hsts = $this->headers['strict-transport-security'] ?? '';
+        $hasHsts = !empty($hsts);
+        $hasPreload = stripos($hsts, 'preload') !== false;
+        $hasIncludeSubDomains = stripos($hsts, 'includesubdomains') !== false;
+
+        $maxAge = 0;
+        if (preg_match('/max-age=(\d+)/i', $hsts, $m)) {
+            $maxAge = (int)$m[1];
+        }
+
+        $preloadReady = $hasHsts && $hasPreload && $hasIncludeSubDomains && $maxAge >= 31536000;
+
+        return Scoring::createMetric(
+            'hsts_preload', 'HSTS Preload',
+            $preloadReady ? 'ready' : ($hasHsts ? 'partial' : 'none'),
+            $preloadReady ? 'Listo para preload' : ($hasHsts ? 'HSTS sin preload' : 'Sin HSTS'),
+            $preloadReady ? 100 : ($hasHsts ? 70 : 40),
+            $preloadReady
+                ? 'HSTS completamente configurado con preload, includeSubDomains y max-age >= 1 año. Listo para enviar a hstspreload.org.'
+                : ($hasHsts
+                    ? 'HSTS presente pero falta preload/includeSubDomains/max-age suficiente para calificar al preload list de Chrome.'
+                    : 'Sin HSTS. Configurar para forzar HTTPS y poder solicitar inclusión en el preload list.'),
+            !$preloadReady ? 'Configurar: Strict-Transport-Security: max-age=31536000; includeSubDomains; preload. Luego registrar en hstspreload.org' : '',
+            'Configuramos HSTS con preload para máxima protección HTTPS.',
+            ['value' => $hsts, 'maxAge' => $maxAge, 'hasPreload' => $hasPreload, 'hasIncludeSubDomains' => $hasIncludeSubDomains]
+        );
+    }
+
+    private function checkSubresourceIntegrity(): array {
+        // Count external scripts without integrity attribute
+        preg_match_all('/<script[^>]+src=["\']https?:\/\/([^"\']+)["\'][^>]*>/i', $this->html, $matches, PREG_SET_ORDER);
+        $external = 0;
+        $withIntegrity = 0;
+        $withoutIntegrity = [];
+
+        foreach ($matches as $m) {
+            $src = $m[1];
+            // Solo scripts de otro dominio
+            if (str_contains($src, $this->host)) continue;
+            $external++;
+            if (str_contains($m[0], 'integrity=')) $withIntegrity++;
+            else $withoutIntegrity[] = $src;
+        }
+
+        if ($external === 0) {
+            return Scoring::createMetric(
+                'sri', 'Subresource Integrity (SRI)', null, 'Sin scripts externos', null,
+                'No se detectaron scripts externos. SRI no aplica.',
+                '', 'Configuramos SRI en scripts de CDN para protección contra CDN comprometido.'
+            );
+        }
+
+        $pct = (int) round(($withIntegrity / $external) * 100);
+        return Scoring::createMetric(
+            'sri', 'Subresource Integrity (SRI)', $pct, "$withIntegrity/$external con SRI",
+            $pct >= 80 ? 100 : ($pct >= 50 ? 70 : 40),
+            "De $external scripts externos, $withIntegrity tienen atributo integrity ($pct%). SRI protege contra CDNs comprometidos.",
+            $pct < 80 ? 'Agregar atributo integrity="sha384-..." a todos los scripts cargados desde CDN externo.' : '',
+            'Implementamos SRI en todos los recursos externos.',
+            ['external' => $external, 'withIntegrity' => $withIntegrity, 'withoutIntegrity' => array_slice($withoutIntegrity, 0, 5)]
+        );
+    }
+
+    private function checkDnssec(): array {
+        // Check if parent zone has DS record for this domain
+        $parts = explode('.', $this->host);
+        if (count($parts) < 2) {
+            return Scoring::createMetric('dnssec', 'DNSSEC', null, 'N/A', null, 'Dominio inválido.', '', '');
+        }
+        $domain = count($parts) >= 2 ? implode('.', array_slice($parts, -2)) : $this->host;
+
+        $records = @dns_get_record($domain, DNS_ANY);
+        $hasDnssec = false;
+        if ($records) {
+            foreach ($records as $r) {
+                if (isset($r['type']) && in_array($r['type'], ['DS', 'DNSKEY', 'RRSIG'])) {
+                    $hasDnssec = true;
+                    break;
+                }
+            }
+        }
+
+        return Scoring::createMetric(
+            'dnssec', 'DNSSEC', $hasDnssec,
+            $hasDnssec ? 'Habilitado' : 'No habilitado',
+            $hasDnssec ? 100 : 60,
+            $hasDnssec
+                ? 'DNSSEC habilitado. Protege contra envenenamiento de caché DNS y redirecciones maliciosas.'
+                : 'DNSSEC no habilitado. Sin firma DNS, es posible suplantar los registros DNS del dominio.',
+            !$hasDnssec ? 'Habilitar DNSSEC en tu registrador o proveedor DNS (Cloudflare lo hace con 1 click).' : '',
+            'Configuramos DNSSEC para proteger contra ataques de DNS.'
+        );
+    }
+
+    private function checkWeakTlsVersions(): array {
+        // Intentar conectar con TLS 1.0 y 1.1 explícitamente
+        $weakFound = [];
+        $contexts = [
+            'TLS 1.0' => STREAM_CRYPTO_METHOD_TLSv1_0_CLIENT ?? 32,
+            'TLS 1.1' => STREAM_CRYPTO_METHOD_TLSv1_1_CLIENT ?? 128,
+        ];
+
+        foreach ($contexts as $version => $method) {
+            $ctx = stream_context_create([
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'crypto_method' => $method,
+                ],
+            ]);
+            $errno = 0; $errstr = '';
+            $sock = @stream_socket_client("ssl://{$this->host}:443", $errno, $errstr, 3, STREAM_CLIENT_CONNECT, $ctx);
+            if ($sock) {
+                $weakFound[] = $version;
+                fclose($sock);
+            }
+        }
+
+        $count = count($weakFound);
+        return Scoring::createMetric(
+            'weak_tls', 'Versiones TLS débiles', $count,
+            $count === 0 ? 'Solo TLS 1.2+' : implode(', ', $weakFound) . ' habilitado',
+            $count === 0 ? 100 : ($count === 1 ? 50 : 20),
+            $count === 0
+                ? 'El servidor solo acepta TLS 1.2 y superior. Correcto.'
+                : 'El servidor acepta versiones TLS débiles: ' . implode(', ', $weakFound) . '. Son vulnerables a ataques como POODLE y BEAST.',
+            $count > 0 ? 'Desactivar TLS 1.0 y 1.1 en la configuración del servidor. Solo habilitar TLS 1.2 y TLS 1.3.' : '',
+            'Configuramos el servidor para aceptar solo versiones modernas de TLS.',
+            ['weakVersions' => $weakFound]
+        );
+    }
+
+    private function checkWpInfoFiles(): array {
+        $files = ['/readme.html', '/license.txt', '/wp-config-sample.php'];
+        $exposed = [];
+        foreach ($files as $f) {
+            $resp = Fetcher::head($this->url . $f, 3);
+            if ($resp['statusCode'] === 200) $exposed[] = $f;
+        }
+        $count = count($exposed);
+
+        return Scoring::createMetric(
+            'wp_info_files', 'Archivos de información de WordPress', $count,
+            $count === 0 ? 'Protegidos' : "$count archivos expuestos",
+            $count === 0 ? 100 : 50,
+            $count === 0
+                ? 'Los archivos informativos de WordPress (readme.html, license.txt) están protegidos. Correcto.'
+                : 'Archivos expuestos: ' . implode(', ', $exposed) . '. readme.html revela la versión exacta de WordPress facilitando ataques dirigidos.',
+            $count > 0 ? 'Eliminar o bloquear acceso a estos archivos en .htaccess.' : '',
+            'Eliminamos archivos informativos que revelan la versión de WordPress.',
+            ['files' => $exposed]
+        );
+    }
+
+    private function checkWpInstallFiles(): array {
+        $files = ['/wp-admin/install.php', '/wp-admin/upgrade.php', '/wp-admin/install-helper.php'];
+        $exposed = [];
+        foreach ($files as $f) {
+            $resp = Fetcher::head($this->url . $f, 3);
+            // Some install files return 200 but show "already installed". Check that 403/404 is the safe state.
+            if ($resp['statusCode'] === 200) $exposed[] = $f;
+        }
+        $count = count($exposed);
+
+        return Scoring::createMetric(
+            'wp_install_files', 'Archivos de instalación WordPress', $count,
+            $count === 0 ? 'Protegidos' : "$count accesibles",
+            $count === 0 ? 100 : 30,
+            $count === 0
+                ? 'Los archivos de instalación de WordPress están protegidos.'
+                : 'Archivos de instalación accesibles: ' . implode(', ', $exposed) . '. Pueden ser explotados en ciertos escenarios.',
+            $count > 0 ? 'Bloquear acceso a /wp-admin/install.php, /wp-admin/upgrade.php vía .htaccess después de la instalación.' : '',
+            'Bloqueamos archivos de instalación después del setup inicial.',
+            ['files' => $exposed]
+        );
+    }
+
+    private function checkPhpInUploads(): array {
+        // Verificar si hay archivos .php en /wp-content/uploads/
+        $testPaths = [
+            '/wp-content/uploads/',
+            '/wp-content/uploads/2024/',
+            '/wp-content/uploads/2025/',
+            '/wp-content/uploads/2026/',
+        ];
+
+        // Fetch uploads listing
+        $response = Fetcher::get($this->url . '/wp-content/uploads/', 5, true, 0);
+        $foundPhp = [];
+
+        if ($response['statusCode'] === 200 && str_contains($response['body'], 'Index of')) {
+            // Extract .php files from directory listing
+            preg_match_all('/href=["\']([^"\']+\.php)["\']/i', $response['body'], $matches);
+            foreach ($matches[1] ?? [] as $phpFile) {
+                if (!str_starts_with($phpFile, '?')) $foundPhp[] = $phpFile;
+            }
+        }
+
+        $count = count($foundPhp);
+        return Scoring::createMetric(
+            'php_in_uploads', 'Archivos PHP en uploads', $count,
+            $count === 0 ? 'Ninguno detectado' : "$count archivos PHP",
+            $count === 0 ? 100 : 0,
+            $count === 0
+                ? 'No se detectaron archivos PHP en /wp-content/uploads/. Correcto.'
+                : 'CRÍTICO: Se detectaron ' . $count . ' archivos PHP en /wp-content/uploads/. Esto es un fuerte indicador de malware o backdoor instalado por un atacante.',
+            $count > 0 ? 'Revisar cada archivo PHP en uploads, escanear el sitio con un plugin de seguridad, cambiar todas las contraseñas, y agregar regla en .htaccess para bloquear ejecución de PHP en uploads.' : '',
+            'Escaneamos y limpiamos malware de los directorios de uploads.',
+            ['phpFiles' => array_slice($foundPhp, 0, 10)]
+        );
+    }
+
+    private function checkRestApiEnumerationExtra(): array {
+        $endpoints = [
+            '/wp-json/wp/v2/users',
+            '/wp-json/wp/v2/pages',
+            '/wp-json/wp/v2/posts',
+            '/wp-json/wp/v2/media',
+        ];
+        $exposed = [];
+
+        foreach ($endpoints as $ep) {
+            $resp = Fetcher::get($this->url . $ep, 3, true, 0);
+            if ($resp['statusCode'] === 200) {
+                $data = json_decode($resp['body'], true);
+                if (is_array($data) && !empty($data)) {
+                    $exposed[] = ['endpoint' => $ep, 'count' => count($data)];
+                }
+            }
+        }
+
+        $count = count($exposed);
+        return Scoring::createMetric(
+            'rest_api_enumeration', 'REST API — Enumeración', $count,
+            $count === 0 ? 'Protegida' : count($exposed) . ' endpoints exponen datos',
+            $count === 0 ? 100 : ($count >= 3 ? 30 : 50),
+            $count === 0
+                ? 'La REST API no expone datos públicamente. Correcto.'
+                : 'La REST API expone datos en: ' . implode(', ', array_map(fn($e) => $e['endpoint'], $exposed)) . '. Facilita recolectar información del sitio.',
+            $count > 0 ? 'Restringir acceso a endpoints REST API para usuarios no autenticados usando plugin de seguridad o código personalizado.' : '',
+            'Protegemos la REST API de WordPress contra enumeración de datos.',
+            ['endpoints' => $exposed]
+        );
+    }
+
+    private function checkDefaultAdminUser(): array {
+        // Check common default usernames via /?author=N and REST API
+        $defaultUsers = ['admin', 'administrator', 'test', 'demo', 'user', 'wordpress'];
+        $detectedUsers = [];
+
+        // Try REST API
+        $response = Fetcher::get($this->url . '/wp-json/wp/v2/users', 3, true, 0);
+        if ($response['statusCode'] === 200) {
+            $data = json_decode($response['body'], true);
+            if (is_array($data)) {
+                foreach ($data as $u) {
+                    $slug = strtolower($u['slug'] ?? '');
+                    if (in_array($slug, $defaultUsers)) {
+                        $detectedUsers[] = $slug;
+                    }
+                }
+            }
+        }
+
+        // Try /?author=1 to get the first user's slug
+        if (empty($detectedUsers)) {
+            for ($i = 1; $i <= 3; $i++) {
+                $resp = Fetcher::get($this->url . '/?author=' . $i, 3, false, 0);
+                if (in_array($resp['statusCode'], [301, 302])) {
+                    $location = $resp['headers']['location'] ?? '';
+                    if (preg_match('#/author/([^/]+)/?#i', $location, $m)) {
+                        $slug = strtolower($m[1]);
+                        if (in_array($slug, $defaultUsers)) {
+                            $detectedUsers[] = $slug;
+                        }
+                    }
+                }
+            }
+        }
+
+        $count = count(array_unique($detectedUsers));
+        return Scoring::createMetric(
+            'default_admin_user', 'Usuario admin por defecto', $count,
+            $count === 0 ? 'Ninguno' : implode(', ', array_unique($detectedUsers)),
+            $count === 0 ? 100 : 20,
+            $count === 0
+                ? 'No se detectaron nombres de usuario por defecto (admin, administrator, etc.).'
+                : 'Usuarios con nombre predecible detectados: ' . implode(', ', array_unique($detectedUsers)) . '. Los atacantes apuntan a estos nombres para ataques de fuerza bruta.',
+            $count > 0 ? 'Crear un nuevo usuario admin con nombre personalizado y eliminar el usuario por defecto.' : '',
+            'Renombramos usuarios admin por defecto para prevenir ataques de fuerza bruta.',
+            ['detected' => array_values(array_unique($detectedUsers))]
+        );
+    }
+
+    private function checkSecurityPlugin(): array {
+        $plugins = [
+            'wordfence' => 'Wordfence',
+            'sucuri' => 'Sucuri',
+            'ithemes-security' => 'Solid Security (iThemes)',
+            'better-wp-security' => 'Solid Security (iThemes)',
+            'all-in-one-wp-security' => 'All In One WP Security',
+            'really-simple-ssl' => 'Really Simple SSL',
+            'defender-security' => 'Defender Security',
+            'shield-security' => 'Shield Security',
+            'jetpack' => 'Jetpack (incluye security)',
+        ];
+
+        $detected = [];
+        foreach ($plugins as $slug => $name) {
+            if (str_contains($this->html, "/$slug/") || stripos($this->html, $slug) !== false) {
+                $detected[] = $name;
+            }
+        }
+        $detected = array_unique($detected);
+        $count = count($detected);
+
+        return Scoring::createMetric(
+            'security_plugin', 'Plugin de seguridad', $count,
+            $count === 0 ? 'No detectado' : implode(', ', $detected),
+            $count > 0 ? 100 : 70,
+            $count > 0
+                ? 'Se detectó plugin de seguridad: ' . implode(', ', $detected) . '. Ayuda a proteger contra malware, brute force y vulnerabilidades.'
+                : 'No se detectó ningún plugin de seguridad instalado. Se recomienda usar Wordfence, Solid Security u otro.',
+            $count === 0 ? 'Instalar un plugin de seguridad como Wordfence o Solid Security para protección adicional.' : '',
+            'Instalamos y configuramos plugins de seguridad para protección en múltiples capas.',
+            ['detected' => $detected]
         );
     }
 }

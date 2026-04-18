@@ -52,7 +52,7 @@ class Scoring {
             $sum = 0;
             $count = 0;
             foreach ($metrics as $metric) {
-                if (isset($metric['score'])) {
+                if (isset($metric['score']) && $metric['score'] !== null) {
                     $sum += $metric['score'];
                     $count++;
                 }
@@ -91,20 +91,22 @@ class Scoring {
         string $name,
         mixed $value,
         string $displayValue,
-        int $score,
+        int|null $score,
         string $description,
         string $recommendation,
         string $imaginaSolution,
         array $details = []
     ): array {
-        $score = self::clamp($score);
+        if ($score !== null) {
+            $score = self::clamp($score);
+        }
         return [
             'id' => $id,
             'name' => $name,
             'value' => $value,
             'displayValue' => $displayValue,
             'score' => $score,
-            'level' => self::getLevel($score),
+            'level' => $score !== null ? self::getLevel($score) : 'info',
             'description' => $description,
             'recommendation' => $recommendation,
             'imaginaSolution' => $imaginaSolution,

@@ -106,10 +106,6 @@ switch ($endpoint) {
         require __DIR__ . '/admin/checklist.php';
         break;
 
-    case 'admin/webpagetest':
-        require __DIR__ . '/admin/webpagetest.php';
-        break;
-
     case 'admin/waterfall':
         require __DIR__ . '/admin/waterfall.php';
         break;

@@ -31,13 +31,11 @@ class PageHealthAnalyzer {
         $metrics[] = $this->checkCharset();
         $metrics[] = $this->checkFrames();
         $metrics[] = $this->checkDuplicateCanonical();
-        $metrics[] = $this->checkIndexability();
         $metrics[] = $this->checkHtmlErrors();
+        $metrics[] = $this->checkTextCodeRatio();
         $metrics[] = $this->checkLinkStats();
         $metrics[] = $this->checkBrokenResources();
-        $metrics[] = $this->checkUrlHealth();
         $metrics[] = $this->checkDoctype();
-        $metrics[] = $this->checkOpenGraphComplete();
         $metrics[] = $this->checkCustom404();
         $metrics[] = $this->checkUrlResolution();
 
@@ -63,7 +61,7 @@ class PageHealthAnalyzer {
 
         return Scoring::createMetric(
             'status_code', 'Código de estado HTTP', $status, (string)$status,
-            $score,
+            $status === 200 ? null : $score, // 200 es informativo, otros sí afectan
             $status === 200
                 ? 'La página responde con código 200 (OK).'
                 : "La página responde con código $status. Se espera código 200 para una página saludable.",
@@ -252,6 +250,7 @@ class PageHealthAnalyzer {
         $dofollow = 0;
         $broken = [];
 
+        $linkDetails = [];
         foreach ($links as $link) {
             $href = $link['href'] ?? '';
             if (empty($href) || str_starts_with($href, '#') || str_starts_with($href, 'javascript:') || str_starts_with($href, 'mailto:') || str_starts_with($href, 'tel:')) continue;
@@ -263,18 +262,29 @@ class PageHealthAnalyzer {
             else $external++;
 
             $rel = strtolower($link['rel'] ?? '');
-            if (str_contains($rel, 'nofollow')) $nofollow++;
+            $isNofollow = str_contains($rel, 'nofollow');
+            if ($isNofollow) $nofollow++;
             else $dofollow++;
+
+            $linkDetails[] = [
+                'href' => mb_substr($href, 0, 120),
+                'anchor' => mb_substr(trim($link['text'] ?? ''), 0, 60) ?: '(sin texto)',
+                'type' => $isInternal ? 'internal' : 'external',
+                'follow' => $isNofollow ? 'nofollow' : 'dofollow',
+            ];
         }
 
         $total = $internal + $external;
+        $extDofollow = count(array_filter($linkDetails, fn($l) => $l['type'] === 'external' && $l['follow'] === 'dofollow'));
+
         return Scoring::createMetric(
             'link_stats', 'Estadísticas de enlaces', $total,
-            "$total enlaces ($internal internos, $external externos)",
-            100, // Informativo
-            "La página tiene $total enlaces: $internal internos y $external externos. $dofollow son dofollow y $nofollow son nofollow.",
-            '', 'Optimizamos la estructura de enlaces internos para mejorar el SEO.',
-            ['total' => $total, 'internal' => $internal, 'external' => $external, 'dofollow' => $dofollow, 'nofollow' => $nofollow]
+            "$total enlaces ($internal int. · $external ext. · $extDofollow ext. dofollow)",
+            null, // Informativo — no afecta score
+            "La página tiene $total enlaces: $internal internos y $external externos. $dofollow dofollow y $nofollow nofollow. $extDofollow enlaces externos dofollow.",
+            $total > 200 ? 'Reducir el número de enlaces a menos de 200 para no diluir el PageRank.' : '',
+            'Optimizamos la estructura de enlaces internos para mejorar el SEO.',
+            ['total' => $total, 'internal' => $internal, 'external' => $external, 'dofollow' => $dofollow, 'nofollow' => $nofollow, 'extDofollow' => $extDofollow, 'links' => array_slice($linkDetails, 0, 50)]
         );
     }
 
@@ -412,6 +422,34 @@ class PageHealthAnalyzer {
             $found < $total ? 'Completar las etiquetas Open Graph y Twitter Cards faltantes para mejor presentación al compartir.' : '',
             'Configuramos todas las etiquetas sociales para una presentación profesional.',
             ['ogPresent' => $ogPresent, 'ogTotal' => count($requiredOg), 'twPresent' => $twPresent, 'twTotal' => count($requiredTw)]
+        );
+    }
+
+    private function checkTextCodeRatio(): array {
+        $htmlSize = strlen($this->html);
+        $textContent = $this->parser->getTextContent();
+        $textSize = strlen($textContent);
+
+        if ($htmlSize === 0) {
+            return Scoring::createMetric(
+                'text_code_ratio', 'Ratio Texto/Código', 0, 'Sin datos', 50,
+                'No se pudo calcular el ratio texto/código.', '',
+                'Optimizamos el código para un mejor ratio texto/código.'
+            );
+        }
+
+        $ratio = round(($textSize / $htmlSize) * 100, 1);
+        $score = $ratio >= 25 ? 100 : ($ratio >= 15 ? 80 : ($ratio >= 10 ? 60 : ($ratio >= 5 ? 40 : 15)));
+
+        return Scoring::createMetric(
+            'text_code_ratio', 'Ratio Texto/Código', $ratio, "$ratio%",
+            $score,
+            $ratio >= 15
+                ? "El ratio texto/código es $ratio%. Buen equilibrio entre contenido visible y código HTML."
+                : "El ratio texto/código es $ratio%. " . ($ratio < 10 ? 'Muy bajo — los buscadores podrían considerar que esta página tiene poco contenido relevante.' : 'Se recomienda al menos 15% para que los buscadores valoren el contenido.'),
+            $ratio < 15 ? 'Reducir el código innecesario (CSS/JS inline, HTML redundante) y agregar más contenido de texto visible.' : '',
+            'Optimizamos el código eliminando bloat y mejorando la proporción de contenido útil.',
+            ['textSize' => $textSize, 'htmlSize' => $htmlSize, 'ratio' => $ratio]
         );
     }
 

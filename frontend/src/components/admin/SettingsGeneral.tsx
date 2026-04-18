@@ -192,11 +192,6 @@ export default function SettingsGeneral() {
               <Input {...register('googlePagespeedApiKey')} placeholder="AIza..." />
               <p className="text-xs text-[var(--text-tertiary)]">Opcional. Sin key funciona con cuota limitada.</p>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-[var(--text-secondary)]">WebPageTest API Key</label>
-              <Input {...register('webpagetestApiKey')} placeholder="A.xxxx..." />
-              <p className="text-xs text-[var(--text-tertiary)]">Para análisis profundo del waterfall. Obtén una gratis en <a href="https://www.webpagetest.org/getkey.php" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">webpagetest.org/getkey.php</a></p>
-            </div>
           </CardContent>
         </Card>
 
