@@ -72,9 +72,12 @@ CREATE TABLE IF NOT EXISTS checklist_items (
 
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_audits_domain ON audits(domain);
+CREATE INDEX IF NOT EXISTS idx_audits_url ON audits(url);
 CREATE INDEX IF NOT EXISTS idx_audits_created ON audits(created_at);
 CREATE INDEX IF NOT EXISTS idx_audits_has_contact ON audits(lead_email);
+CREATE INDEX IF NOT EXISTS idx_audits_score ON audits(global_score);
 CREATE INDEX IF NOT EXISTS idx_rate_limits_ip ON rate_limits(ip_address, endpoint);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_time ON rate_limits(request_time);
 CREATE INDEX IF NOT EXISTS idx_vulnerabilities_slug ON vulnerabilities(plugin_slug);
 CREATE INDEX IF NOT EXISTS idx_checklist_audit ON checklist_items(audit_id);
 CREATE INDEX IF NOT EXISTS idx_wp_snapshots_audit ON wp_snapshots(audit_id);

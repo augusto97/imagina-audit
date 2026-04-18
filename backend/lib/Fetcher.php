@@ -80,6 +80,8 @@ class Fetcher {
         }
 
         $host = $parsed['host'];
+        $port = $parsed['port'] ?? ($parsed['scheme'] === 'https' ? 443 : 80);
+        $resolvedIp = null;
 
         // Verificar IP privada si es una IP directa
         if (filter_var($host, FILTER_VALIDATE_IP)) {
@@ -88,10 +90,14 @@ class Fetcher {
                 return self::createResult(0, [], '', $url, 0);
             }
         } else {
-            // Resolver DNS y verificar la IP
-            $ip = gethostbyname($host);
-            if ($ip !== $host && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-                Logger::warning("SSRF bloqueado: $host resuelve a IP privada $ip");
+            // Resolver DNS y verificar la IP — forzar esta IP en cURL para prevenir DNS rebinding
+            $resolvedIp = gethostbyname($host);
+            if ($resolvedIp === $host) {
+                Logger::warning("SSRF bloqueado: no se pudo resolver $host");
+                return self::createResult(0, [], '', $url, 0);
+            }
+            if (filter_var($resolvedIp, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+                Logger::warning("SSRF bloqueado: $host resuelve a IP privada $resolvedIp");
                 return self::createResult(0, [], '', $url, 0);
             }
         }
@@ -101,7 +107,7 @@ class Fetcher {
 
         while ($attempt < $maxAttempts) {
             $attempt++;
-            $result = self::executeRequest($method, $url, $body, $timeout, $followRedirects);
+            $result = self::executeRequest($method, $url, $body, $timeout, $followRedirects, $resolvedIp ? "$host:$port:$resolvedIp" : null);
 
             if ($result['statusCode'] > 0) {
                 return $result;
@@ -124,12 +130,13 @@ class Fetcher {
         string $url,
         ?string $body,
         int $timeout,
-        bool $followRedirects
+        bool $followRedirects,
+        ?string $dnsResolve = null
     ): array {
         $ch = curl_init();
         $responseHeaders = [];
 
-        curl_setopt_array($ch, [
+        $opts = [
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => $timeout,
@@ -156,7 +163,13 @@ class Fetcher {
                 }
                 return $len;
             },
-        ]);
+        ];
+
+        if ($dnsResolve !== null) {
+            $opts[CURLOPT_RESOLVE] = [$dnsResolve];
+        }
+
+        curl_setopt_array($ch, $opts);
 
         if ($method === 'HEAD') {
             curl_setopt($ch, CURLOPT_NOBODY, true);

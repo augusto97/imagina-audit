@@ -327,7 +327,7 @@ class WordPressDetector {
         $count = 0;
 
         foreach ($slugs as $slug) {
-            if ($count >= 15) break; // Limitar consultas
+            if ($count >= 10) break;
             $count++;
 
             $plugin = [
@@ -338,16 +338,7 @@ class WordPressDetector {
                 'outdated' => false,
             ];
 
-            // Intentar readme.txt para versión
-            $readmeUrl = $this->url . '/wp-content/plugins/' . $slug . '/readme.txt';
-            $readme = Fetcher::get($readmeUrl, 3, false, 0);
-            if ($readme['statusCode'] === 200) {
-                if (preg_match('/Stable tag:\s*([\d.]+)/i', $readme['body'], $m)) {
-                    $plugin['detectedVersion'] = $m[1];
-                }
-            }
-
-            // Consultar API de WordPress.org
+            // Consultar API de WordPress.org (incluye versión latest)
             $apiUrl = 'https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&slug=' . urlencode($slug);
             $api = Fetcher::get($apiUrl, 5, true, 0);
             if ($api['statusCode'] === 200) {
@@ -355,14 +346,23 @@ class WordPressDetector {
                 if ($data && isset($data['version'])) {
                     $plugin['name'] = $data['name'] ?? $plugin['name'];
                     $plugin['latestVersion'] = $data['version'];
+                }
+            }
 
-                    if ($plugin['detectedVersion'] && version_compare($plugin['detectedVersion'], $data['version'], '<')) {
+            // Solo buscar readme.txt si la API dio versión (para comparar)
+            if ($plugin['latestVersion']) {
+                $readmeUrl = $this->url . '/wp-content/plugins/' . $slug . '/readme.txt';
+                $readme = Fetcher::get($readmeUrl, 3, false, 0);
+                if ($readme['statusCode'] === 200 && preg_match('/Stable tag:\s*([\d.]+)/i', $readme['body'], $m)) {
+                    $plugin['detectedVersion'] = $m[1];
+                    if (version_compare($m[1], $plugin['latestVersion'], '<')) {
                         $plugin['outdated'] = true;
                     }
                 }
             }
 
             $plugins[] = $plugin;
+            usleep(100000); // 100ms entre plugins
         }
 
         return $plugins;
@@ -451,21 +451,12 @@ class WordPressDetector {
         $filesToCheck = [
             '/wp-config.php.bak',
             '/wp-config.old',
-            '/wp-config.txt',
-            '/wp-config.php~',
             '/.env',
-            '/.env.local',
-            '/.env.production',
             '/debug.log',
             '/wp-content/debug.log',
             '/error_log',
             '/backup.zip',
             '/backup.sql',
-            '/backup.tar.gz',
-            '/database.sql',
-            '/dump.sql',
-            '/wp-content/backups/',
-            '/wp-content/uploads/backup.zip',
         ];
 
         foreach ($filesToCheck as $file) {

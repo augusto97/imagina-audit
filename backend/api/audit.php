@@ -154,13 +154,6 @@ try {
     ];
     $waterfallJson = json_encode($perfData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-    // Asegurar que la columna waterfall_json existe (auto-migración)
-    try {
-        $db->execute("ALTER TABLE audits ADD COLUMN waterfall_json TEXT");
-    } catch (Throwable $e) {
-        // Columna ya existe — ignorar
-    }
-
     $db->execute(
         "INSERT INTO audits (id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_wordpress, scan_duration_ms, result_json, waterfall_json, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
