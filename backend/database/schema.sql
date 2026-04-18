@@ -46,6 +46,18 @@ CREATE TABLE IF NOT EXISTS rate_limits (
     request_time TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Tabla de snapshots de WordPress (wp-snapshot plugin)
+CREATE TABLE IF NOT EXISTS wp_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_id TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'upload',
+    source_url TEXT,
+    snapshot_json TEXT NOT NULL,
+    analysis_json TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(audit_id)
+);
+
 -- Tabla de checklist del reporte técnico
 CREATE TABLE IF NOT EXISTS checklist_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,3 +77,4 @@ CREATE INDEX IF NOT EXISTS idx_audits_has_contact ON audits(lead_email);
 CREATE INDEX IF NOT EXISTS idx_rate_limits_ip ON rate_limits(ip_address, endpoint);
 CREATE INDEX IF NOT EXISTS idx_vulnerabilities_slug ON vulnerabilities(plugin_slug);
 CREATE INDEX IF NOT EXISTS idx_checklist_audit ON checklist_items(audit_id);
+CREATE INDEX IF NOT EXISTS idx_wp_snapshots_audit ON wp_snapshots(audit_id);

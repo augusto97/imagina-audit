@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAdmin } from '@/hooks/useAdmin'
 import { getLevelLabel, getLevelColor } from '@/lib/utils'
 import api from '@/lib/api'
+import SnapshotUploader from './SnapshotUploader'
 import type { AuditResult, ModuleResult, MetricResult } from '@/types/audit'
 
 interface ChecklistState {
@@ -20,6 +21,15 @@ export default function TechnicalReport() {
   const [result, setResult] = useState<AuditResult | null>(null)
   const [checklist, setChecklist] = useState<ChecklistState>({})
   const [loading, setLoading] = useState(true)
+  const [snapshotModule, setSnapshotModule] = useState<ModuleResult | null>(null)
+  const [snapshotReloadKey, setSnapshotReloadKey] = useState(0)
+
+  useEffect(() => {
+    if (!id) return
+    api.get('/admin/snapshot.php', { params: { audit_id: id } })
+      .then(res => setSnapshotModule(res.data?.data?.analysis || null))
+      .catch(() => setSnapshotModule(null))
+  }, [id, snapshotReloadKey])
 
   useEffect(() => {
     if (!id) return
@@ -61,12 +71,16 @@ export default function TechnicalReport() {
   return (
     <div className="space-y-8">
       <ReportHeader result={result} onBack={() => navigate('/admin/leads')} />
-      <ExecutiveSummary result={result} criticalCount={criticalMetrics.length} warningCount={warningMetrics.length} />
+      <ExecutiveSummary result={result} criticalCount={criticalMetrics.length} warningCount={warningMetrics.length} snapshotModule={snapshotModule} />
       {result.techStack && <TechStackSummary techStack={result.techStack} scanDuration={result.scanDurationMs} />}
+      {result.isWordPress && id && (
+        <SnapshotUploader auditId={id} onChange={() => setSnapshotReloadKey(k => k + 1)} />
+      )}
       <ActionPlan critical={criticalMetrics} warning={warningMetrics} checklist={checklist} onToggle={toggleCheck} />
       {result.modules.map(m => (
         <ModuleDetail key={m.id} module={m} />
       ))}
+      {snapshotModule && <ModuleDetail module={snapshotModule} />}
     </div>
   )
 }
@@ -138,7 +152,8 @@ function ReportHeader({ result, onBack }: { result: AuditResult; onBack: () => v
   )
 }
 
-function ExecutiveSummary({ result, criticalCount, warningCount }: { result: AuditResult; criticalCount: number; warningCount: number }) {
+function ExecutiveSummary({ result, criticalCount, warningCount, snapshotModule }: { result: AuditResult; criticalCount: number; warningCount: number; snapshotModule: ModuleResult | null }) {
+  const modules = snapshotModule ? [...result.modules, snapshotModule] : result.modules
   return (
     <div className="rounded-2xl border border-[var(--border-default)] bg-white p-6">
       <h2 className="text-lg font-bold text-[var(--text-primary)] mb-4">Resumen Ejecutivo</h2>
@@ -149,7 +164,7 @@ function ExecutiveSummary({ result, criticalCount, warningCount }: { result: Aud
         <SummaryCard label="WordPress" value={result.isWordPress ? 'Sí' : 'No'} color="var(--accent-primary)" />
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {result.modules.map(m => (
+        {modules.map(m => (
           <div key={m.id} className="flex items-center gap-2 text-sm">
             <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: getLevelColor(m.level) }} />
             <span className="text-[var(--text-secondary)] truncate">{m.name}</span>
