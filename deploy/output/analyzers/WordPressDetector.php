@@ -452,12 +452,20 @@ class WordPressDetector {
             '/wp-config.php.bak',
             '/wp-config.old',
             '/wp-config.txt',
+            '/wp-config.php~',
             '/.env',
+            '/.env.local',
+            '/.env.production',
             '/debug.log',
             '/wp-content/debug.log',
             '/error_log',
             '/backup.zip',
+            '/backup.sql',
+            '/backup.tar.gz',
+            '/database.sql',
+            '/dump.sql',
             '/wp-content/backups/',
+            '/wp-content/uploads/backup.zip',
         ];
 
         foreach ($filesToCheck as $file) {
