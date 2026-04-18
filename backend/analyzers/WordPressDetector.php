@@ -327,7 +327,7 @@ class WordPressDetector {
         $count = 0;
 
         foreach ($slugs as $slug) {
-            if ($count >= 10) break;
+            if ($count >= 15) break;
             $count++;
 
             $plugin = [
