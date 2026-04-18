@@ -72,7 +72,7 @@ class InfrastructureAnalyzer {
             'Servidor Web',
             $serverName,
             $serverName,
-            80,
+            null, // Informativo
             "Servidor web detectado: $serverName.",
             '',
             'Recomendamos LiteSpeed o Nginx para máximo rendimiento con WordPress.'
@@ -220,7 +220,7 @@ class InfrastructureAnalyzer {
             'Hosting / IP',
             $ip,
             "$provider ($ip)",
-            75, // Informativo, no penalizar
+            null, // Informativo
             "IP del servidor: $ip. Proveedor detectado: $provider.",
             '',
             'Evaluamos tu hosting y recomendamos la mejor opción para WordPress.'

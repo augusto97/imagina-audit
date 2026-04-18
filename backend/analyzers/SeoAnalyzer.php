@@ -41,6 +41,8 @@ class SeoAnalyzer {
         $metrics[] = $this->checkHreflang();
         $metrics[] = $this->checkContent();
         $metrics[] = $this->checkUrlStructure();
+        $metrics[] = $this->checkOversizeHeadings();
+        $metrics[] = $this->checkOversizedAlt();
         $metrics[] = $this->checkKeywordDensity();
         $metrics[] = $this->checkRssFeeds();
 
@@ -1080,13 +1082,80 @@ class SeoAnalyzer {
         return Scoring::createMetric(
             'rss_feeds', 'Web Feeds (RSS/Atom)', $count,
             $count === 0 ? 'No detectados' : "$count feed(s) detectados",
-            $count > 0 ? 100 : 60,
+            null, // Informativo — no afecta score
             $count > 0
                 ? "Se detectaron $count feeds: " . implode(', ', array_map(fn($f) => $f['type'] . ': ' . basename($f['url']), $feeds)) . '. Los feeds permiten a los usuarios suscribirse a las actualizaciones del sitio.'
                 : 'No se detectaron feeds RSS o Atom. Los feeds permiten que los usuarios se suscriban a tu contenido.',
             $count === 0 ? 'Agregar un feed RSS para que los usuarios y agregadores puedan seguir tu contenido.' : '',
             'Configuramos feeds RSS optimizados para distribución de contenido.',
             ['feeds' => $feeds]
+        );
+    }
+
+    private function checkOversizeHeadings(): array {
+        $headings = $this->parser->getHeadings();
+        $oversized = [];
+
+        foreach ($headings as $h) {
+            $len = mb_strlen($h['text']);
+            $maxLen = $h['level'] <= 1 ? 70 : 100;
+            if ($len > $maxLen) {
+                $oversized[] = [
+                    'tag' => 'H' . $h['level'],
+                    'text' => mb_substr($h['text'], 0, 80) . '...',
+                    'length' => $len,
+                    'maxLength' => $maxLen,
+                ];
+            }
+        }
+
+        $count = count($oversized);
+        $score = $count === 0 ? 100 : Scoring::clamp(100 - ($count * 15));
+
+        return Scoring::createMetric(
+            'oversize_headings', 'Encabezados demasiado largos', $count,
+            $count === 0 ? 'Todos dentro del límite' : "$count encabezados exceden el largo recomendado",
+            $score,
+            $count === 0
+                ? 'Todos los encabezados tienen una longitud adecuada. H1 hasta 70 caracteres, H2-H6 hasta 100.'
+                : "$count encabezados son demasiado largos: " . implode('; ', array_map(fn($o) => "{$o['tag']} ({$o['length']} car.)", array_slice($oversized, 0, 3))) . '.',
+            $count > 0 ? 'Acortar los encabezados que excedan el límite. H1 máx. 70 caracteres, H2-H6 máx. 100.' : '',
+            'Optimizamos los encabezados para que sean concisos y descriptivos.',
+            ['oversized' => $oversized]
+        );
+    }
+
+    private function checkOversizedAlt(): array {
+        $images = $this->parser->getImages();
+        $oversized = [];
+
+        foreach ($images as $img) {
+            $alt = $img['alt'] ?? '';
+            if (mb_strlen($alt) > 125) {
+                $src = $img['src'] ?? '';
+                $filename = basename(parse_url($src, PHP_URL_PATH) ?: $src);
+                $oversized[] = [
+                    'file' => $filename,
+                    'altLength' => mb_strlen($alt),
+                    'altPreview' => mb_substr($alt, 0, 60) . '...',
+                ];
+            }
+        }
+
+        $totalImages = count($images);
+        $count = count($oversized);
+        $score = $count === 0 ? 100 : Scoring::clamp(100 - ($count * 10));
+
+        return Scoring::createMetric(
+            'oversized_alt', 'Textos ALT demasiado largos', $count,
+            $count === 0 ? 'Todos dentro del límite' : "$count imágenes con alt excesivo",
+            $score,
+            $count === 0
+                ? "Las $totalImages imágenes revisadas tienen textos alt de longitud adecuada (máx. 125 caracteres)."
+                : "$count imágenes tienen textos alt de más de 125 caracteres. Textos alt muy largos pueden ser ignorados por los buscadores.",
+            $count > 0 ? 'Acortar los textos alt a máximo 125 caracteres. Deben ser descriptivos pero concisos.' : '',
+            'Optimizamos los textos alt para que sean descriptivos y de longitud adecuada.',
+            ['oversized' => $oversized, 'totalImages' => $totalImages]
         );
     }
 }
