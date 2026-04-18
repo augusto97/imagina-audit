@@ -818,6 +818,187 @@ function renderTechnicalDetails(metricId: string, details: Record<string, unknow
     )
   }
 
+  // Broken resources
+  if (metricId === 'broken_resources' && Array.isArray(details.broken) && (details.broken as Array<Record<string, unknown>>).length > 0) {
+    const broken = details.broken as Array<{ url: string; type: string; status: number }>
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-red-200 p-3">
+        <p className="text-xs font-bold text-red-600 mb-1">RECURSOS ROTOS ({broken.length} de {String(details.checked)} verificados)</p>
+        {broken.map((b, i) => (
+          <div key={i} className="text-xs flex items-center gap-2 py-0.5">
+            <span className="text-red-600 font-mono">{b.status}</span>
+            <span className="text-gray-500">[{b.type}]</span>
+            <span className="text-gray-700 truncate">{b.url}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // HTML errors
+  if (metricId === 'html_errors' && Array.isArray(details.errors) && (details.errors as string[]).length > 0) {
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-amber-200 p-3">
+        <p className="text-xs font-bold text-amber-700 mb-1">PROBLEMAS DETECTADOS</p>
+        <ul className="space-y-0.5">
+          {(details.errors as string[]).map((e, i) => <li key={i} className="text-xs text-gray-700">- {e}</li>)}
+        </ul>
+        {Number(details.inlineStyles) > 20 && <p className="text-xs text-gray-500 mt-1">{String(details.inlineStyles)} estilos inline detectados</p>}
+      </div>
+    )
+  }
+
+  // Oversize headings
+  if (metricId === 'oversize_headings' && Array.isArray(details.oversized) && (details.oversized as Array<Record<string, unknown>>).length > 0) {
+    const items = details.oversized as Array<{ tag: string; text: string; length: number; maxLength: number }>
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-amber-200 p-3 text-xs space-y-1">
+        {items.map((h, i) => (
+          <div key={i}><span className="font-mono font-bold text-amber-600">{h.tag}</span> <span className="text-gray-500">({h.length} car., máx {h.maxLength})</span>: <span className="text-gray-700">{h.text}</span></div>
+        ))}
+      </div>
+    )
+  }
+
+  // Oversized alt
+  if (metricId === 'oversized_alt' && Array.isArray(details.oversized) && (details.oversized as Array<Record<string, unknown>>).length > 0) {
+    const items = details.oversized as Array<{ file: string; altLength: number; altPreview: string }>
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-amber-200 p-3 text-xs space-y-1">
+        {items.map((a, i) => (
+          <div key={i}><span className="font-medium text-gray-700">{a.file}</span> <span className="text-amber-600">({a.altLength} car.)</span>: <span className="text-gray-500">{a.altPreview}</span></div>
+        ))}
+      </div>
+    )
+  }
+
+  // Exposed emails
+  if (metricId === 'exposed_email' && Array.isArray(details.emails) && (details.emails as string[]).length > 0) {
+    return (
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {(details.emails as string[]).map((e, i) => (
+          <span key={i} className="text-xs font-mono px-2 py-0.5 bg-amber-50 border border-amber-200 rounded text-amber-700">{e}</span>
+        ))}
+      </div>
+    )
+  }
+
+  // DMARC value
+  if (metricId === 'dmarc' && details.value) {
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3">
+        <p className="text-xs font-bold text-[var(--text-tertiary)] mb-1">REGISTRO DMARC</p>
+        <code className="text-[10px] text-gray-600 font-mono break-all">{String(details.value)}</code>
+      </div>
+    )
+  }
+
+  // Structured data types
+  if (metricId === 'structured_data' && Array.isArray(details.types)) {
+    return (
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {(details.types as string[]).map((t, i) => (
+          <span key={i} className="text-xs px-2 py-0.5 bg-blue-50 border border-blue-200 rounded text-blue-700">{t}</span>
+        ))}
+      </div>
+    )
+  }
+
+  // Cache details
+  if (metricId === 'cache_headers' && Array.isArray(details.details)) {
+    return (
+      <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3 text-xs space-y-0.5">
+        {(details.details as string[]).map((d, i) => <div key={i} className="text-gray-600">{d}</div>)}
+      </div>
+    )
+  }
+
+  // Text/code ratio
+  if (metricId === 'text_code_ratio' && details.ratio != null) {
+    const ratio = Number(details.ratio)
+    return (
+      <div className="mt-2 flex items-center gap-3 text-xs">
+        <div className="flex-1 bg-gray-100 rounded-full h-3 max-w-xs">
+          <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(ratio, 100)}%`, backgroundColor: ratio >= 15 ? '#10B981' : ratio >= 10 ? '#F59E0B' : '#EF4444' }} />
+        </div>
+        <span className="text-gray-500">Texto: {String(details.textSize)}B / HTML: {String(details.htmlSize)}B</span>
+      </div>
+    )
+  }
+
+  // Safe Browsing threats
+  if (metricId === 'safe_browsing' && Array.isArray(details.threatTypes) && (details.threatTypes as string[]).length > 0) {
+    return (
+      <div className="mt-2 rounded-lg bg-red-100 border border-red-300 p-3">
+        <p className="text-xs font-bold text-red-700 mb-1">AMENAZAS DETECTADAS POR GOOGLE</p>
+        <div className="flex flex-wrap gap-1.5">
+          {(details.threatTypes as string[]).map((t, i) => (
+            <span key={i} className="text-xs px-2 py-0.5 bg-red-200 rounded text-red-800 font-medium">{t}</span>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Theme/core vulnerabilities (same format as plugin vulns)
+  if ((metricId === 'theme_vulnerabilities' || metricId === 'core_vulnerabilities') && Array.isArray(details.vulnerabilities)) {
+    const vulns = details.vulnerabilities as Array<Record<string, unknown>>
+    if (vulns.length === 0) return null
+    return (
+      <div className="mt-2 space-y-1.5">
+        {vulns.map((v, i) => (
+          <div key={i} className="rounded-lg border border-red-200 bg-red-50/50 p-2 text-xs">
+            <span className="font-medium text-gray-900">{String(v.name || v.cve || 'Vulnerabilidad')}</span>
+            {v.cvssScore != null && Number(v.cvssScore) > 0 && <span className="ml-2 px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] font-bold">{Number(v.cvssScore).toFixed(1)}</span>}
+            {v.fixedInVersion != null && <span className="ml-2 text-emerald-600">Fix: v{String(v.fixedInVersion)}</span>}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // Sitemap details
+  if (metricId === 'sitemap' && (details.url || details.count)) {
+    return (
+      <div className="mt-2 text-xs text-gray-600 space-y-0.5">
+        {details.url != null && <div>URL: <span className="font-mono">{String(details.url)}</span></div>}
+        {details.isIndex === true && <div>Tipo: Sitemap Index</div>}
+        {Number(details.count) > 0 && <div>{details.isIndex ? 'Sub-sitemaps' : 'URLs'}: <b>{String(details.count)}</b></div>}
+      </div>
+    )
+  }
+
+  // Robots.txt details
+  if (metricId === 'robots' && (details.lineCount || details.disallowCount)) {
+    return (
+      <div className="mt-2 flex gap-3 text-xs">
+        <span className="px-2 py-1 rounded bg-gray-50 border border-gray-200">Directivas: <b>{String(details.lineCount)}</b></span>
+        <span className="px-2 py-1 rounded bg-gray-50 border border-gray-200">Disallow: <b>{String(details.disallowCount)}</b></span>
+        {details.hasSitemap === true && <span className="px-2 py-1 rounded bg-emerald-50 border border-emerald-200 text-emerald-700">Incluye Sitemap</span>}
+      </div>
+    )
+  }
+
+  // Hreflang languages
+  if (metricId === 'hreflang' && Array.isArray(details.languages)) {
+    return (
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {(details.languages as string[]).map((l, i) => (
+          <span key={i} className="text-xs px-2 py-0.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-700 font-mono">{l}</span>
+        ))}
+      </div>
+    )
+  }
+
+  // Mixed content count
+  if (metricId === 'mixed_content' && Number(details.count) > 0) {
+    return (
+      <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+        {Number(details.count)} recursos cargados por HTTP inseguro. Buscar <code className="font-mono bg-amber-100 px-1 rounded">src="http://</code> en el código y cambiar a <code className="font-mono bg-amber-100 px-1 rounded">https://</code>
+      </div>
+    )
+  }
+
   return null
 }
 
