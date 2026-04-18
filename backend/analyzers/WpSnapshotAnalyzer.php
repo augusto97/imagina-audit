@@ -17,45 +17,39 @@ class WpSnapshotAnalyzer {
     public function analyze(): array {
         $metrics = [];
 
-        $metrics[] = $this->analyzeEnvironment();
-        $metrics[] = $this->analyzeWpDebug();
-        $metrics[] = $this->analyzeFileEditing();
+        $checks = [
+            $this->analyzeEnvironment(),
+            $this->analyzeMysqlVersion(),
+            $this->analyzeUploadLimits(),
+            $this->analyzeExecutionLimits(),
+            $this->analyzeSiteUrlMismatch(),
+            $this->analyzeMultisite(),
+            $this->analyzeWpDebug(),
+            $this->analyzeFileEditing(),
+            $this->analyzeAutoUpdates(),
+            $this->analyzePlugins(),
+            $this->analyzeInactivePlugins(),
+            $this->analyzePluginOverload(),
+            $this->analyzeAbandonedPlugins(),
+            $this->analyzeThemes(),
+            $this->analyzeInactiveThemes(),
+            $this->analyzeDatabase(),
+            $this->analyzeDbEngine(),
+            $this->analyzeAutoload(),
+            $this->analyzeRevisions(),
+            $this->analyzeTransients(),
+            $this->analyzeOrphanedMeta(),
+            $this->analyzeSpamComments(),
+            $this->analyzeTrashedPosts(),
+            $this->analyzeCron(),
+            $this->analyzeUsers(),
+            $this->analyzeWeakAdminUsers(),
+            $this->analyzeObjectCache(),
+            $this->analyzeOpcache(),
+            $this->analyzeMediaSize(),
+        ];
 
-        $pluginsMetric = $this->analyzePlugins();
-        if ($pluginsMetric !== null) $metrics[] = $pluginsMetric;
-
-        $inactivePluginsMetric = $this->analyzeInactivePlugins();
-        if ($inactivePluginsMetric !== null) $metrics[] = $inactivePluginsMetric;
-
-        $themesMetric = $this->analyzeThemes();
-        if ($themesMetric !== null) $metrics[] = $themesMetric;
-
-        $dbMetric = $this->analyzeDatabase();
-        if ($dbMetric !== null) $metrics[] = $dbMetric;
-
-        $autoloadMetric = $this->analyzeAutoload();
-        if ($autoloadMetric !== null) $metrics[] = $autoloadMetric;
-
-        $revisionsMetric = $this->analyzeRevisions();
-        if ($revisionsMetric !== null) $metrics[] = $revisionsMetric;
-
-        $transientsMetric = $this->analyzeTransients();
-        if ($transientsMetric !== null) $metrics[] = $transientsMetric;
-
-        $orphanedMetric = $this->analyzeOrphanedMeta();
-        if ($orphanedMetric !== null) $metrics[] = $orphanedMetric;
-
-        $cronMetric = $this->analyzeCron();
-        if ($cronMetric !== null) $metrics[] = $cronMetric;
-
-        $usersMetric = $this->analyzeUsers();
-        if ($usersMetric !== null) $metrics[] = $usersMetric;
-
-        $cacheMetric = $this->analyzeObjectCache();
-        if ($cacheMetric !== null) $metrics[] = $cacheMetric;
-
-        // Filtrar métricas null (las que no aplican)
-        $metrics = array_values(array_filter($metrics, fn($m) => $m !== null));
+        $metrics = array_values(array_filter($checks, fn($m) => $m !== null));
 
         $score = Scoring::calculateModuleScore($metrics);
 
@@ -419,6 +413,365 @@ class WpSnapshotAnalyzer {
             !$active ? 'Configurar Redis o Memcached como cache de objetos. Mejora dramáticamente el rendimiento.' : '',
             'Instalamos y configuramos Redis/Memcached para cache de objetos persistente.',
             ['active' => $active, 'type' => $type]
+        );
+    }
+
+    private function analyzeMysqlVersion(): ?array {
+        $env = $this->getSection('environment');
+        $ver = $env['mysql_version'] ?? ($env['db_version'] ?? '');
+        if (empty($ver)) return null;
+
+        $num = (float) preg_replace('/[^0-9.]/', '', $ver);
+        $isMariaDB = stripos($ver, 'mariadb') !== false || stripos($ver, 'maria') !== false;
+
+        $score = 100;
+        if ($isMariaDB) {
+            if ($num < 10.3) $score = 40;
+            elseif ($num < 10.5) $score = 70;
+        } else {
+            if ($num < 5.7) $score = 30;
+            elseif ($num < 8.0) $score = 70;
+        }
+
+        return Scoring::createMetric(
+            'mysql_version', 'Versión MySQL/MariaDB',
+            $ver, $ver,
+            $score,
+            $score >= 100 ? "Versión $ver actualizada." : "Versión $ver. Se recomienda actualizar para mejor rendimiento y seguridad.",
+            $score < 100 ? ($isMariaDB ? 'Actualizar MariaDB a 10.5+ o superior.' : 'Actualizar MySQL a 8.0+ o superior.') : '',
+            'Gestionamos la actualización de la base de datos sin pérdida de información.',
+            ['version' => $ver, 'isMariaDB' => $isMariaDB]
+        );
+    }
+
+    private function analyzeUploadLimits(): ?array {
+        $env = $this->getSection('environment');
+        $maxUpload = $env['max_upload_size'] ?? ($env['upload_max_filesize'] ?? '');
+        $postMax = $env['php_post_max_size'] ?? ($env['post_max_size'] ?? '');
+        if (empty($maxUpload) && empty($postMax)) return null;
+
+        $uploadBytes = $this->parseSize($maxUpload);
+        $mb = $uploadBytes / (1024 * 1024);
+        $score = $mb >= 64 ? 100 : ($mb >= 32 ? 90 : ($mb >= 8 ? 70 : 40));
+
+        return Scoring::createMetric(
+            'upload_limits', 'Límites de subida',
+            $maxUpload, "Upload: $maxUpload · Post: $postMax",
+            $score,
+            $mb < 8
+                ? "Límite de subida muy bajo ($maxUpload). Los usuarios no podrán subir imágenes grandes o documentos."
+                : "Límite de subida: $maxUpload, post máximo: $postMax. " . ($mb >= 32 ? 'Adecuado.' : 'Considerar aumentar.'),
+            $mb < 32 ? 'Aumentar upload_max_filesize y post_max_size en php.ini o .htaccess.' : '',
+            'Configuramos los límites de subida adecuados según las necesidades del sitio.',
+            ['maxUpload' => $maxUpload, 'postMax' => $postMax]
+        );
+    }
+
+    private function analyzeExecutionLimits(): ?array {
+        $env = $this->getSection('environment');
+        $maxExec = $env['max_execution_time'] ?? ($env['php_max_execution_time'] ?? null);
+        if ($maxExec === null) return null;
+
+        $sec = (int) $maxExec;
+        $score = $sec >= 120 ? 100 : ($sec >= 60 ? 80 : ($sec >= 30 ? 60 : 30));
+
+        return Scoring::createMetric(
+            'execution_limits', 'Tiempo de ejecución PHP',
+            $sec, "{$sec}s",
+            $score,
+            $sec < 30
+                ? "Tiempo de ejecución PHP muy corto ({$sec}s). Operaciones como importaciones, backups o actualizaciones pueden fallar."
+                : "Tiempo de ejecución: {$sec}s. " . ($sec >= 60 ? 'Adecuado.' : 'Podría ser insuficiente para operaciones pesadas.'),
+            $sec < 60 ? 'Aumentar max_execution_time a 120s o más en php.ini.' : '',
+            'Ajustamos los límites PHP para operaciones de mantenimiento sin interrupciones.',
+            ['maxExecutionTime' => $sec]
+        );
+    }
+
+    private function analyzeSiteUrlMismatch(): ?array {
+        $env = $this->getSection('environment');
+        $siteUrl = $env['site_url'] ?? ($this->snapshot['site_url'] ?? '');
+        $homeUrl = $env['home_url'] ?? ($env['home'] ?? '');
+        if (empty($siteUrl) || empty($homeUrl)) return null;
+
+        $match = rtrim($siteUrl, '/') === rtrim($homeUrl, '/');
+
+        return Scoring::createMetric(
+            'site_url_match', 'Coincidencia Site URL / Home URL',
+            $match, $match ? 'Coinciden' : 'No coinciden',
+            $match ? 100 : 50,
+            $match
+                ? 'site_url y home_url coinciden correctamente.'
+                : "site_url ($siteUrl) y home_url ($homeUrl) no coinciden. Esto puede causar problemas de redirección y SEO.",
+            !$match ? 'Verificar que ambas URLs estén correctas en Ajustes → General o directamente en la DB.' : '',
+            'Corregimos inconsistencias de URL que afectan SEO y funcionalidad.',
+            ['siteUrl' => $siteUrl, 'homeUrl' => $homeUrl]
+        );
+    }
+
+    private function analyzeMultisite(): ?array {
+        $env = $this->getSection('environment');
+        $isMultisite = $env['is_multisite'] ?? ($env['multisite'] ?? false);
+        if (!$isMultisite) return null;
+
+        return Scoring::createMetric(
+            'multisite', 'WordPress Multisite',
+            true, 'Multisite activo',
+            null,
+            'Este sitio es una instalación WordPress Multisite. Requiere mantenimiento especializado y cuidado extra en actualizaciones.',
+            'Verificar que todos los subsitios estén actualizados y que la configuración de red sea segura.',
+            'Gestionamos redes WordPress Multisite con actualizaciones coordinadas.',
+            ['isMultisite' => true]
+        );
+    }
+
+    private function analyzeAutoUpdates(): ?array {
+        $env = $this->getSection('environment');
+        $autoUpdaterDisabled = $env['automatic_updater_disabled'] ?? ($env['auto_update_disabled'] ?? null);
+        if ($autoUpdaterDisabled === null) return null;
+
+        return Scoring::createMetric(
+            'auto_updates', 'Actualizaciones automáticas',
+            !$autoUpdaterDisabled, $autoUpdaterDisabled ? 'Deshabilitadas' : 'Habilitadas',
+            $autoUpdaterDisabled ? 50 : 100,
+            $autoUpdaterDisabled
+                ? 'Las actualizaciones automáticas están deshabilitadas. El sitio no recibirá parches de seguridad automáticos de WordPress.'
+                : 'Las actualizaciones automáticas están habilitadas. El sitio recibe parches de seguridad menores automáticamente.',
+            $autoUpdaterDisabled ? 'Habilitar al menos las actualizaciones menores de seguridad o implementar un proceso de actualización manual regular.' : '',
+            'Configuramos actualizaciones automáticas seguras con monitoreo de compatibilidad.',
+            ['disabled' => $autoUpdaterDisabled]
+        );
+    }
+
+    private function analyzePluginOverload(): ?array {
+        $plugins = $this->getSection('plugins');
+        if (empty($plugins)) return null;
+
+        $active = $plugins['active_count'] ?? 0;
+        if ($active < 15) return null;
+
+        $score = $active <= 20 ? 70 : ($active <= 30 ? 50 : ($active <= 40 ? 30 : 10));
+
+        return Scoring::createMetric(
+            'plugin_overload', 'Exceso de plugins activos',
+            $active, "$active plugins activos",
+            $score,
+            "$active plugins activos. Un número excesivo de plugins aumenta el tiempo de carga, el consumo de memoria y la superficie de ataque.",
+            'Auditar qué plugins son realmente necesarios. Combinar funcionalidades y eliminar plugins redundantes.',
+            'Auditamos y reducimos la cantidad de plugins necesarios optimizando funcionalidad.',
+            ['activeCount' => $active]
+        );
+    }
+
+    private function analyzeAbandonedPlugins(): ?array {
+        $plugins = $this->getSection('plugins');
+        if (empty($plugins)) return null;
+
+        $list = $plugins['plugins'] ?? [];
+        $abandoned = [];
+        $now = time();
+
+        foreach ($list as $p) {
+            $lastUpdated = $p['last_updated'] ?? ($p['last_updated_date'] ?? null);
+            if (empty($lastUpdated)) continue;
+            $ts = strtotime($lastUpdated);
+            if ($ts === false) continue;
+            $daysSince = ($now - $ts) / 86400;
+            if ($daysSince > 730) {
+                $abandoned[] = [
+                    'name' => $p['name'] ?? '?',
+                    'lastUpdated' => $lastUpdated,
+                    'daysSince' => (int) $daysSince,
+                ];
+            }
+        }
+
+        if (empty($abandoned)) return null;
+
+        $count = count($abandoned);
+        $score = $count <= 1 ? 60 : ($count <= 3 ? 40 : 20);
+
+        return Scoring::createMetric(
+            'abandoned_plugins', 'Plugins abandonados',
+            $count, "$count plugins sin actualizar en +2 años",
+            $score,
+            "$count plugins no han sido actualizados por sus desarrolladores en más de 2 años. Pueden tener vulnerabilidades no parcheadas.",
+            'Buscar alternativas actualizadas para estos plugins o evaluar si aún son necesarios.',
+            'Identificamos y reemplazamos plugins abandonados por alternativas seguras y actualizadas.',
+            ['count' => $count, 'plugins' => $abandoned]
+        );
+    }
+
+    private function analyzeInactiveThemes(): ?array {
+        $themes = $this->getSection('themes');
+        if (empty($themes)) return null;
+
+        $total = $themes['total_themes'] ?? 0;
+        $inactive = max(0, $total - 1);
+        if ($inactive <= 1) return null;
+
+        $score = $inactive <= 2 ? 80 : ($inactive <= 4 ? 60 : 30);
+
+        return Scoring::createMetric(
+            'inactive_themes', 'Temas inactivos',
+            $inactive, "$inactive temas sin usar",
+            $score,
+            "$inactive temas inactivos instalados. Los temas inactivos pueden contener vulnerabilidades y deben eliminarse. Mantener solo el tema activo y un tema default (Twenty Twenty-Four) como fallback.",
+            'Eliminar todos los temas inactivos excepto uno por defecto como respaldo.',
+            'Limpiamos temas innecesarios reduciendo la superficie de ataque.',
+            ['total' => $total, 'inactive' => $inactive]
+        );
+    }
+
+    private function analyzeDbEngine(): ?array {
+        $db = $this->getSection('database');
+        if (empty($db)) return null;
+
+        $tables = $db['tables'] ?? [];
+        $myisamTables = [];
+        foreach ($tables as $t) {
+            $engine = $t['engine'] ?? ($t['Engine'] ?? '');
+            if (stripos($engine, 'myisam') !== false) {
+                $myisamTables[] = $t['name'] ?? '?';
+            }
+        }
+
+        if (empty($myisamTables)) return null;
+
+        $count = count($myisamTables);
+
+        return Scoring::createMetric(
+            'db_engine', 'Motor de base de datos',
+            'MyISAM', "$count tablas con MyISAM",
+            $count <= 2 ? 70 : 40,
+            "$count tablas usan el motor MyISAM, que no soporta transacciones, bloqueo a nivel de fila, ni foreign keys. InnoDB es superior en rendimiento y confiabilidad.",
+            'Convertir las tablas MyISAM a InnoDB con: ALTER TABLE nombre ENGINE=InnoDB;',
+            'Migramos tablas a InnoDB para mejor rendimiento y confiabilidad.',
+            ['count' => $count, 'tables' => array_slice($myisamTables, 0, 10)]
+        );
+    }
+
+    private function analyzeSpamComments(): ?array {
+        $db = $this->getSection('database');
+        if (empty($db)) return null;
+
+        $spam = $db['spam_comments'] ?? ($db['spam_comment_count'] ?? null);
+        if ($spam === null || $spam === 0) return null;
+
+        $score = $spam < 100 ? 80 : ($spam < 1000 ? 50 : 20);
+
+        return Scoring::createMetric(
+            'spam_comments', 'Comentarios spam',
+            $spam, "$spam comentarios spam",
+            $score,
+            "$spam comentarios marcados como spam en la base de datos. Estos ocupan espacio y afectan el rendimiento de consultas.",
+            'Vaciar la carpeta de spam desde Comentarios → Spam → Vaciar spam. Instalar Akismet o similar para prevención.',
+            'Limpiamos spam acumulado y configuramos protección anti-spam efectiva.',
+            ['count' => $spam]
+        );
+    }
+
+    private function analyzeTrashedPosts(): ?array {
+        $db = $this->getSection('database');
+        $pt = $this->getSection('post_types');
+        $trashed = $db['trashed_posts'] ?? ($pt['trashed_count'] ?? null);
+        if ($trashed === null || $trashed === 0) return null;
+
+        $score = $trashed < 50 ? 90 : ($trashed < 200 ? 70 : 40);
+
+        return Scoring::createMetric(
+            'trashed_posts', 'Posts en papelera',
+            $trashed, "$trashed posts",
+            $score,
+            "$trashed posts en la papelera. Estos se mantienen en la DB ocupando espacio innecesario.",
+            'Vaciar la papelera desde Posts → Papelera → Vaciar papelera. Configurar limpieza automática con EMPTY_TRASH_DAYS.',
+            'Configuramos limpieza automática de la papelera para mantener la DB limpia.',
+            ['count' => $trashed]
+        );
+    }
+
+    private function analyzeWeakAdminUsers(): ?array {
+        $users = $this->getSection('users');
+        if (empty($users)) return null;
+
+        $userList = $users['users'] ?? [];
+        $weakNames = ['admin', 'administrator', 'root', 'test', 'user'];
+        $found = [];
+
+        foreach ($userList as $u) {
+            $login = strtolower($u['user_login'] ?? ($u['login'] ?? ($u['username'] ?? '')));
+            $role = $u['role'] ?? ($u['roles'] ?? '');
+            if (is_array($role)) $role = implode(', ', $role);
+            if (in_array($login, $weakNames, true)) {
+                $found[] = ['login' => $login, 'role' => $role];
+            }
+        }
+
+        if (empty($found)) return null;
+
+        return Scoring::createMetric(
+            'weak_admin_users', 'Usuarios con nombres predecibles',
+            count($found), count($found) . ' usuarios con nombre débil',
+            count($found) >= 2 ? 20 : 40,
+            'Se detectaron usuarios con nombres predecibles (' . implode(', ', array_column($found, 'login')) . '). Estos son los primeros que los atacantes intentan en ataques de fuerza bruta.',
+            'Crear nuevos usuarios con nombres únicos, transferir el contenido y eliminar los usuarios con nombres predecibles.',
+            'Cambiamos usernames predecibles y configuramos protección contra fuerza bruta.',
+            ['users' => $found]
+        );
+    }
+
+    private function analyzeOpcache(): ?array {
+        $perf = $this->getSection('performance');
+        $env = $this->getSection('environment');
+        $opcache = $perf['opcache_active'] ?? ($env['opcache_enabled'] ?? ($env['opcache'] ?? null));
+        if ($opcache === null) return null;
+
+        return Scoring::createMetric(
+            'opcache', 'OPcache PHP',
+            $opcache, $opcache ? 'Activo' : 'Inactivo',
+            $opcache ? 100 : 50,
+            $opcache
+                ? 'OPcache está activo. PHP no necesita recompilar los scripts en cada petición, mejorando significativamente el rendimiento.'
+                : 'OPcache no está activo. Cada petición PHP requiere compilar los scripts desde cero, lo que aumenta el tiempo de respuesta.',
+            !$opcache ? 'Habilitar OPcache en php.ini: opcache.enable=1, opcache.memory_consumption=128.' : '',
+            'Habilitamos y optimizamos OPcache para máximo rendimiento PHP.',
+            ['active' => $opcache]
+        );
+    }
+
+    private function analyzeMediaSize(): ?array {
+        $media = $this->getSection('media');
+        if (empty($media)) return null;
+
+        $totalCount = $media['total_count'] ?? ($media['total_items'] ?? 0);
+        $totalSize = $media['total_size'] ?? ($media['uploads_size'] ?? 0);
+        $orphaned = $media['orphaned_count'] ?? ($media['unattached'] ?? null);
+
+        if ($totalCount === 0 && $totalSize === 0) return null;
+
+        $humanSize = $this->formatBytes($totalSize);
+        $gbSize = $totalSize / (1024 * 1024 * 1024);
+
+        $score = 100;
+        if ($gbSize > 5) $score -= 30;
+        elseif ($gbSize > 2) $score -= 15;
+        if ($orphaned !== null && $orphaned > 50) $score -= 20;
+
+        $desc = "$totalCount archivos de medios ($humanSize).";
+        if ($orphaned !== null && $orphaned > 0) {
+            $desc .= " $orphaned archivos no están asociados a ningún contenido (huérfanos).";
+        }
+
+        return Scoring::createMetric(
+            'media_size', 'Biblioteca de medios',
+            $totalCount, "$totalCount archivos · $humanSize",
+            Scoring::clamp($score),
+            $desc . ($gbSize > 2 ? ' La biblioteca es muy pesada — considerar limpieza y optimización de imágenes.' : ''),
+            ($gbSize > 2 || ($orphaned !== null && $orphaned > 50))
+                ? 'Eliminar medios no usados, comprimir imágenes con ShortPixel/Imagify, y servir en formato WebP.'
+                : '',
+            'Optimizamos la biblioteca de medios: compresión, formato WebP y limpieza de archivos no utilizados.',
+            ['totalCount' => $totalCount, 'totalSize' => $totalSize, 'humanSize' => $humanSize, 'orphaned' => $orphaned]
         );
     }
 

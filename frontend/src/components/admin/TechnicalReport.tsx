@@ -45,7 +45,7 @@ export default function TechnicalReport() {
       setChecklist(state)
       setLoading(false)
     }).catch(() => setLoading(false))
-  }, [id, fetchLeadDetail])
+  }, [id, fetchLeadDetail, snapshotReloadKey])
 
   const toggleCheck = useCallback((metricId: string) => {
     if (!id) return

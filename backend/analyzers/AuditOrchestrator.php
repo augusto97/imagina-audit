@@ -7,10 +7,12 @@
 class AuditOrchestrator {
     private string $url;
     private array $leadData;
+    private ?array $snapshotData;
 
-    public function __construct(string $url, array $leadData = []) {
+    public function __construct(string $url, array $leadData = [], ?array $snapshotData = null) {
         $this->url = $url;
         $this->leadData = $leadData;
+        $this->snapshotData = $snapshotData;
     }
 
     /**
@@ -117,6 +119,17 @@ class AuditOrchestrator {
         } catch (Throwable $e) {
             Logger::error('PageHealthAnalyzer falló: ' . $e->getMessage());
             $modules[] = $this->createFailedModule('page_health', 'Salud de Página', 'heart-pulse');
+        }
+
+        // 8c. WpSnapshotAnalyzer (si se tiene snapshot del plugin wp-snapshot)
+        if ($this->snapshotData !== null && isset($this->snapshotData['sections'])) {
+            try {
+                $snapshotAnalyzer = new WpSnapshotAnalyzer($this->snapshotData);
+                $modules[] = $snapshotAnalyzer->analyze();
+            } catch (Throwable $e) {
+                Logger::error('WpSnapshotAnalyzer falló: ' . $e->getMessage());
+                $modules[] = $this->createFailedModule('wp_internal', 'Análisis Interno', 'database');
+            }
         }
 
         // 9. Detectar stack tecnológico (informativo, no afecta score)

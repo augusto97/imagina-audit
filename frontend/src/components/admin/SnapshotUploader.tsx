@@ -47,8 +47,13 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
     if (!shareUrl.trim()) { toast.error('Pega la URL del share'); return }
     setSubmitting(true)
     try {
-      await api.post('/admin/snapshot.php', { auditId, source: 'url', shareUrl: shareUrl.trim() })
-      toast.success('Snapshot cargado y analizado')
+      const res = await api.post('/admin/snapshot.php', { auditId, source: 'url', shareUrl: shareUrl.trim() })
+      const data = res.data?.data
+      if (data?.reaudit) {
+        toast.success(`Snapshot conectado y auditoría re-ejecutada (Score: ${data.newScore}/100)`)
+      } else {
+        toast.success('Snapshot cargado y analizado')
+      }
       setShareUrl('')
       await load()
       onChange?.()
@@ -64,8 +69,13 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
     try {
       const text = await file.text()
       const parsed = JSON.parse(text)
-      await api.post('/admin/snapshot.php', { auditId, source: 'upload', jsonData: parsed })
-      toast.success('Snapshot cargado y analizado')
+      const res = await api.post('/admin/snapshot.php', { auditId, source: 'upload', jsonData: parsed })
+      const data = res.data?.data
+      if (data?.reaudit) {
+        toast.success(`Snapshot conectado y auditoría re-ejecutada (Score: ${data.newScore}/100)`)
+      } else {
+        toast.success('Snapshot cargado y analizado')
+      }
       await load()
       onChange?.()
     } catch (e: unknown) {

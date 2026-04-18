@@ -130,7 +130,7 @@ if ($method === 'POST') {
         Response::error('El JSON no tiene la estructura esperada de wp-snapshot (falta "sections").', 422);
     }
 
-    // Run analyzer
+    // Run standalone analyzer for preview
     try {
         $analyzer = new WpSnapshotAnalyzer($snapshotData);
         $analysis = $analyzer->analyze();
@@ -139,7 +139,7 @@ if ($method === 'POST') {
         Response::error('Error al analizar el snapshot: ' . $e->getMessage(), 500);
     }
 
-    // Save to DB (upsert)
+    // Save snapshot to DB (upsert)
     $snapshotJson = json_encode($snapshotData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     $analysisJson = json_encode($analysis, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
@@ -156,9 +156,57 @@ if ($method === 'POST') {
         );
     }
 
+    // Re-run full audit with snapshot data injected
+    $reauditResult = null;
+    try {
+        $auditRow = $db->queryOne("SELECT url FROM audits WHERE id = ?", [$auditId]);
+        if ($auditRow && !empty($auditRow['url'])) {
+            set_time_limit(120);
+            ini_set('memory_limit', '256M');
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_write_close();
+            }
+
+            $orchestrator = new AuditOrchestrator($auditRow['url'], [], $snapshotData);
+            $reauditResult = $orchestrator->run();
+
+            // Keep original audit ID and timestamp
+            $reauditResult['id'] = $auditId;
+
+            $resultForStorage = $reauditResult;
+            $waterfallData = $reauditResult['waterfall'] ?? [];
+            $extendedPerf = $reauditResult['extendedPerf'] ?? [];
+            unset($resultForStorage['waterfall'], $resultForStorage['extendedPerf']);
+            $resultJson = json_encode($resultForStorage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $perfData = [
+                'waterfall' => $waterfallData,
+                'crux' => $extendedPerf['crux'] ?? null,
+                'resourceBreakdown' => $extendedPerf['resourceBreakdown'] ?? [],
+                'lighthouseAudits' => $extendedPerf['lighthouseAudits'] ?? [],
+                'lcpElement' => $extendedPerf['lcpElement'] ?? null,
+                'clsElements' => $extendedPerf['clsElements'] ?? [],
+                'mainThreadWork' => $extendedPerf['mainThreadWork'] ?? [],
+            ];
+            $waterfallJson = json_encode($perfData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+            try { $db->execute("ALTER TABLE audits ADD COLUMN waterfall_json TEXT"); } catch (Throwable $e) {}
+
+            $db->execute(
+                "UPDATE audits SET global_score = ?, global_level = ?, scan_duration_ms = ?, result_json = ?, waterfall_json = ? WHERE id = ?",
+                [$reauditResult['globalScore'], $reauditResult['globalLevel'], $reauditResult['scanDurationMs'], $resultJson, $waterfallJson, $auditId]
+            );
+
+            Logger::info("Re-audit con snapshot completada para audit $auditId: score {$reauditResult['globalScore']}");
+        }
+    } catch (Throwable $e) {
+        Logger::error("Re-audit con snapshot falló para audit $auditId: " . $e->getMessage());
+    }
+
     Response::success([
         'ok' => true,
         'analysis' => $analysis,
+        'reaudit' => $reauditResult !== null,
+        'newScore' => $reauditResult['globalScore'] ?? null,
         'generatedAt' => $snapshotData['generated_at'] ?? null,
         'siteName' => $snapshotData['site_name'] ?? null,
     ]);
