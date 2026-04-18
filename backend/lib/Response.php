@@ -44,6 +44,15 @@ class Response {
      */
     public static function cors(): void {
         $allowedOrigin = env('ALLOWED_ORIGIN', '*');
+
+        // Prefer DB setting over .env
+        try {
+            $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'allowed_origins'");
+            if ($row && !empty($row['value'])) {
+                $allowedOrigin = $row['value'];
+            }
+        } catch (Throwable $e) {}
+
         $requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
         if ($allowedOrigin === '*') {

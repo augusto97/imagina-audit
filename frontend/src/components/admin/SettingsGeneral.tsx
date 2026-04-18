@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
-import { Loader2, Save, Send, Copy, Code } from 'lucide-react'
+import { Loader2, Save, Send, Copy, Code, X, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,14 +14,35 @@ export default function SettingsGeneral() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testingEmail, setTestingEmail] = useState(false)
+  const [origins, setOrigins] = useState<string[]>([])
+  const [originInput, setOriginInput] = useState('')
   const { register, handleSubmit, reset, watch } = useForm()
 
   useEffect(() => {
     fetchSettings().then((data: Record<string, unknown>) => {
       reset(data)
+      const raw = (data.allowedOrigins as string) || '*'
+      if (raw !== '*') {
+        setOrigins(raw.split(',').map(s => s.trim()).filter(Boolean))
+      } else {
+        setOrigins([])
+      }
       setLoading(false)
     })
   }, [fetchSettings, reset])
+
+  const addOrigin = useCallback(() => {
+    let val = originInput.trim()
+    if (!val) return
+    if (!val.startsWith('http://') && !val.startsWith('https://')) val = 'https://' + val
+    val = val.replace(/\/+$/, '')
+    if (!origins.includes(val)) setOrigins(prev => [...prev, val])
+    setOriginInput('')
+  }, [originInput, origins])
+
+  const removeOrigin = useCallback((idx: number) => {
+    setOrigins(prev => prev.filter((_, i) => i !== idx))
+  }, [])
 
   const onSubmit = async (data: Record<string, unknown>) => {
     setSaving(true)
@@ -31,6 +52,7 @@ export default function SettingsGeneral() {
       const payload: Record<string, unknown> = { ...data }
       delete payload.newPassword
       delete payload.confirmPassword
+      payload.allowedOrigins = origins.length > 0 ? origins.join(',') : '*'
 
       if (newPass && newPass.length >= 8) {
         if (newPass !== confirmPass) {
@@ -112,6 +134,47 @@ export default function SettingsGeneral() {
                 <p className="mt-1 text-xs text-[var(--text-tertiary)]">Tiempo que se reutiliza un resultado antes de re-escanear. 0 = sin cache.</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Dominios permitidos (CORS) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Dominios Permitidos</CardTitle>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Dominios desde los cuales se permite acceder a la API. Si no agregas ninguno, se permite cualquier origen.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex gap-2">
+              <Input
+                value={originInput}
+                onChange={e => setOriginInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOrigin() } }}
+                placeholder="https://midominio.com"
+                className="flex-1"
+              />
+              <Button type="button" variant="outline" size="sm" onClick={addOrigin} disabled={!originInput.trim()}>
+                <Plus className="h-4 w-4" strokeWidth={1.5} />
+                Agregar
+              </Button>
+            </div>
+            {origins.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {origins.map((o, i) => (
+                  <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-700">
+                    {o}
+                    <button type="button" onClick={() => removeOrigin(i)} className="text-blue-400 hover:text-blue-700 transition-colors">
+                      <X className="h-3.5 w-3.5" strokeWidth={2} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                Sin dominios configurados — se permite cualquier origen (*). Agrega al menos el dominio de tu app para mayor seguridad.
+              </p>
+            )}
           </CardContent>
         </Card>
 
