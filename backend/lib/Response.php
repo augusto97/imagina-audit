@@ -44,20 +44,30 @@ class Response {
      */
     public static function cors(): void {
         $allowedOrigin = env('ALLOWED_ORIGIN', '*');
+
+        // Prefer DB setting over .env
+        try {
+            $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'allowed_origins'");
+            if ($row && !empty($row['value'])) {
+                $allowedOrigin = $row['value'];
+            }
+        } catch (Throwable $e) {}
+
         $requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
         if ($allowedOrigin === '*') {
-            // Si es *, reflejar el origin del request (o * si no hay origin)
-            // Esto permite que el widget funcione desde cualquier dominio
-            if (!empty($requestOrigin)) {
+            header('Access-Control-Allow-Origin: *');
+        } else {
+            $allowed = array_map('trim', explode(',', $allowedOrigin));
+            if (!empty($requestOrigin) && in_array($requestOrigin, $allowed, true)) {
                 header("Access-Control-Allow-Origin: $requestOrigin");
                 header('Access-Control-Allow-Credentials: true');
+                header('Vary: Origin');
             } else {
-                header('Access-Control-Allow-Origin: *');
+                header("Access-Control-Allow-Origin: {$allowed[0]}");
+                header('Access-Control-Allow-Credentials: true');
+                header('Vary: Origin');
             }
-        } else {
-            header("Access-Control-Allow-Origin: $allowedOrigin");
-            header('Access-Control-Allow-Credentials: true');
         }
 
         header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');

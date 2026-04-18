@@ -47,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'smtpFromName' => $dbSettings['smtp_from_name'] ?? 'Imagina Audit',
             'rateLimitMaxPerHour' => (int) ($dbSettings['rate_limit_max_per_hour'] ?? env('RATE_LIMIT_MAX_PER_HOUR', '100')),
             'cacheTtlHours' => (int) round(((int) ($dbSettings['cache_ttl_seconds'] ?? env('CACHE_TTL_SECONDS', '86400'))) / 3600),
+            'allowedOrigins' => $dbSettings['allowed_origins'] ?? env('ALLOWED_ORIGIN', '*'),
             'moduleWeights' => $weights,
             'thresholds' => [
                 'excellent' => (int) ($dbSettings['threshold_excellent'] ?? $defaults['threshold_excellent']),

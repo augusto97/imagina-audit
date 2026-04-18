@@ -27,6 +27,7 @@ class Database {
         $this->pdo->exec('PRAGMA journal_mode = WAL');
         $this->pdo->exec('PRAGMA synchronous = NORMAL');
         $this->pdo->exec('PRAGMA foreign_keys = ON');
+        $this->pdo->exec('PRAGMA busy_timeout = 5000');
     }
 
     /**
