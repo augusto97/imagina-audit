@@ -1,7 +1,6 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ExternalLink, Filter, Loader2, Microscope } from 'lucide-react'
-import { toast } from 'sonner'
+import { ArrowLeft, ExternalLink, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -30,22 +29,6 @@ interface ResourceBreakdownItem { resourceType: string; label: string; requestCo
 interface LighthouseAudit {
   id: string; title: string; description: string; score: number | null
   impact: string; displayValue: string; group: string; weight: number
-}
-
-interface WptRequest extends NetworkRequest {
-  dns: number
-  connect: number
-  ssl: number
-  ttfb: number
-  download: number
-}
-
-interface WptResult {
-  status: string
-  testId: string
-  summary: { loadTime: number; fullyLoaded: number; ttfb: number; bytesIn: number; requests: number }
-  waterfall: WptRequest[]
-  webpagetestUrl: string
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -103,54 +86,6 @@ export default function WaterfallPage() {
   const [expandedRow, setExpandedRow] = useState<number | null>(null)
   const [sortBy, setSortBy] = useState<'default' | 'url' | 'status' | 'size' | 'duration' | 'start'>('default')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-  const [wptLoading, setWptLoading] = useState(false)
-  const [wptStatus, setWptStatus] = useState('')
-  const [wptResult, setWptResult] = useState<WptResult | null>(null)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const runDeepAnalysis = useCallback(async () => {
-    if (!result) return
-    setWptLoading(true)
-    setWptStatus('Enviando test...')
-    setWptResult(null)
-    try {
-      const res = await api.post('/admin/webpagetest.php', { url: result.url })
-      const testId = res.data?.data?.testId
-      if (!testId) throw new Error('No testId')
-      setWptStatus('Test enviado. Esperando resultados (30-60s)...')
-
-      // Poll every 5s
-      pollRef.current = setInterval(async () => {
-        try {
-          const poll = await api.get('/admin/webpagetest.php', { params: { testId } })
-          const d = poll.data?.data
-          if (d?.status === 'completed') {
-            if (pollRef.current) clearInterval(pollRef.current)
-            setWptResult(d)
-            setWptLoading(false)
-            setWptStatus('')
-            toast.success('Análisis profundo completado')
-          } else if (d?.status === 'running') {
-            setWptStatus(d.statusText || 'En progreso...')
-          }
-        } catch {
-          if (pollRef.current) clearInterval(pollRef.current)
-          setWptLoading(false)
-          setWptStatus('')
-          toast.error('Error al obtener resultados')
-        }
-      }, 5000)
-    } catch (e: unknown) {
-      setWptLoading(false)
-      setWptStatus('')
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al iniciar análisis'
-      toast.error(msg)
-    }
-  }, [result])
-
-  useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [])
 
   const [requests, setRequests] = useState<NetworkRequest[]>([])
   const [cruxData, setCruxData] = useState<CruxData | null>(null)
@@ -325,10 +260,6 @@ export default function WaterfallPage() {
             </div>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={runDeepAnalysis} disabled={wptLoading}>
-          {wptLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Microscope className="h-4 w-4" strokeWidth={1.5} />}
-          {wptLoading ? wptStatus : 'Análisis Profundo'}
-        </Button>
       </div>
 
       {/* Filters */}
@@ -530,136 +461,6 @@ export default function WaterfallPage() {
       {lighthouseAudits.length > 0 && <StructureAuditsSection audits={lighthouseAudits} />}
 
       {/* WebPageTest Deep Analysis Results */}
-      {wptResult && <DeepAnalysisResults data={wptResult} />}
-    </div>
-  )
-}
-
-/* === Deep Analysis Results (WebPageTest) === */
-
-const TIMING_COLORS = {
-  dns: '#8BC34A',
-  connect: '#FF9800',
-  ssl: '#9C27B0',
-  ttfb: '#2196F3',
-  download: '#4CAF50',
-}
-
-function DeepAnalysisResults({ data }: { data: WptResult }) {
-  const [dFilterType, setDFilterType] = useState('All')
-  const [dSearch, setDSearch] = useState('')
-
-  const filtered = useMemo(() => {
-    let items = data.waterfall
-    if (dFilterType !== 'All') items = items.filter(r => (TYPE_LABELS[r.resourceType] || 'Other') === dFilterType)
-    if (dSearch) { const q = dSearch.toLowerCase(); items = items.filter(r => r.url.toLowerCase().includes(q)) }
-    return items
-  }, [data.waterfall, dFilterType, dSearch])
-
-  const maxTime = Math.max(...data.waterfall.map(r => r.endTime), 1)
-  const types = ['All', ...Array.from(new Set(data.waterfall.map(r => TYPE_LABELS[r.resourceType] || 'Other')))]
-
-  return (
-    <div className="mt-8 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">Análisis Profundo (WebPageTest)</h2>
-          <div className="flex flex-wrap gap-4 text-xs text-gray-500 mt-1">
-            <span>TTFB: <b>{data.summary.ttfb}ms</b></span>
-            <span>Load: <b>{(data.summary.loadTime / 1000).toFixed(2)}s</b></span>
-            <span>Fully Loaded: <b>{(data.summary.fullyLoaded / 1000).toFixed(2)}s</b></span>
-            <span>Requests: <b>{data.summary.requests}</b></span>
-            <span>Size: <b>{formatSize(data.summary.bytesIn)}</b></span>
-          </div>
-        </div>
-        <a href={data.webpagetestUrl} target="_blank" rel="noreferrer">
-          <Button variant="ghost" size="sm" className="text-blue-600 text-xs">
-            <ExternalLink className="h-3.5 w-3.5" /> Ver en WebPageTest
-          </Button>
-        </a>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 max-w-xs">
-          <Filter className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-          <Input value={dSearch} onChange={e => setDSearch(e.target.value)} placeholder="Filtrar..." className="pl-8 h-8 text-xs" />
-        </div>
-        <div className="flex gap-1">
-          {types.map(t => (
-            <button key={t} onClick={() => setDFilterType(t)}
-              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${dFilterType === t ? 'text-white bg-gray-700' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'}`}>
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Timing legend */}
-      <div className="flex gap-4 text-[10px] text-gray-500">
-        {Object.entries(TIMING_COLORS).map(([k, c]) => (
-          <div key={k} className="flex items-center gap-1">
-            <span className="w-3 h-2 rounded-sm" style={{ backgroundColor: c }} />
-            {k.toUpperCase()}
-          </div>
-        ))}
-      </div>
-
-      {/* Table with detailed timing */}
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <div className="grid grid-cols-[minmax(180px,2fr)_55px_65px_1fr] gap-0 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
-          <div className="px-3 py-2">URL</div>
-          <div className="px-2 py-2">Status</div>
-          <div className="px-2 py-2 text-right">Size</div>
-          <div className="px-3 py-2">Timeline (DNS / Connect / SSL / TTFB / Download)</div>
-        </div>
-
-        <div>
-          {filtered.map((req, i) => {
-            const barLeft = (req.startTime / maxTime) * 100
-            const totalDur = req.endTime - req.startTime
-            const segments = [
-              { key: 'dns', ms: req.dns, color: TIMING_COLORS.dns },
-              { key: 'connect', ms: req.connect, color: TIMING_COLORS.connect },
-              { key: 'ssl', ms: req.ssl, color: TIMING_COLORS.ssl },
-              { key: 'ttfb', ms: req.ttfb, color: TIMING_COLORS.ttfb },
-              { key: 'download', ms: req.download, color: TIMING_COLORS.download },
-            ].filter(s => s.ms > 0)
-
-            return (
-              <div key={i} className="grid grid-cols-[minmax(180px,2fr)_55px_65px_1fr] gap-0 border-b border-gray-100 hover:bg-blue-50/30 text-xs group"
-                title={`${req.url}\nDNS: ${req.dns}ms · Connect: ${req.connect}ms · SSL: ${req.ssl}ms · TTFB: ${req.ttfb}ms · Download: ${req.download}ms`}>
-                <div className="px-3 py-1.5 flex items-center gap-1.5 min-w-0">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: TYPE_COLORS[req.resourceType] || TYPE_COLORS.Other }} />
-                  <span className="truncate text-gray-700">{extractFilename(req.url)}</span>
-                </div>
-                <div className="px-2 py-1.5">
-                  <span className={req.statusCode >= 400 ? 'text-red-600' : 'text-gray-500'}>{req.statusCode || '—'}</span>
-                </div>
-                <div className="px-2 py-1.5 text-right text-gray-500 tabular-nums">{formatSize(req.transferSize)}</div>
-                <div className="px-3 py-1.5 flex items-center">
-                  <div className="relative w-full h-4">
-                    {/* Stacked timing segments */}
-                    {segments.length > 0 ? (
-                      <div className="absolute h-full flex" style={{ left: `${barLeft}%` }}>
-                        {segments.map(s => (
-                          <div key={s.key} className="h-full opacity-80 group-hover:opacity-100 first:rounded-l-sm last:rounded-r-sm"
-                            style={{ width: `${Math.max((s.ms / maxTime) * 100, 0.3)}vw`, maxWidth: `${(s.ms / maxTime) * 100}%`, backgroundColor: s.color, minWidth: '1px' }} />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="absolute h-full rounded-sm opacity-80" style={{ left: `${barLeft}%`, width: `${Math.max((totalDur / maxTime) * 100, 0.5)}%`, backgroundColor: TYPE_COLORS[req.resourceType] || '#9E9E9E', minWidth: '2px' }} />
-                    )}
-                    <span className="absolute text-[10px] text-gray-400 top-0.5 hidden group-hover:inline" style={{ left: `${barLeft + Math.max((totalDur / maxTime) * 100, 1) + 0.5}%` }}>
-                      {totalDur < 1000 ? `${totalDur.toFixed(0)}ms` : `${(totalDur / 1000).toFixed(2)}s`}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
     </div>
   )
 }
