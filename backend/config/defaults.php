@@ -59,6 +59,9 @@ return [
     'latest_wp_version' => '6.7.2',
 
     // Cola de auditorías
-    'audit_max_concurrent' => 3,   // Audits que pueden correr en paralelo
-    'audit_stale_seconds' => 180,  // Tras esto, un job 'running' se considera huérfano
+    'audit_max_concurrent' => 3,           // Audits que pueden correr en paralelo
+    'audit_stale_seconds' => 180,          // Tras esto, un job 'running' se considera huérfano
+    'audit_failure_cache_minutes' => 10,   // Si una URL falló en los últimos N min, devolvemos el mismo error sin reprocesar
+    'audit_max_attempts' => 3,             // Tras N intentos fallidos, se marca como permanently_failed
+    'audit_jobs_retention_days' => 7,      // Cuánto retener jobs completed/failed antes de borrar
 ];

@@ -33,7 +33,7 @@ spl_autoload_register(function (string $class) {
 
 set_time_limit(120);
 
-$stats = ['rate_limits' => 0, 'login_attempts' => 0, 'cache_files' => 0, 'log_files' => 0, 'errors' => []];
+$stats = ['rate_limits' => 0, 'login_attempts' => 0, 'audit_jobs' => 0, 'cache_files' => 0, 'log_files' => 0, 'errors' => []];
 
 try {
     $db = Database::getInstance();
@@ -47,6 +47,24 @@ try {
         $stats['login_attempts'] = $db->execute("DELETE FROM login_attempts WHERE attempted_at < datetime('now', '-15 minutes')");
     } catch (Throwable $e) {
         // Tabla podría no existir aún si nadie ha intentado loguearse
+    }
+
+    // Audit jobs completed/failed viejos — ya se guardó el resultado en `audits`,
+    // no hace falta mantener el registro de la cola más allá del período de
+    // retención. Además, liberar espacio e índice hace el dequeue más rápido.
+    try {
+        $defaults = require dirname(__DIR__) . '/config/defaults.php';
+        $retentionDays = (int) ($defaults['audit_jobs_retention_days'] ?? 7);
+        if ($retentionDays > 0) {
+            $stats['audit_jobs'] = $db->execute(
+                "DELETE FROM audit_jobs
+                 WHERE status IN ('completed', 'failed')
+                 AND completed_at < datetime('now', ?)",
+                ["-$retentionDays days"]
+            );
+        }
+    } catch (Throwable $e) {
+        $stats['errors'][] = 'audit_jobs cleanup: ' . $e->getMessage();
     }
 } catch (Throwable $e) {
     $stats['errors'][] = 'DB cleanup: ' . $e->getMessage();
@@ -80,9 +98,9 @@ try {
 }
 
 $msg = sprintf(
-    '[%s] cleanup: rate_limits=%d login_attempts=%d cache_files=%d log_files=%d errors=%d',
+    '[%s] cleanup: rate_limits=%d login_attempts=%d audit_jobs=%d cache_files=%d log_files=%d errors=%d',
     date('Y-m-d H:i:s'),
-    $stats['rate_limits'], $stats['login_attempts'],
+    $stats['rate_limits'], $stats['login_attempts'], $stats['audit_jobs'],
     $stats['cache_files'], $stats['log_files'],
     count($stats['errors'])
 );

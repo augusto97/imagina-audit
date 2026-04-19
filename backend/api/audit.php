@@ -112,6 +112,13 @@ try {
     Logger::error('Error consultando cache: ' . $e->getMessage());
 }
 
+// Circuit breaker: si esta URL acaba de fallar, devolvemos el mismo error
+// sin reprocesar. Evita loops de retry y ahorra cuota de APIs externas.
+$recentError = QueueManager::findRecentFailure($url);
+if ($recentError !== null && !$forceRefresh) {
+    Response::error($recentError, 422);
+}
+
 // Encolar o ejecutar directo
 $auditId = AuditOrchestrator::generateUuid();
 $leadData = [

@@ -55,9 +55,13 @@ export default function ScanningAnimation() {
           <Card className="w-full max-w-md text-center">
             <CardContent className="pt-8 pb-8">
               <AlertCircle className="mx-auto h-12 w-12 text-[var(--color-critical)]" strokeWidth={1.5} />
-              <h2 className="mt-4 text-lg font-semibold text-[var(--text-primary)]">Error al analizar</h2>
+              <h2 className="mt-4 text-lg font-semibold text-[var(--text-primary)]">No pudimos analizar este sitio</h2>
               <p className="mt-2 text-sm text-[var(--text-secondary)]">{error}</p>
-              <Button onClick={() => { reset(); navigate('/') }} className="mt-6">Intentar de nuevo</Button>
+              <p className="mt-4 text-xs text-[var(--text-tertiary)]">
+                Si el problema persiste, verifica que el sitio esté online.<br />
+                Espera unos minutos antes de reintentar.
+              </p>
+              <Button onClick={() => { reset(); navigate('/') }} className="mt-6">Volver</Button>
             </CardContent>
           </Card>
         </motion.div>

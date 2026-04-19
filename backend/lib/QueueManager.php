@@ -51,6 +51,57 @@ class QueueManager {
     }
 
     /**
+     * Busca el último fallo reciente para una URL dentro de la ventana
+     * configurada (`audit_failure_cache_minutes`). Si existe, retorna el
+     * mensaje de error — el caller puede devolverlo sin reprocesar.
+     *
+     * Esto protege contra:
+     *   - Usuarios que hacen clic repetidamente sobre un sitio caído.
+     *   - Widget embebido en un sitio de cliente que genera loops si falla.
+     *   - Ataques que intentan abrumar la cola con URLs inválidas.
+     */
+    public static function findRecentFailure(string $url): ?string {
+        $defaults = require dirname(__DIR__) . '/config/defaults.php';
+        $windowMin = (int) ($defaults['audit_failure_cache_minutes'] ?? 10);
+        if ($windowMin <= 0) return null;
+
+        try {
+            $db = Database::getInstance();
+            $row = $db->queryOne(
+                "SELECT error_message FROM audit_jobs
+                 WHERE url = ? AND status = 'failed'
+                 AND completed_at > datetime('now', ?)
+                 ORDER BY completed_at DESC LIMIT 1",
+                [$url, "-$windowMin minutes"]
+            );
+            if ($row && !empty($row['error_message'])) {
+                return $row['error_message'];
+            }
+        } catch (Throwable $e) {
+            Logger::warning('findRecentFailure falló: ' . $e->getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Cuenta cuántas veces una URL ha fallado dentro de la ventana. Útil
+     * para detectar URLs "tóxicas" que conviene bloquear temporalmente.
+     */
+    public static function recentFailureCount(string $url, int $windowMinutes = 30): int {
+        try {
+            $db = Database::getInstance();
+            return (int) $db->scalar(
+                "SELECT COUNT(*) FROM audit_jobs
+                 WHERE url = ? AND status = 'failed'
+                 AND completed_at > datetime('now', ?)",
+                [$url, "-$windowMinutes minutes"]
+            );
+        } catch (Throwable $e) {
+            return 0;
+        }
+    }
+
+    /**
      * Cuántos jobs están corriendo ahora mismo.
      */
     public static function runningCount(): int {
@@ -165,11 +216,29 @@ class QueueManager {
                 return null;
             }
 
+            // Defensa: si el job ya superó max attempts, marcarlo failed y pasar.
+            // Ocurre si un job quedó running, se reapeó, se re-encoló manual y
+            // falla de nuevo. No queremos retry eterno de URLs problemáticas.
+            $defaults = require dirname(__DIR__) . '/config/defaults.php';
+            $maxAttempts = (int) ($defaults['audit_max_attempts'] ?? 3);
+            if (((int) $job['attempts']) >= $maxAttempts) {
+                $db->execute(
+                    "UPDATE audit_jobs SET status = 'failed', error_message = 'Abandonado tras ' || attempts || ' intentos.', completed_at = datetime('now') WHERE id = ?",
+                    [$job['id']]
+                );
+                $pdo->commit();
+                AuditProgress::failed($job['audit_id'], 'El análisis falló repetidamente y fue abandonado. Contacta a soporte si persiste.');
+                // Recursive call para intentar el siguiente; evita bucle porque
+                // este job ya se marcó failed y no volverá a salir del query.
+                return self::dequeueNext();
+            }
+
             $db->execute(
                 "UPDATE audit_jobs SET status = 'running', started_at = datetime('now'), attempts = attempts + 1 WHERE id = ?",
                 [$job['id']]
             );
             $pdo->commit();
+            $job['attempts'] = ((int) $job['attempts']) + 1;
             return $job;
         } catch (Throwable $e) {
             try { $pdo->rollback(); } catch (Throwable $e2) {}
@@ -250,6 +319,27 @@ class QueueManager {
         $url = $job['url'];
         $leadData = json_decode($job['lead_data_json'] ?? '[]', true) ?: [];
         $ip = $job['ip_address'] ?? 'unknown';
+
+        // Si otro audit con la misma URL falló mientras este esperaba en cola,
+        // no lo re-ejecutamos — devolvemos el mismo error.
+        $recentError = self::findRecentFailure($url);
+        if ($recentError !== null) {
+            self::markFailed($auditId, $recentError);
+            AuditProgress::failed($auditId, $recentError);
+            return;
+        }
+
+        // Límite de attempts — defensa ante loops (hoy attempts solo crece en
+        // dequeueNext, pero si en el futuro agregamos retry automático, esto
+        // evita que un job problemático se quede dando vueltas para siempre).
+        $defaults = require dirname(__DIR__) . '/config/defaults.php';
+        $maxAttempts = (int) ($defaults['audit_max_attempts'] ?? 3);
+        if (((int) ($job['attempts'] ?? 0)) > $maxAttempts) {
+            $msg = 'El análisis se abandonó tras varios intentos fallidos.';
+            self::markFailed($auditId, $msg);
+            AuditProgress::failed($auditId, $msg);
+            return;
+        }
 
         AuditProgress::update($auditId, [
             'status' => 'running',
