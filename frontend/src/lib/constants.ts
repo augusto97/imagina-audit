@@ -31,6 +31,8 @@ export const MODULE_ICONS: Record<string, string> = {
   mobile: 'smartphone',
   infrastructure: 'server',
   conversion: 'bar-chart-3',
+  page_health: 'activity',
+  wp_internal: 'database',
 }
 
 /** Nombres de módulos en español */
@@ -43,6 +45,7 @@ export const MODULE_NAMES: Record<string, string> = {
   infrastructure: 'Infraestructura',
   conversion: 'Conversión',
   page_health: 'Salud de Página',
+  wp_internal: 'Análisis Interno',
 }
 
 /** Emojis de módulos para el feature grid */
@@ -55,6 +58,7 @@ export const MODULE_EMOJIS: Record<string, string> = {
   infrastructure: '🖥️',
   conversion: '📊',
   page_health: '🩺',
+  wp_internal: '🗄️',
 }
 
 /** Pasos simulados del escaneo */

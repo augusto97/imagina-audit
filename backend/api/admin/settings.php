@@ -15,8 +15,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $dbSettings[$row['key']] = $row['value'];
         }
 
-        // Construir respuesta con valores de DB o defaults
-        $moduleIds = ['wordpress', 'security', 'performance', 'seo', 'mobile', 'infrastructure', 'conversion'];
+        // Derivar la lista de módulos dinámicamente desde los defaults + DB.
+        // Al agregar un nuevo módulo (weight_* en defaults.php) aparece
+        // automáticamente en el admin sin tocar esta lista.
+        $moduleIds = [];
+        $seen = [];
+        foreach (array_merge(array_keys($defaults), array_keys($dbSettings)) as $key) {
+            if (str_starts_with($key, 'weight_')) {
+                $id = substr($key, 7);
+                if (!isset($seen[$id])) {
+                    $moduleIds[] = $id;
+                    $seen[$id] = true;
+                }
+            }
+        }
 
         $weights = [];
         $salesMessages = [];

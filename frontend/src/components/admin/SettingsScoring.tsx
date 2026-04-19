@@ -10,8 +10,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAdmin } from '@/hooks/useAdmin'
 import { MODULE_EMOJIS, MODULE_NAMES } from '@/lib/constants'
 
-const moduleIds = ['wordpress', 'security', 'performance', 'seo', 'mobile', 'infrastructure', 'conversion']
-
 export default function SettingsScoring() {
   const { fetchSettings, updateSettings } = useAdmin()
   const [loading, setLoading] = useState(true)
@@ -27,6 +25,11 @@ export default function SettingsScoring() {
       setLoading(false)
     })
   }, [fetchSettings])
+
+  // Los módulos se derivan de lo que devuelve el backend en moduleWeights:
+  // así al agregar uno nuevo (e.g. page_health, wp_internal) aparece
+  // automáticamente aquí sin cambios en el frontend.
+  const moduleIds = Object.keys(weights)
 
   const totalWeight = Object.values(weights).reduce((s, v) => s + v, 0)
   const isSumValid = Math.abs(totalWeight - 1.0) < 0.005

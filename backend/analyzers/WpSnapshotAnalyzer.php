@@ -56,16 +56,18 @@ class WpSnapshotAnalyzer {
         $metrics = array_values(array_filter($checks, fn($m) => $m !== null));
         $score = Scoring::calculateModuleScore($metrics);
 
+        $defaults = require dirname(__DIR__) . '/config/defaults.php';
+
         return [
             'id' => 'wp_internal',
             'name' => 'Análisis Interno (WordPress)',
             'icon' => 'database',
             'score' => $score,
             'level' => Scoring::getLevel($score),
-            'weight' => 0.10,
+            'weight' => $defaults['weight_wp_internal'] ?? 0.10,
             'metrics' => $metrics,
             'summary' => "Análisis interno del sitio basado en el snapshot: $score/100.",
-            'salesMessage' => 'Analizamos el estado interno de tu WordPress y lo optimizamos a nivel de plugins, base de datos, configuración y rendimiento.',
+            'salesMessage' => $defaults['sales_wp_internal'] ?? '',
         ];
     }
 }
