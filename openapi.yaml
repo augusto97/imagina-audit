@@ -1,0 +1,967 @@
+openapi: 3.1.0
+info:
+  title: Imagina Audit API
+  version: 2.0.0
+  description: |
+    API del backend de Imagina Audit (PHP vanilla + SQLite).
+
+    Todas las respuestas usan el envelope estándar `{ success: bool, data?: any, error?: string }`.
+
+    - Endpoints `/api/audit`, `/api/audit-status`, `/api/config`, `/api/health`,
+      `/api/compare`, `/api/history` son **públicos**: CORS abierto (`*` sin credenciales).
+    - Endpoints bajo `/api/admin/*` requieren sesión (cookie `PHPSESSID`) y, para
+      POST/PUT/DELETE/PATCH, header `X-CSRF-Token` obtenido en login o session.
+
+servers:
+  - url: /api
+    description: Ruta relativa al servidor
+
+paths:
+  /health.php:
+    get:
+      tags: [Public]
+      summary: Healthcheck
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          status: { type: string, enum: [healthy] }
+                          version: { type: string }
+
+  /config.php:
+    get:
+      tags: [Public]
+      summary: Configuración pública (branding, CTA, planes)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data: { $ref: '#/components/schemas/AppSettings' }
+
+  /audit.php:
+    post:
+      tags: [Public]
+      summary: Ejecuta una auditoría (o devuelve la cacheada si existe)
+      description: Rate-limited por IP. Si hay cache <24h y `forceRefresh` no es true, devuelve el resultado cacheado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuditRequest' }
+      responses:
+        '200':
+          description: Auditoría completa
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data: { $ref: '#/components/schemas/AuditResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413': { $ref: '#/components/responses/BadRequest' }
+        '422': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /audit-status.php:
+    get:
+      tags: [Public]
+      summary: Recupera una auditoría guardada por ID
+      parameters:
+        - $ref: '#/components/parameters/AuditId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data: { $ref: '#/components/schemas/AuditResult' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /compare.php:
+    post:
+      tags: [Public]
+      summary: Compara dos auditorías lado a lado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url1, url2]
+              properties:
+                url1: { type: string, format: uri }
+                url2: { type: string, format: uri }
+      responses:
+        '200':
+          description: Dos AuditResult y una comparativa
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          audit1: { $ref: '#/components/schemas/AuditResult' }
+                          audit2: { $ref: '#/components/schemas/AuditResult' }
+                          comparison:
+                            type: object
+                            properties:
+                              winner: { type: string, description: 'id del audit ganador' }
+                              scoreDifference: { type: integer }
+                              moduleComparison:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    moduleId: { type: string }
+                                    audit1Score: { type: integer }
+                                    audit2Score: { type: integer }
+
+  /history.php:
+    get:
+      tags: [Public]
+      summary: Historial de auditorías para un dominio (hasta 12)
+      parameters:
+        - $ref: '#/components/parameters/Domain'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          domain: { type: string }
+                          totalAudits: { type: integer }
+                          trend: { type: string, enum: [improving, declining, stable, insufficient_data] }
+                          history:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                globalScore: { type: integer }
+                                globalLevel: { $ref: '#/components/schemas/SemaphoreLevel' }
+                                moduleScores: { type: object, additionalProperties: { type: integer } }
+                                createdAt: { type: string, format: date-time }
+
+  /admin/login.php:
+    post:
+      tags: [Admin Auth]
+      summary: Autenticación admin
+      description: Rate-limited a 5 intentos por IP en ventana de 15 minutos.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Sesión iniciada. Guarda `data.csrfToken` para mutaciones futuras.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          authenticated: { type: boolean, enum: [true] }
+                          csrfToken: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /admin/logout.php:
+    post:
+      tags: [Admin Auth]
+      summary: Cerrar sesión
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+
+  /admin/session.php:
+    get:
+      tags: [Admin Auth]
+      summary: Verifica sesión activa y devuelve CSRF token si autenticado
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          authenticated: { type: boolean }
+                          csrfToken: { type: string, nullable: true }
+
+  /admin/dashboard.php:
+    get:
+      tags: [Admin Data]
+      summary: Métricas agregadas para el dashboard
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data: { $ref: '#/components/schemas/DashboardStats' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /admin/leads.php:
+    get:
+      tags: [Admin Data]
+      summary: Lista de leads/auditorías (paginada, filtrable)
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20 } }
+        - { name: filter, in: query, schema: { type: string, enum: [all, with_contact, critical_score, this_week] } }
+        - { name: sort, in: query, schema: { type: string, enum: [date_desc, date_asc, score_desc, score_asc] } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          leads:
+                            type: array
+                            items: { $ref: '#/components/schemas/LeadSummary' }
+                          total: { type: integer }
+                          page: { type: integer }
+    delete:
+      tags: [Admin Data]
+      summary: Eliminar una auditoría
+      security: [{ SessionCookie: [], CsrfToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/AuditId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/lead-detail.php:
+    get:
+      tags: [Admin Data]
+      summary: Auditoría completa + datos del lead
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/AuditId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/AuditResult'
+                          - properties:
+                              leadName: { type: string, nullable: true }
+                              leadEmail: { type: string, nullable: true }
+                              leadWhatsapp: { type: string, nullable: true }
+                              leadCompany: { type: string, nullable: true }
+                              createdAt: { type: string, format: date-time }
+
+  /admin/settings.php:
+    get:
+      tags: [Admin Config]
+      summary: Lee la configuración completa
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data: { $ref: '#/components/schemas/AppSettings' }
+    put:
+      tags: [Admin Config]
+      summary: Actualiza settings (merge parcial)
+      security: [{ SessionCookie: [], CsrfToken: [] }]
+      description: |
+        Acepta cualquier subset de las claves de AppSettings. Las claves en
+        camelCase se convierten a snake_case automáticamente antes de guardar
+        en la tabla `settings`. La clave especial `adminPassword` se hashea.
+        `smtpPassword` igual a `""` o `"••••••••"` se ignora (placeholder).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/AppSettings'
+                - properties:
+                    adminPassword: { type: string, format: password }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+
+  /admin/vulnerabilities.php:
+    get:
+      tags: [Admin Config]
+      summary: Lista de vulnerabilidades (paginada)
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 50 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          vulnerabilities:
+                            type: array
+                            items: { $ref: '#/components/schemas/VulnerabilityEntry' }
+                          total: { type: integer }
+    post:
+      tags: [Admin Config]
+      summary: Crear vulnerabilidad
+      security: [{ SessionCookie: [], CsrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VulnerabilityEntry' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: integer }
+    put:
+      tags: [Admin Config]
+      summary: Actualizar vulnerabilidad
+      security: [{ SessionCookie: [], CsrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VulnerabilityEntry' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+    delete:
+      tags: [Admin Config]
+      summary: Eliminar vulnerabilidad
+      security: [{ SessionCookie: [], CsrfToken: [] }]
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+
+  /admin/update-vulnerabilities.php:
+    post:
+      tags: [Admin Config]
+      summary: Refresca vulnerabilidades desde WPVulnerability.net
+      security: [{ SessionCookie: [], CsrfToken: [] }]
+      responses:
+        '200':
+          description: Estadísticas del update
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          newVulnerabilities: { type: integer }
+                          updatedVulnerabilities: { type: integer }
+                          pluginsChecked: { type: integer }
+                          errors: { type: integer }
+
+  /admin/checklist.php:
+    get:
+      tags: [Admin Data]
+      summary: Checklist de correcciones para una auditoría
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - { name: audit_id, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            metric_id: { type: string }
+                            completed: { type: integer, enum: [0, 1] }
+                            notes: { type: string, nullable: true }
+                            completed_at: { type: string, nullable: true, format: date-time }
+    put:
+      tags: [Admin Data]
+      summary: Toggle un item del checklist
+      security: [{ SessionCookie: [], CsrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [auditId, metricId, completed]
+              properties:
+                auditId: { type: string }
+                metricId: { type: string }
+                completed: { type: boolean }
+                notes: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+
+  /admin/waterfall.php:
+    get:
+      tags: [Admin Data]
+      summary: Datos de waterfall + CrUX + Lighthouse + resource breakdown
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/AuditId'
+      responses:
+        '200':
+          description: OK (schemas internos — ver WaterfallPage.tsx)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        additionalProperties: true
+
+  /admin/snapshot.php:
+    get:
+      tags: [Admin Data]
+      summary: Snapshot wp-snapshot guardado para una auditoría
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - { name: audit_id, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK o null si no hay snapshot
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        nullable: true
+                        additionalProperties: true
+    post:
+      tags: [Admin Data]
+      summary: Sube un snapshot (URL de share o JSON directo)
+      security: [{ SessionCookie: [], CsrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [auditId, source]
+              properties:
+                auditId: { type: string }
+                source: { type: string, enum: [url, upload] }
+                shareUrl: { type: string }
+                jsonData:
+                  description: Acepta string (JSON) u objeto
+                  oneOf:
+                    - { type: string }
+                    - { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: OK — incluye reaudit si se regeneró
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          ok: { type: boolean }
+                          analysis: { type: object, additionalProperties: true }
+                          reaudit: { type: boolean }
+                          newScore: { type: integer, nullable: true }
+                          generatedAt: { type: string, nullable: true }
+                          siteName: { type: string, nullable: true }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+        '413': { $ref: '#/components/responses/BadRequest' }
+        '422': { $ref: '#/components/responses/BadRequest' }
+    delete:
+      tags: [Admin Data]
+      summary: Elimina el snapshot asociado a una auditoría
+      security: [{ SessionCookie: [], CsrfToken: [] }]
+      parameters:
+        - { name: audit_id, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+
+  /admin/export-leads.php:
+    get:
+      tags: [Admin Data]
+      summary: Exporta leads a CSV
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200':
+          description: Archivo CSV
+          content:
+            text/csv:
+              schema: { type: string }
+
+  /admin/test-email.php:
+    post:
+      tags: [Admin Config]
+      summary: Envía un email de prueba con la configuración SMTP actual
+      security: [{ SessionCookie: [], CsrfToken: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                to: { type: string, format: email }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+
+tags:
+  - name: Public
+  - name: Admin Auth
+  - name: Admin Data
+  - name: Admin Config
+
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: PHPSESSID
+      description: Cookie de sesión PHP. Se fija tras `POST /admin/login`.
+    CsrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: Token CSRF devuelto por login/session. Obligatorio en mutaciones admin.
+
+  parameters:
+    AuditId:
+      name: id
+      in: query
+      required: true
+      schema: { type: string }
+      description: UUID de la auditoría
+    Domain:
+      name: domain
+      in: query
+      required: true
+      schema: { type: string }
+      description: Dominio (sin esquema)
+
+  responses:
+    Unauthorized:
+      description: Sesión ausente o expirada
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    CsrfInvalid:
+      description: Token CSRF ausente o inválido
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    BadRequest:
+      description: Parámetros inválidos
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    RateLimited:
+      description: Demasiadas peticiones
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: {}
+    ErrorEnvelope:
+      type: object
+      required: [success, error]
+      properties:
+        success: { type: boolean, enum: [false] }
+        error: { type: string }
+        details: { type: object, additionalProperties: true }
+
+    SemaphoreLevel:
+      type: string
+      enum: [critical, warning, good, excellent, info, unknown]
+
+    MetricResult:
+      type: object
+      required: [id, name, value, displayValue, score, level, description, recommendation, imaginaSolution]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        value:
+          description: Valor crudo detectado
+          oneOf:
+            - { type: string }
+            - { type: number }
+            - { type: boolean }
+            - { type: 'null' }
+        displayValue: { type: string }
+        score: { type: integer, minimum: 0, maximum: 100, nullable: true }
+        level: { $ref: '#/components/schemas/SemaphoreLevel' }
+        description: { type: string }
+        recommendation: { type: string }
+        imaginaSolution: { type: string }
+        details:
+          type: object
+          additionalProperties: true
+
+    ModuleResult:
+      type: object
+      required: [id, name, icon, score, level, weight, metrics, summary, salesMessage]
+      properties:
+        id: { type: string, description: 'wordpress | security | performance | seo | mobile | infrastructure | conversion | page_health | wp_internal' }
+        name: { type: string }
+        icon: { type: string, description: 'Nombre de icono Lucide' }
+        score: { type: integer, minimum: 0, maximum: 100, nullable: true }
+        level: { $ref: '#/components/schemas/SemaphoreLevel' }
+        weight: { type: number, format: float }
+        metrics:
+          type: array
+          items: { $ref: '#/components/schemas/MetricResult' }
+        summary: { type: string }
+        salesMessage: { type: string }
+
+    SolutionItem:
+      type: object
+      required: [problem, level, solution, includedInPlan]
+      properties:
+        problem: { type: string }
+        level: { $ref: '#/components/schemas/SemaphoreLevel' }
+        solution: { type: string }
+        includedInPlan: { type: string, description: 'Basic | Pro | Custom' }
+
+    HostingInfo:
+      type: object
+      nullable: true
+      properties:
+        ip: { type: string, nullable: true }
+        provider: { type: string, nullable: true }
+        country: { type: string, nullable: true }
+        city: { type: string, nullable: true }
+        reverseDns: { type: string, nullable: true }
+        nameservers:
+          type: array
+          items: { type: string }
+
+    DomainInfo:
+      type: object
+      nullable: true
+      properties:
+        domain: { type: string, nullable: true }
+        registrar: { type: string, nullable: true }
+        createdDate: { type: string, nullable: true }
+        expiryDate: { type: string, nullable: true }
+        daysUntilExpiry: { type: integer, nullable: true }
+
+    TechStack:
+      type: object
+      properties:
+        server: { type: string, nullable: true }
+        cms: { type: string, nullable: true }
+        pageBuilder: { type: array, items: { type: string } }
+        ecommerce: { type: array, items: { type: string } }
+        cachePlugin: { type: array, items: { type: string } }
+        seoPlugin: { type: array, items: { type: string } }
+        securityPlugin: { type: array, items: { type: string } }
+        jsLibraries: { type: array, items: { type: string } }
+        cssFramework: { type: array, items: { type: string } }
+        fonts: { type: array, items: { type: string } }
+        cdn: { type: string, nullable: true }
+        analytics: { type: array, items: { type: string } }
+        phpVersion: { type: string, nullable: true }
+        httpProtocol: { type: string, nullable: true }
+        hostingInfo: { $ref: '#/components/schemas/HostingInfo' }
+        domainInfo: { $ref: '#/components/schemas/DomainInfo' }
+
+    AuditResult:
+      type: object
+      required:
+        - id
+        - url
+        - domain
+        - timestamp
+        - scanDurationMs
+        - globalScore
+        - globalLevel
+        - totalIssues
+        - modules
+        - isWordPress
+        - economicImpact
+        - solutionMap
+      properties:
+        id: { type: string, format: uuid }
+        url: { type: string, format: uri }
+        domain: { type: string }
+        timestamp: { type: string, format: date-time }
+        scanDurationMs: { type: integer }
+        globalScore: { type: integer, minimum: 0, maximum: 100 }
+        globalLevel: { $ref: '#/components/schemas/SemaphoreLevel' }
+        totalIssues:
+          type: object
+          required: [critical, warning, good]
+          properties:
+            critical: { type: integer }
+            warning: { type: integer }
+            good: { type: integer }
+        modules:
+          type: array
+          items: { $ref: '#/components/schemas/ModuleResult' }
+        isWordPress: { type: boolean }
+        economicImpact:
+          type: object
+          required: [estimatedMonthlyLoss, currency, explanation]
+          properties:
+            estimatedMonthlyLoss: { type: integer }
+            currency: { type: string }
+            explanation: { type: string }
+        solutionMap:
+          type: array
+          items: { $ref: '#/components/schemas/SolutionItem' }
+        techStack: { $ref: '#/components/schemas/TechStack' }
+
+    AuditRequest:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string, format: uri }
+        leadName: { type: string }
+        leadEmail: { type: string, format: email }
+        leadWhatsapp: { type: string }
+        leadCompany: { type: string }
+        forceRefresh: { type: boolean, default: false }
+
+    LeadSummary:
+      type: object
+      required: [id, url, domain, globalScore, globalLevel, timestamp, hasContactInfo]
+      properties:
+        id: { type: string }
+        url: { type: string }
+        domain: { type: string }
+        leadName: { type: string, nullable: true }
+        leadEmail: { type: string, nullable: true }
+        leadWhatsapp: { type: string, nullable: true }
+        leadCompany: { type: string, nullable: true }
+        globalScore: { type: integer }
+        globalLevel: { $ref: '#/components/schemas/SemaphoreLevel' }
+        timestamp: { type: string, format: date-time }
+        hasContactInfo: { type: boolean }
+
+    DashboardStats:
+      type: object
+      required: [totalAudits, totalLeads, auditsToday, auditsThisWeek, auditsThisMonth, averageScore, scoreDistribution, recentAudits]
+      properties:
+        totalAudits: { type: integer }
+        totalLeads: { type: integer }
+        auditsToday: { type: integer }
+        auditsThisWeek: { type: integer }
+        auditsThisMonth: { type: integer }
+        averageScore: { type: number }
+        scoreDistribution:
+          type: object
+          properties:
+            critical: { type: integer }
+            deficient: { type: integer }
+            regular: { type: integer }
+            good: { type: integer }
+            excellent: { type: integer }
+        recentAudits:
+          type: array
+          items: { $ref: '#/components/schemas/LeadSummary' }
+        recurringDomains:
+          type: array
+          items:
+            type: object
+            properties:
+              domain: { type: string }
+              totalAudits: { type: integer }
+              bestScore: { type: integer }
+              worstScore: { type: integer }
+              lastAuditId: { type: string }
+              trend: { type: string, enum: [improving, declining, stable] }
+
+    Plan:
+      type: object
+      required: [name, price, currency]
+      properties:
+        name: { type: string }
+        price: { type: string }
+        currency: { type: string }
+
+    AppSettings:
+      type: object
+      properties:
+        companyName: { type: string }
+        companyUrl: { type: string }
+        companyWhatsapp: { type: string }
+        companyEmail: { type: string }
+        companyPlansUrl: { type: string }
+        logoUrl: { type: string }
+        googlePagespeedApiKey: { type: string }
+        leadNotificationEmail: { type: string }
+        smtpHost: { type: string }
+        smtpPort: { type: integer }
+        smtpUsername: { type: string }
+        smtpPassword: { type: string, description: 'Vacío o placeholder "••••••••" si existe' }
+        smtpEncryption: { type: string, enum: [tls, ssl, ''] }
+        smtpFromEmail: { type: string }
+        smtpFromName: { type: string }
+        rateLimitMaxPerHour: { type: integer }
+        cacheTtlHours: { type: integer }
+        allowedOrigins: { type: string, description: 'Lista separada por comas de orígenes permitidos en /api/admin/*' }
+        moduleWeights:
+          type: object
+          additionalProperties: { type: number }
+          description: 'Map de moduleId → peso (deben sumar 1.0)'
+        thresholds:
+          type: object
+          properties:
+            excellent: { type: integer }
+            good: { type: integer }
+            warning: { type: integer }
+            critical: { type: integer }
+        salesMessages:
+          type: object
+          additionalProperties: { type: string }
+        ctaTitle: { type: string }
+        ctaDescription: { type: string }
+        ctaButtonWhatsappText: { type: string }
+        ctaButtonPlansText: { type: string }
+        plans:
+          type: array
+          items: { $ref: '#/components/schemas/Plan' }
+
+    VulnerabilityEntry:
+      type: object
+      required: [pluginSlug, pluginName, affectedVersions, severity, description]
+      properties:
+        id: { type: integer }
+        pluginSlug: { type: string }
+        pluginName: { type: string }
+        affectedVersions: { type: string }
+        severity: { type: string, enum: [low, medium, high, critical] }
+        cveId: { type: string }
+        description: { type: string }
+        fixedInVersion: { type: string }
+        dateAdded: { type: string, format: date-time }
