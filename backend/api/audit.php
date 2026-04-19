@@ -1,22 +1,22 @@
 <?php
 /**
- * POST /api/audit — Arranca una auditoría.
+ * POST /api/audit — Arranca una auditoría (con control de concurrencia).
  *
- * Modelo de ejecución (Pingdom-style sin cola):
- *
- * 1. Se valida URL, rate limit y se consulta cache.
- * 2. Si hay cache <24h y no se pidió forceRefresh → respuesta 200 con el
- *    `AuditResult` completo (camino rápido, compatible con flujo legacy).
- * 3. Si no hay cache → se reserva un `auditId`, se responde 202 con
- *    `{ auditId, queued: false }` y se cierra la conexión HTTP con
- *    `fastcgi_finish_request()` (PHP-FPM) o `ignore_user_abort(true)` +
- *    flush (Apache mod_php).
- * 4. El script sigue ejecutando el audit en background, reportando progreso
- *    vía `AuditProgress`. El frontend hace polling a
- *    `GET /api/scan-progress.php?id=<auditId>`.
- * 5. Al terminar, guarda el resultado en la tabla `audits` y marca el
- *    progreso como `completed`. El frontend detecta el estado y navega a
- *    `/results/:auditId` (que consulta `audit-status.php`).
+ * Flujo:
+ *   1. Valida URL, rate limit, consulta cache.
+ *   2. Si hay cache <24h → 200 con el AuditResult (camino rápido, sin cola).
+ *   3. Reserva un auditId.
+ *   4. QueueManager::enqueueOrStart():
+ *      - Si hay slot libre (jobs 'running' < audit_max_concurrent):
+ *        marca 'running' y responde 202 con { queued: false, auditId }.
+ *      - Si no: encola como 'queued' y responde 202 con
+ *        { queued: true, auditId, position, totalInQueue }.
+ *   5. Cierra HTTP con fastcgi_finish_request().
+ *   6. Solo si obtuvo slot 'running': ejecuta el audit. Al terminar,
+ *      llama a QueueManager::drain() para procesar los siguientes
+ *      de la cola hasta que no queden slots o se acabe el tiempo PHP.
+ *      Los requests 'queued' simplemente salen — serán procesados por
+ *      el request que libere el slot.
  */
 require_once __DIR__ . '/bootstrap.php';
 
@@ -24,17 +24,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     Response::error('Método no permitido', 405);
 }
 
-set_time_limit(120);
+set_time_limit(180); // 3 min: suficiente para 1-3 audits consecutivos
 ini_set('memory_limit', '256M');
 
-// Cerrar el lock de sesión ANTES del scan para no bloquear otras peticiones
 if (session_status() === PHP_SESSION_ACTIVE) {
     session_write_close();
 }
 
 $body = Response::getJsonBody();
-
-// Validar URL
 $url = trim($body['url'] ?? '');
 if (empty($url)) {
     Response::error('La URL es obligatoria.');
@@ -45,15 +42,14 @@ try {
     Response::error($e->getMessage());
 }
 
-$domain = UrlValidator::extractDomain($url);
 $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
-// Rate limiting (no aplica si estás logueado como admin)
+// Rate limiting
 $maxPerHour = (int) env('RATE_LIMIT_MAX_PER_HOUR', '10');
 try {
     $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'rate_limit_max_per_hour'");
     if ($row && is_numeric($row['value'])) $maxPerHour = (int) $row['value'];
-} catch (Throwable $e) { /* usar valor de .env */ }
+} catch (Throwable $e) {}
 $isAdmin = Auth::checkAuth();
 
 try {
@@ -75,7 +71,7 @@ try {
     Logger::error('Error en rate limiting: ' . $e->getMessage());
 }
 
-// Cache: verificar si ya se escaneó esta URL recientemente
+// Cache lookup
 $forceRefresh = !empty($body['forceRefresh']);
 $cacheTtl = (int) env('CACHE_TTL_SECONDS', '86400');
 try {
@@ -94,7 +90,6 @@ try {
         if ($cached) {
             $result = JsonStore::decode($cached['result_json']);
 
-            // Si hay nuevos datos de lead, actualizar el registro existente
             $leadName = trim($body['leadName'] ?? '');
             $leadEmail = trim($body['leadEmail'] ?? '');
             $leadWhatsapp = trim($body['leadWhatsapp'] ?? '');
@@ -106,7 +101,6 @@ try {
                 );
             }
 
-            // Camino rápido: resultado cacheado listo. El cliente detecta `cached: true`.
             Response::success([
                 'cached' => true,
                 'auditId' => $cached['id'],
@@ -118,25 +112,38 @@ try {
     Logger::error('Error consultando cache: ' . $e->getMessage());
 }
 
-// Sin cache: arrancamos audit en background
+// Encolar o ejecutar directo
 $auditId = AuditOrchestrator::generateUuid();
+$leadData = [
+    'leadName' => $body['leadName'] ?? '',
+    'leadEmail' => $body['leadEmail'] ?? '',
+    'leadWhatsapp' => $body['leadWhatsapp'] ?? '',
+    'leadCompany' => $body['leadCompany'] ?? '',
+];
 
-// Inicializar progreso para que el polling del frontend tenga algo que leer
-AuditProgress::update($auditId, [
-    'status' => 'running',
-    'currentStep' => 'init',
-    'completedSteps' => 0,
-    'totalSteps' => 12,
-    'startedAt' => time(),
-]);
+$slot = QueueManager::enqueueOrStart($auditId, $url, $leadData, $ip);
 
-// Responder al cliente AHORA (202 Accepted) antes de arrancar el scan
+if ($slot['status'] === 'running') {
+    AuditProgress::update($auditId, [
+        'status' => 'running',
+        'currentStep' => 'init',
+        'completedSteps' => 0,
+        'totalSteps' => 12,
+        'startedAt' => time(),
+    ]);
+} else {
+    AuditProgress::queued($auditId, $slot['position'], QueueManager::queuedCount());
+}
+
+// Responder inmediato con auditId + posición en cola (si aplica)
 $responseBody = json_encode([
     'success' => true,
     'data' => [
         'cached' => false,
         'auditId' => $auditId,
-        'queued' => false,
+        'queued' => $slot['status'] === 'queued',
+        'position' => $slot['position'],
+        'totalInQueue' => QueueManager::queuedCount(),
     ],
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
@@ -146,41 +153,41 @@ header('Content-Length: ' . strlen($responseBody));
 header('Connection: close');
 echo $responseBody;
 
-// Cerrar la conexión HTTP pero seguir ejecutando
 if (function_exists('fastcgi_finish_request')) {
     fastcgi_finish_request();
 } else {
-    // Fallback para Apache mod_php
     ignore_user_abort(true);
     @ob_end_flush();
     @flush();
 }
 
-// A partir de aquí el cliente ya recibió la respuesta y está haciendo polling.
-// Ejecutamos el audit en "background".
-try {
-    $orchestrator = new AuditOrchestrator($url, [
-        'leadName' => $body['leadName'] ?? '',
-        'leadEmail' => $body['leadEmail'] ?? '',
-        'leadWhatsapp' => $body['leadWhatsapp'] ?? '',
-        'leadCompany' => $body['leadCompany'] ?? '',
-    ], null, $auditId);
+// ------------------------------------------------------------------
+// A partir de aquí el cliente ya tiene la respuesta.
+// Solo el request que obtuvo 'running' ejecuta el audit + drena la cola.
+// Los requests 'queued' simplemente salen — serán procesados por otro worker.
+// ------------------------------------------------------------------
+if ($slot['status'] !== 'running') {
+    exit;
+}
 
+try {
+    $orchestrator = new AuditOrchestrator($url, $leadData, null, $auditId);
     $result = $orchestrator->run();
 } catch (RuntimeException $e) {
     Logger::warning('Audit background falló (validación): ' . $e->getMessage());
+    QueueManager::markFailed($auditId, $e->getMessage());
     AuditProgress::failed($auditId, $e->getMessage());
     exit;
 } catch (Throwable $e) {
     Logger::error('Audit background error: ' . $e->getMessage(), ['url' => $url]);
+    QueueManager::markFailed($auditId, 'Error interno');
     AuditProgress::failed($auditId, 'Ocurrió un error al analizar el sitio. Intenta nuevamente.');
     exit;
 }
 
-// Guardar en base de datos
+// Guardar el resultado de NUESTRO audit en la tabla audits
 try {
     $db = Database::getInstance();
-
     $waterfallData = $result['waterfall'] ?? [];
     $extendedPerf = $result['extendedPerf'] ?? [];
     $resultForStorage = $result;
@@ -200,53 +207,39 @@ try {
     $db->execute(
         "INSERT INTO audits (id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_wordpress, scan_duration_ms, result_json, waterfall_json, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
-            $result['id'],
-            $result['url'],
-            $result['domain'],
-            $body['leadName'] ?? null,
-            $body['leadEmail'] ?? null,
-            $body['leadWhatsapp'] ?? null,
-            $body['leadCompany'] ?? null,
-            $result['globalScore'],
-            $result['globalLevel'],
-            $result['isWordPress'] ? 1 : 0,
-            $result['scanDurationMs'],
-            $resultJson,
-            $waterfallJson,
-            $ip,
+            $result['id'], $result['url'], $result['domain'],
+            $leadData['leadName'] ?: null, $leadData['leadEmail'] ?: null,
+            $leadData['leadWhatsapp'] ?: null, $leadData['leadCompany'] ?: null,
+            $result['globalScore'], $result['globalLevel'],
+            $result['isWordPress'] ? 1 : 0, $result['scanDurationMs'],
+            $resultJson, $waterfallJson, $ip,
         ]
     );
 } catch (Throwable $e) {
     Logger::error('Error guardando auditoría: ' . $e->getMessage());
+    QueueManager::markFailed($auditId, 'Error guardando');
     AuditProgress::failed($auditId, 'Error guardando el resultado. Intenta nuevamente.');
     exit;
 }
 
-// Notificar al admin si el lead tiene datos de contacto
+// Notificar al admin por email si hay lead
 try {
-    $leadEmail = trim($body['leadEmail'] ?? '');
-    $leadWhatsapp = trim($body['leadWhatsapp'] ?? '');
-
+    $leadEmail = trim($leadData['leadEmail']);
+    $leadWhatsapp = trim($leadData['leadWhatsapp']);
     if ($leadEmail || $leadWhatsapp) {
         $db = Database::getInstance();
         $notifRow = $db->queryOne("SELECT value FROM settings WHERE key = 'lead_notification_email'");
         $notifEmail = $notifRow['value'] ?? '';
-
         if (!empty($notifEmail) && filter_var($notifEmail, FILTER_VALIDATE_EMAIL)) {
             $score = $result['globalScore'];
-            $level = $result['globalLevel'];
-            $leadName = trim($body['leadName'] ?? '') ?: 'No proporcionado';
-            $leadCompany = trim($body['leadCompany'] ?? '') ?: 'No proporcionado';
+            $leadName = trim($leadData['leadName']) ?: 'No proporcionado';
+            $leadCompany = trim($leadData['leadCompany']) ?: 'No proporcionado';
             $subject = "Nuevo lead: {$result['domain']} (Score: $score/100)";
             $emailBody = "Nuevo lead capturado en Imagina Audit\n\n"
-                . "Sitio: {$result['url']}\n"
-                . "Score: $score/100 ($level)\n\n"
-                . "Datos de contacto:\n"
-                . "Nombre: $leadName\n"
-                . "Email: " . ($leadEmail ?: 'No proporcionado') . "\n"
+                . "Sitio: {$result['url']}\nScore: $score/100 ({$result['globalLevel']})\n\n"
+                . "Nombre: $leadName\nEmail: " . ($leadEmail ?: 'No proporcionado') . "\n"
                 . "WhatsApp: " . ($leadWhatsapp ?: 'No proporcionado') . "\n"
-                . "Empresa: $leadCompany\n\n"
-                . "Fecha: " . date('d/m/Y H:i') . "\n";
+                . "Empresa: $leadCompany\nFecha: " . date('d/m/Y H:i') . "\n";
             Mailer::send($notifEmail, $subject, $emailBody);
         }
     }
@@ -254,5 +247,11 @@ try {
     Logger::warning('Error enviando notificación de lead: ' . $e->getMessage());
 }
 
-// Marcar progreso como completado — el frontend lo detectará en el próximo poll
+QueueManager::markCompleted($auditId);
 AuditProgress::completed($auditId, 12);
+
+// Drenar cola: mientras haya jobs 'queued' y slots libres y tiempo PHP,
+// procesamos los siguientes. Con esto la cola fluye sin necesidad de daemon.
+// Dejamos 30s de margen para el cron del servidor.
+$remainingTime = max(10, (int) ini_get('max_execution_time') - (time() - $_SERVER['REQUEST_TIME']) - 30);
+QueueManager::drain($remainingTime);

@@ -5,7 +5,8 @@ import { startAudit, getScanProgress, getAuditResult } from '@/lib/api'
 import type { AuditRequest } from '@/types/audit'
 
 const POLL_INTERVAL_MS = 1500
-const POLL_TIMEOUT_MS = 180_000 // 3 min máximo
+// 15 min máximo — cubre el caso de cola llena (ej. 30 audits esperando con 3 slots)
+const POLL_TIMEOUT_MS = 15 * 60_000
 
 /**
  * Hook para ejecutar auditorías.

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle, Loader2, Clock, AlertCircle } from 'lucide-react'
+import { CheckCircle, Loader2, Clock, AlertCircle, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuditStore } from '@/store/auditStore'
 import { Button } from '@/components/ui/button'
@@ -39,7 +39,6 @@ export default function ScanningAnimation() {
   const navigate = useNavigate()
   const [elapsedSec, setElapsedSec] = useState(0)
 
-  // Contador de tiempo transcurrido (visual)
   useEffect(() => {
     if (status !== 'scanning') return
     const startedAt = progress?.startedAt ? progress.startedAt * 1000 : Date.now()
@@ -67,7 +66,60 @@ export default function ScanningAnimation() {
   }
 
   const domain = request?.url ? new URL(request.url.startsWith('http') ? request.url : `https://${request.url}`).hostname : ''
-  const displayProgress = progress?.progress ?? 5 // muestra 5% inicial antes del primer poll
+
+  // Pantalla de cola: el audit aún no arrancó
+  if (progress?.status === 'queued') {
+    const position = progress.position ?? 0
+    const total = progress.totalInQueue ?? 0
+    // Estimación heurística: 45s por audit que falta procesar, dividido por
+    // slots concurrentes (asumimos 3 como default del backend)
+    const estimatedWaitSec = Math.max(0, Math.ceil((position - 1) * 45 / 3))
+    const waitLabel = estimatedWaitSec < 60
+      ? `~${estimatedWaitSec} segundos`
+      : `~${Math.ceil(estimatedWaitSec / 60)} minuto${Math.ceil(estimatedWaitSec / 60) > 1 ? 's' : ''}`
+
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-secondary)] px-4">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 w-full max-w-md">
+          <div className="mb-8 text-center">
+            <p className="text-sm text-[var(--text-tertiary)]">Esperando turno</p>
+            <h2 className="mt-1 text-2xl font-bold text-[var(--accent-primary)]">{domain}</h2>
+          </div>
+
+          <Card>
+            <CardContent className="py-8 px-6 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--accent-primary)]/10">
+                <Users className="h-8 w-8 text-[var(--accent-primary)]" strokeWidth={1.5} />
+              </div>
+              <h3 className="text-xl font-bold text-[var(--text-primary)]">
+                Tu análisis está en cola
+              </h3>
+              <p className="mt-3 text-sm text-[var(--text-secondary)]">
+                Hay <span className="font-bold text-[var(--text-primary)]">{total}</span> análisis en cola.
+                Tu posición: <span className="font-bold text-[var(--accent-primary)]">#{position}</span>
+              </p>
+              <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                Tiempo estimado de espera: <span className="font-medium text-[var(--text-primary)]">{waitLabel}</span>
+              </p>
+              <div className="mt-6">
+                <Loader2 className="mx-auto h-5 w-5 animate-spin text-[var(--text-tertiary)]" strokeWidth={1.5} />
+                <p className="mt-2 text-xs text-[var(--text-tertiary)]">
+                  Arrancará automáticamente cuando sea tu turno.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <p className="mt-4 text-center text-xs text-[var(--text-tertiary)]">
+            Puedes dejar esta ventana abierta — te avisaremos en cuanto termine.
+          </p>
+        </motion.div>
+      </div>
+    )
+  }
+
+  // Pantalla de ejecución: audit corriendo con progreso real
+  const displayProgress = progress?.progress ?? 5
   const currentLabel = progress?.currentLabel ?? 'Iniciando análisis...'
   const allStepIds = DISPLAY_STEPS.map(s => s.id)
 
@@ -95,7 +147,6 @@ export default function ScanningAnimation() {
           )}
         </div>
 
-        {/* Barra de progreso real (viene del backend) */}
         <div className="mb-8">
           <div className="mb-2 flex items-center justify-between text-xs text-[var(--text-tertiary)]">
             <span>Progreso</span>
@@ -104,7 +155,6 @@ export default function ScanningAnimation() {
           <Progress value={displayProgress} className="h-2" />
         </div>
 
-        {/* Lista de steps */}
         <Card>
           <CardContent className="py-4 px-4">
             <div className="space-y-0">

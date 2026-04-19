@@ -1,11 +1,14 @@
 <?php
 /**
- * GET /api/scan-progress?id=UUID — Estado actual de un audit en curso.
+ * GET /api/scan-progress?id=UUID — Estado actual de un audit.
  *
  * El frontend hace polling a este endpoint mientras espera que un audit
- * termine. Retorna 404 si el audit no está en curso o ya expiró (10 min tras
- * completarse). Para leer resultados ya guardados en BD usar
- * `/api/audit-status.php`.
+ * termine. Si el audit está 'queued', recalcula la posición en cola en
+ * vivo (otros podrían haber terminado desde la última actualización).
+ *
+ * Retorna 404 si no hay progreso registrado (auditId inexistente o ya
+ * expiró tras 10 min de completarse — para resultados usar
+ * `/api/audit-status.php`).
  */
 require_once __DIR__ . '/bootstrap.php';
 
@@ -21,6 +24,12 @@ if (empty($id)) {
 $state = AuditProgress::get($id);
 if (!$state) {
     Response::error('Progreso no encontrado o expirado', 404);
+}
+
+// Si está en cola, recalcular posición y total en tiempo real
+if (($state['status'] ?? '') === 'queued') {
+    $state['position'] = QueueManager::getPosition($id);
+    $state['totalInQueue'] = QueueManager::queuedCount();
 }
 
 Response::success($state);

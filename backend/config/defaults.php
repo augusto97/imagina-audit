@@ -57,4 +57,8 @@ return [
 
     // Versión más reciente conocida de WordPress
     'latest_wp_version' => '6.7.2',
+
+    // Cola de auditorías
+    'audit_max_concurrent' => 3,   // Audits que pueden correr en paralelo
+    'audit_stale_seconds' => 180,  // Tras esto, un job 'running' se considera huérfano
 ];

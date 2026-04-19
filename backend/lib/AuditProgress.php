@@ -34,28 +34,49 @@ class AuditProgress {
     ];
 
     /**
-     * Actualiza el estado de progreso de un audit en curso.
+     * Actualiza el estado de progreso de un audit.
      *
      * @param string $auditId UUID del audit
      * @param array $state {
-     *   status: 'running' | 'completed' | 'failed',
+     *   status: 'queued' | 'running' | 'completed' | 'failed',
      *   currentStep: key de STEPS,
      *   completedSteps: int,
      *   totalSteps: int,
      *   startedAt: int timestamp,
-     *   error?: string,
+     *   position?: int,        // solo si status=queued
+     *   totalInQueue?: int,    // solo si status=queued
+     *   error?: string,        // solo si status=failed
      * }
      */
     public static function update(string $auditId, array $state): void {
         $cache = new Cache();
-        // Derivar label legible y progreso
-        $step = $state['currentStep'] ?? 'init';
-        $state['currentLabel'] = self::STEPS[$step] ?? $step;
+        // Derivar label legible. Si el caller ya lo especificó (p. ej. queued),
+        // respetarlo; si no, lo derivamos del step.
+        if (!isset($state['currentLabel'])) {
+            $step = $state['currentStep'] ?? 'init';
+            $state['currentLabel'] = self::STEPS[$step] ?? $step;
+        }
         $completed = (int) ($state['completedSteps'] ?? 0);
         $total = max(1, (int) ($state['totalSteps'] ?? count(self::STEPS)));
         $state['progress'] = min(100, (int) round(($completed / $total) * 100));
 
         $cache->setByName(self::cacheKey($auditId), $state, self::TTL_SECONDS);
+    }
+
+    /**
+     * Marca el audit como encolado con su posición.
+     */
+    public static function queued(string $auditId, int $position, int $totalInQueue): void {
+        self::update($auditId, [
+            'status' => 'queued',
+            'currentStep' => 'init',
+            'currentLabel' => 'En cola de procesamiento',
+            'completedSteps' => 0,
+            'totalSteps' => count(self::STEPS),
+            'startedAt' => time(),
+            'position' => $position,
+            'totalInQueue' => $totalInQueue,
+        ]);
     }
 
     /**

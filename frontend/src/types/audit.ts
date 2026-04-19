@@ -142,8 +142,7 @@ export type AuditStatus = 'idle' | 'scanning' | 'completed' | 'error'
  * Se lee vía GET /api/scan-progress?id=X con polling cada 1.5s.
  */
 export interface AuditProgress {
-  status: 'running' | 'completed' | 'failed'
-  /** init | fetch | wordpress | security | performance | seo | mobile | infrastructure | conversion | page_health | wp_internal | techstack | compile */
+  status: 'queued' | 'running' | 'completed' | 'failed'
   currentStep: string
   /** Texto legible: "Analizando seguridad..." */
   currentLabel: string
@@ -151,6 +150,10 @@ export interface AuditProgress {
   totalSteps: number
   progress: number
   startedAt: number
+  /** Solo si status=queued: posición 1-indexed en la cola */
+  position?: number
+  /** Solo si status=queued: total de audits esperando turno */
+  totalInQueue?: number
   /** Presente cuando status=completed */
   auditId?: string
   /** Presente cuando status=failed */

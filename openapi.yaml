@@ -86,7 +86,11 @@ paths:
                           auditId: { type: string }
                           result: { $ref: '#/components/schemas/AuditResult' }
         '202':
-          description: Auditoría arrancada en background
+          description: |
+            Auditoría aceptada. Si `queued=false`, arrancó inmediatamente.
+            Si `queued=true`, está esperando turno y se procesará cuando
+            haya un slot libre. En ambos casos hay que hacer polling a
+            `/scan-progress.php?id=<auditId>`.
           content:
             application/json:
               schema:
@@ -100,6 +104,12 @@ paths:
                           cached: { type: boolean, enum: [false] }
                           auditId: { type: string, format: uuid }
                           queued: { type: boolean }
+                          position:
+                            type: integer
+                            description: Si queued=true, posición 1-indexed en la cola.
+                          totalInQueue:
+                            type: integer
+                            description: Cuántos audits hay esperando turno.
         '400': { $ref: '#/components/responses/BadRequest' }
         '413': { $ref: '#/components/responses/BadRequest' }
         '422': { $ref: '#/components/responses/BadRequest' }
@@ -927,7 +937,7 @@ components:
       properties:
         status:
           type: string
-          enum: [running, completed, failed]
+          enum: [queued, running, completed, failed]
         currentStep:
           type: string
           description: 'init | fetch | wordpress | security | performance | seo | mobile | infrastructure | conversion | page_health | wp_internal | techstack | compile'
@@ -944,6 +954,12 @@ components:
         startedAt:
           type: integer
           description: Unix timestamp de cuando arrancó
+        position:
+          type: integer
+          description: Solo si status=queued. Posición 1-indexed en la cola FIFO.
+        totalInQueue:
+          type: integer
+          description: Solo si status=queued. Cuántos audits hay esperando turno.
         auditId:
           type: string
           description: Presente cuando status=completed, apunta al resultado guardado

@@ -133,7 +133,12 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Auditoría arrancada en background */
+                /**
+                 * @description Auditoría aceptada. Si `queued=false`, arrancó inmediatamente.
+                 *     Si `queued=true`, está esperando turno y se procesará cuando
+                 *     haya un slot libre. En ambos casos hay que hacer polling a
+                 *     `/scan-progress.php?id=<auditId>`.
+                 */
                 202: {
                     headers: {
                         [name: string]: unknown;
@@ -146,6 +151,10 @@ export interface paths {
                                 /** Format: uuid */
                                 auditId: string;
                                 queued: boolean;
+                                /** @description Si queued=true, posición 1-indexed en la cola. */
+                                position?: number;
+                                /** @description Cuántos audits hay esperando turno. */
+                                totalInQueue?: number;
                             };
                         };
                     };
@@ -1344,7 +1353,7 @@ export interface components {
         };
         AuditProgress: {
             /** @enum {string} */
-            status: "running" | "completed" | "failed";
+            status: "queued" | "running" | "completed" | "failed";
             /** @description init | fetch | wordpress | security | performance | seo | mobile | infrastructure | conversion | page_health | wp_internal | techstack | compile */
             currentStep: string;
             /** @description Texto legible para mostrar al usuario ("Analizando seguridad...") */
@@ -1355,6 +1364,10 @@ export interface components {
             progress: number;
             /** @description Unix timestamp de cuando arrancó */
             startedAt: number;
+            /** @description Solo si status=queued. Posición 1-indexed en la cola FIFO. */
+            position?: number;
+            /** @description Solo si status=queued. Cuántos audits hay esperando turno. */
+            totalInQueue?: number;
             /** @description Presente cuando status=completed, apunta al resultado guardado */
             auditId?: string;
             /** @description Mensaje legible cuando status=failed */
