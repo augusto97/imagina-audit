@@ -43,8 +43,8 @@ if ($method === 'GET') {
     Response::success([
         'source' => $row['source'],
         'sourceUrl' => $row['source_url'],
-        'snapshot' => json_decode($row['snapshot_json'], true),
-        'analysis' => $row['analysis_json'] ? json_decode($row['analysis_json'], true) : null,
+        'snapshot' => JsonStore::decode($row['snapshot_json']),
+        'analysis' => $row['analysis_json'] ? JsonStore::decode($row['analysis_json']) : null,
         'createdAt' => $row['created_at'],
     ]);
 }
@@ -152,9 +152,9 @@ if ($method === 'POST') {
         Response::error('Error al analizar el snapshot: ' . $e->getMessage(), 500);
     }
 
-    // Save snapshot to DB (upsert)
-    $snapshotJson = json_encode($snapshotData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    $analysisJson = json_encode($analysis, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    // Save snapshot to DB (upsert) — comprimido con gzip
+    $snapshotJson = JsonStore::encode($snapshotData);
+    $analysisJson = JsonStore::encode($analysis);
 
     $existing = $db->queryOne("SELECT id FROM wp_snapshots WHERE audit_id = ?", [$auditId]);
     if ($existing) {
@@ -190,7 +190,7 @@ if ($method === 'POST') {
             $waterfallData = $reauditResult['waterfall'] ?? [];
             $extendedPerf = $reauditResult['extendedPerf'] ?? [];
             unset($resultForStorage['waterfall'], $resultForStorage['extendedPerf']);
-            $resultJson = json_encode($resultForStorage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $resultJson = JsonStore::encode($resultForStorage);
             $perfData = [
                 'waterfall' => $waterfallData,
                 'crux' => $extendedPerf['crux'] ?? null,
@@ -200,7 +200,7 @@ if ($method === 'POST') {
                 'clsElements' => $extendedPerf['clsElements'] ?? [],
                 'mainThreadWork' => $extendedPerf['mainThreadWork'] ?? [],
             ];
-            $waterfallJson = json_encode($perfData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $waterfallJson = JsonStore::encode($perfData);
 
             try { $db->execute("ALTER TABLE audits ADD COLUMN waterfall_json TEXT"); } catch (Throwable $e) {}
 

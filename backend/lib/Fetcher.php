@@ -344,6 +344,112 @@ class Fetcher {
     }
 
     /**
+     * Realiza múltiples GET en paralelo con curl_multi.
+     *
+     * Valida cada URL contra SSRF antes de firar y fija la IP resuelta
+     * en CURLOPT_RESOLVE (anti DNS-rebinding). No sigue redirects: los
+     * callers de este método asumen endpoints confiables (p. ej. APIs
+     * de Google). Preserva las claves del array de entrada.
+     *
+     * @param array $urls Mapa clave → URL
+     * @param int $timeout Timeout por petición en segundos
+     * @return array Mapa clave → resultado (mismo shape que get())
+     */
+    public static function multiGet(array $urls, int $timeout = 30): array {
+        if (empty($urls)) {
+            return [];
+        }
+
+        $results = [];
+        $handles = [];
+        $allHeaders = [];
+        $multi = curl_multi_init();
+
+        foreach ($urls as $key => $url) {
+            $ssrf = self::validateUrlForRequest($url);
+            if ($ssrf === null) {
+                $results[$key] = self::createResult(0, [], '', $url, 0);
+                continue;
+            }
+
+            $ch = curl_init();
+            $id = spl_object_id($ch);
+            $allHeaders[$id] = [];
+
+            $opts = [
+                CURLOPT_URL => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => $timeout,
+                CURLOPT_CONNECTTIMEOUT => min(5, $timeout),
+                CURLOPT_USERAGENT => self::USER_AGENT,
+                CURLOPT_FOLLOWLOCATION => false,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+                CURLOPT_ENCODING => '',
+                CURLOPT_MAXFILESIZE => self::MAX_RESPONSE_SIZE,
+                CURLOPT_HTTPHEADER => [
+                    'Accept: application/json,text/html;q=0.9,*/*;q=0.8',
+                    'Accept-Language: es,en;q=0.5',
+                ],
+                CURLOPT_HEADERFUNCTION => function ($ch, $header) use (&$allHeaders, $id) {
+                    $parts = explode(':', $header, 2);
+                    if (count($parts) === 2) {
+                        $allHeaders[$id][strtolower(trim($parts[0]))] = trim($parts[1]);
+                    }
+                    return strlen($header);
+                },
+            ];
+            if ($ssrf['dnsResolve'] !== null) {
+                $opts[CURLOPT_RESOLVE] = [$ssrf['dnsResolve']];
+            }
+
+            curl_setopt_array($ch, $opts);
+            curl_multi_add_handle($multi, $ch);
+
+            $handles[$key] = ['ch' => $ch, 'id' => $id, 'url' => $url, 'start' => microtime(true)];
+        }
+
+        // Ejecutar en paralelo
+        $running = null;
+        do {
+            $status = curl_multi_exec($multi, $running);
+            if ($running > 0) {
+                curl_multi_select($multi, 0.1);
+            }
+        } while ($running > 0 && $status === CURLM_OK);
+
+        // Recolectar resultados
+        foreach ($handles as $key => $h) {
+            $ch = $h['ch'];
+            $body = curl_multi_getcontent($ch);
+            $statusCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+            $responseTime = round((microtime(true) - $h['start']) * 1000, 2);
+
+            if (curl_errno($ch)) {
+                Logger::warning('cURL multi error: ' . curl_error($ch), ['url' => $h['url']]);
+                $statusCode = 0;
+                $body = '';
+            }
+
+            $results[$key] = self::createResult(
+                $statusCode,
+                $allHeaders[$h['id']] ?? [],
+                $body ?: '',
+                $finalUrl ?: $h['url'],
+                $responseTime
+            );
+
+            curl_multi_remove_handle($multi, $ch);
+            curl_close($ch);
+        }
+
+        curl_multi_close($multi);
+
+        return $results;
+    }
+
+    /**
      * Obtiene información del certificado SSL de un dominio
      */
     public static function getSslInfo(string $host): array {

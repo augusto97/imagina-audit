@@ -90,7 +90,7 @@ try {
         );
 
         if ($cached) {
-            $result = json_decode($cached['result_json'], true);
+            $result = JsonStore::decode($cached['result_json']);
 
             // Si hay nuevos datos de lead, actualizar el registro
             $leadName = trim($body['leadName'] ?? '');
@@ -142,7 +142,7 @@ try {
     $extendedPerf = $result['extendedPerf'] ?? [];
     $resultForStorage = $result;
     unset($resultForStorage['waterfall'], $resultForStorage['extendedPerf']);
-    $resultJson = json_encode($resultForStorage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $resultJson = JsonStore::encode($resultForStorage);
     $perfData = [
         'waterfall' => $waterfallData,
         'crux' => $extendedPerf['crux'] ?? null,
@@ -152,7 +152,7 @@ try {
         'clsElements' => $extendedPerf['clsElements'] ?? [],
         'mainThreadWork' => $extendedPerf['mainThreadWork'] ?? [],
     ];
-    $waterfallJson = json_encode($perfData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $waterfallJson = JsonStore::encode($perfData);
 
     $db->execute(
         "INSERT INTO audits (id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_wordpress, scan_duration_ms, result_json, waterfall_json, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",

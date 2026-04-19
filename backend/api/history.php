@@ -22,7 +22,7 @@ try {
 
     $history = [];
     foreach ($rows as $row) {
-        $result = json_decode($row['result_json'], true);
+        $result = JsonStore::decode($row['result_json']) ?? [];
         $moduleScores = [];
         foreach ($result['modules'] ?? [] as $mod) {
             $moduleScores[$mod['id']] = $mod['score'] ?? 0;

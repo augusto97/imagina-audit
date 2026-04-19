@@ -21,7 +21,7 @@ try {
         Response::error('Auditoría no encontrada.', 404);
     }
 
-    $result = json_decode($audit['result_json'], true);
+    $result = JsonStore::decode($audit['result_json']);
     Response::success($result);
 } catch (Throwable $e) {
     Logger::error('Error obteniendo auditoría: ' . $e->getMessage());

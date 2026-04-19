@@ -15,7 +15,7 @@ try {
         Response::error('Auditoría no encontrada.', 404);
     }
 
-    $result = json_decode($audit['result_json'], true);
+    $result = JsonStore::decode($audit['result_json']) ?? [];
     // Agregar datos del lead al resultado
     $result['leadName'] = $audit['lead_name'];
     $result['leadEmail'] = $audit['lead_email'];
