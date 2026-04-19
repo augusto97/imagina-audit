@@ -42,36 +42,28 @@ class Response {
     /**
      * Envía headers CORS y de seguridad.
      *
-     * CORS: por defecto restrictivo. Solo se emiten Access-Control-Allow-*
-     * si el Origin de la petición coincide con la whitelist (env + DB).
-     * Si la whitelist está en '*' se echa el origin de vuelta (nunca '*' con credenciales).
+     * Dos políticas según el endpoint:
+     *
+     * - Endpoints públicos (/api/audit, /api/config, /api/health, /api/compare,
+     *   /api/history, /api/audit-status): CORS abierto (Allow-Origin: *) SIN
+     *   credenciales. Permite que el widget embebible funcione desde cualquier
+     *   dominio de cliente sin tener que listarlos previamente. Los endpoints
+     *   están rate-limited por IP y no exponen datos privados.
+     *
+     * - Endpoints admin (/api/admin/*): whitelist estricta (env ALLOWED_ORIGIN o
+     *   DB allowed_origins) con Allow-Credentials: true para que la cookie de
+     *   sesión viaje. Si el Origin no matchea, no se envían cabeceras CORS y el
+     *   navegador bloquea la petición.
      */
     public static function cors(): void {
-        $allowedOrigin = env('ALLOWED_ORIGIN', '');
+        $requestUri = $_SERVER['REQUEST_URI'] ?? '';
+        $isAdminEndpoint = str_contains($requestUri, '/admin/');
 
-        // La configuración en DB tiene prioridad sobre .env
-        try {
-            $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'allowed_origins'");
-            if ($row && !empty($row['value'])) {
-                $allowedOrigin = $row['value'];
-            }
-        } catch (Throwable $e) {}
-
-        $requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
-        $allowed = $allowedOrigin === '' ? [] : array_map('trim', explode(',', $allowedOrigin));
-        $wildcard = in_array('*', $allowed, true);
-
-        if (!empty($requestOrigin) && ($wildcard || in_array($requestOrigin, $allowed, true))) {
-            // Reflejar origin (nunca '*' cuando hay credenciales)
-            header("Access-Control-Allow-Origin: $requestOrigin");
-            header('Access-Control-Allow-Credentials: true');
-            header('Vary: Origin');
-            header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-CSRF-Token');
-            header('Access-Control-Max-Age: 86400');
+        if ($isAdminEndpoint) {
+            self::applyAdminCors();
+        } else {
+            self::applyPublicCors();
         }
-        // Si no hay match: no enviamos cabeceras CORS y el navegador bloquea la petición cross-origin.
-        // Las mismas-origin (sin cabecera Origin o mismo dominio) siguen funcionando con normalidad.
 
         // Headers de seguridad (aplican a todas las respuestas)
         header('X-Content-Type-Options: nosniff');
@@ -95,6 +87,45 @@ class Response {
             http_response_code(204);
             exit;
         }
+    }
+
+    /**
+     * CORS para endpoints públicos (widget embebible y frontend público).
+     * Abierto a cualquier origen SIN credenciales.
+     */
+    private static function applyPublicCors(): void {
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type');
+        header('Access-Control-Max-Age: 86400');
+    }
+
+    /**
+     * CORS para endpoints admin. Solo dominios whitelisted, con credenciales.
+     */
+    private static function applyAdminCors(): void {
+        $allowedOrigin = env('ALLOWED_ORIGIN', '');
+
+        // La configuración en DB tiene prioridad sobre .env
+        try {
+            $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'allowed_origins'");
+            if ($row && !empty($row['value'])) {
+                $allowedOrigin = $row['value'];
+            }
+        } catch (Throwable $e) {}
+
+        $requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        $allowed = $allowedOrigin === '' ? [] : array_map('trim', explode(',', $allowedOrigin));
+
+        if (!empty($requestOrigin) && in_array($requestOrigin, $allowed, true)) {
+            header("Access-Control-Allow-Origin: $requestOrigin");
+            header('Access-Control-Allow-Credentials: true');
+            header('Vary: Origin');
+            header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-CSRF-Token');
+            header('Access-Control-Max-Age: 86400');
+        }
+        // Si no hay match: sin cabeceras CORS. Mismo-origen sigue funcionando normalmente.
     }
 
     /**

@@ -44,7 +44,7 @@ Crea `public_html/audit/.env` (copia de `.env.example`) y configura:
 |---|---|---|
 | `APP_ENV` | sí | `production` |
 | `APP_DEBUG` | sí | `false` en producción |
-| `ALLOWED_ORIGIN` | **sí** | Dominio(s) frontend separados por coma. **No uses `*` en producción.** |
+| `ALLOWED_ORIGIN` | **sí** | Dominio(s) del panel admin separados por coma. Solo aplica a `/api/admin/*`. Los endpoints públicos (audit, config, health, etc.) están abiertos con `*` sin credenciales para que el widget embebible funcione desde cualquier dominio cliente. |
 | `ADMIN_PASSWORD_HASH` | sí (primer arranque) | Genera con `php -r "echo password_hash('tu-pass', PASSWORD_BCRYPT);"` |
 | `GOOGLE_PAGESPEED_API_KEY` | no | Mejora cuota de PageSpeed |
 | `GOOGLE_SAFE_BROWSING_API_KEY` | no | Activa check de Safe Browsing |
