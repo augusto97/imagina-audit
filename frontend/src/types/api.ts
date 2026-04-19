@@ -94,8 +94,15 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Ejecuta una auditoría (o devuelve la cacheada si existe)
-         * @description Rate-limited por IP. Si hay cache <24h y `forceRefresh` no es true, devuelve el resultado cacheado.
+         * Arranca una auditoría (background) o devuelve la cacheada
+         * @description Rate-limited por IP. Dos caminos posibles:
+         *
+         *     - **200 (`cached: true`)**: hay resultado cacheado <24h y no se pidió
+         *       `forceRefresh`. La respuesta incluye el `AuditResult` completo.
+         *     - **202 (`cached: false`)**: se reservó un `auditId` y el audit está
+         *       corriendo en background. El cliente debe hacer polling a
+         *       `GET /scan-progress.php?id=<auditId>` hasta que `status=completed`,
+         *       y luego leer el resultado con `GET /audit-status.php?id=<auditId>`.
          */
         post: {
             parameters: {
@@ -110,14 +117,36 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Auditoría completa */
+                /** @description Auditoría cacheada lista */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": components["schemas"]["SuccessEnvelope"] & {
-                            data?: components["schemas"]["AuditResult"];
+                            data?: {
+                                /** @enum {boolean} */
+                                cached: true;
+                                auditId: string;
+                                result: components["schemas"]["AuditResult"];
+                            };
+                        };
+                    };
+                };
+                /** @description Auditoría arrancada en background */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SuccessEnvelope"] & {
+                            data?: {
+                                /** @enum {boolean} */
+                                cached: false;
+                                /** Format: uuid */
+                                auditId: string;
+                                queued: boolean;
+                            };
                         };
                     };
                 };
@@ -127,6 +156,71 @@ export interface paths {
                 429: components["responses"]["RateLimited"];
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scan-progress.php": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Estado actual de un audit en curso (polling)
+         * @description Retorna el estado del audit reportado por el orquestador antes de
+         *     cada analyzer. El cliente hace polling cada 1.5-2s mientras
+         *     `status=running`. Cuando `status=completed` puede leer el resultado
+         *     con `/audit-status.php?id=<auditId>`.
+         *
+         *     Los estados posibles son:
+         *     - `running`: audit en curso. Incluye `currentStep`, `currentLabel`,
+         *       `completedSteps`, `totalSteps`, `progress` (0-100).
+         *     - `completed`: audit terminado correctamente. El resultado está
+         *       guardado en la tabla `audits`.
+         *     - `failed`: audit abortado. `error` contiene un mensaje legible.
+         *
+         *     Expira a los 10 minutos de completarse.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description auditId devuelto por POST /audit.php */
+                    id: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Estado actual del audit */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SuccessEnvelope"] & {
+                            data?: components["schemas"]["AuditProgress"];
+                        };
+                    };
+                };
+                /** @description Audit no encontrado o progreso expirado */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1247,6 +1341,24 @@ export interface components {
             leadCompany?: string;
             /** @default false */
             forceRefresh: boolean;
+        };
+        AuditProgress: {
+            /** @enum {string} */
+            status: "running" | "completed" | "failed";
+            /** @description init | fetch | wordpress | security | performance | seo | mobile | infrastructure | conversion | page_health | wp_internal | techstack | compile */
+            currentStep: string;
+            /** @description Texto legible para mostrar al usuario ("Analizando seguridad...") */
+            currentLabel: string;
+            completedSteps: number;
+            totalSteps: number;
+            /** @description Porcentaje calculado (completedSteps / totalSteps × 100) */
+            progress: number;
+            /** @description Unix timestamp de cuando arrancó */
+            startedAt: number;
+            /** @description Presente cuando status=completed, apunta al resultado guardado */
+            auditId?: string;
+            /** @description Mensaje legible cuando status=failed */
+            error?: string;
         };
         LeadSummary: {
             id: string;

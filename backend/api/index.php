@@ -62,6 +62,10 @@ switch ($endpoint) {
         require __DIR__ . '/audit-status.php';
         break;
 
+    case 'scan-progress':
+        require __DIR__ . '/scan-progress.php';
+        break;
+
     case 'config':
         require __DIR__ . '/config.php';
         break;

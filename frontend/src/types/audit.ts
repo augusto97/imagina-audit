@@ -136,3 +136,23 @@ export interface AuditRequest {
 
 /** Estado de la auditoría en curso */
 export type AuditStatus = 'idle' | 'scanning' | 'completed' | 'error'
+
+/**
+ * Progreso reportado por el backend durante un audit en background.
+ * Se lee vía GET /api/scan-progress?id=X con polling cada 1.5s.
+ */
+export interface AuditProgress {
+  status: 'running' | 'completed' | 'failed'
+  /** init | fetch | wordpress | security | performance | seo | mobile | infrastructure | conversion | page_health | wp_internal | techstack | compile */
+  currentStep: string
+  /** Texto legible: "Analizando seguridad..." */
+  currentLabel: string
+  completedSteps: number
+  totalSteps: number
+  progress: number
+  startedAt: number
+  /** Presente cuando status=completed */
+  auditId?: string
+  /** Presente cuando status=failed */
+  error?: string
+}

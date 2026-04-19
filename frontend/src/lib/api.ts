@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { API_BASE_URL, DEFAULT_CONFIG } from './constants'
 import { useAuthStore } from '@/store/authStore'
-import type { AuditRequest, AuditResult } from '@/types/audit'
+import type { AuditRequest, AuditResult, AuditProgress } from '@/types/audit'
 
 /** Cliente HTTP configurado para el backend PHP */
 const api = axios.create({
@@ -33,9 +33,37 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-/** Ejecuta una auditoría */
-export async function runAudit(request: AuditRequest): Promise<AuditResult> {
-  const response = await api.post<{ success: boolean; data: AuditResult }>('/audit.php', request)
+/**
+ * Resultado del POST /api/audit.
+ *
+ * - `cached=true`: hay resultado cacheado <24h, se devuelve completo.
+ * - `cached=false`: se reservó un auditId y el audit corre en background.
+ *   El cliente debe sondear `getScanProgress(auditId)` hasta status=completed
+ *   y luego leer el resultado con `getAuditResult(auditId)`.
+ */
+export interface StartAuditResponse {
+  cached: boolean
+  auditId: string
+  result?: AuditResult
+  queued?: boolean
+}
+
+/** Arranca una auditoría. No bloquea HTTP durante el scan. */
+export async function startAudit(request: AuditRequest): Promise<StartAuditResponse> {
+  const response = await api.post<{ success: boolean; data: StartAuditResponse }>(
+    '/audit.php',
+    request,
+    { timeout: 15000 }, // la respuesta es inmediata; 15s es margen generoso
+  )
+  return response.data.data
+}
+
+/** Consulta el progreso de un audit en curso (polling). */
+export async function getScanProgress(auditId: string): Promise<AuditProgress> {
+  const response = await api.get<{ success: boolean; data: AuditProgress }>(
+    '/scan-progress.php',
+    { params: { id: auditId }, timeout: 10000 },
+  )
   return response.data.data
 }
 

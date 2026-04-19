@@ -54,8 +54,16 @@ paths:
   /audit.php:
     post:
       tags: [Public]
-      summary: Ejecuta una auditoría (o devuelve la cacheada si existe)
-      description: Rate-limited por IP. Si hay cache <24h y `forceRefresh` no es true, devuelve el resultado cacheado.
+      summary: Arranca una auditoría (background) o devuelve la cacheada
+      description: |
+        Rate-limited por IP. Dos caminos posibles:
+
+        - **200 (`cached: true`)**: hay resultado cacheado <24h y no se pidió
+          `forceRefresh`. La respuesta incluye el `AuditResult` completo.
+        - **202 (`cached: false`)**: se reservó un `auditId` y el audit está
+          corriendo en background. El cliente debe hacer polling a
+          `GET /scan-progress.php?id=<auditId>` hasta que `status=completed`,
+          y luego leer el resultado con `GET /audit-status.php?id=<auditId>`.
       requestBody:
         required: true
         content:
@@ -63,18 +71,79 @@ paths:
             schema: { $ref: '#/components/schemas/AuditRequest' }
       responses:
         '200':
-          description: Auditoría completa
+          description: Auditoría cacheada lista
           content:
             application/json:
               schema:
                 allOf:
                   - $ref: '#/components/schemas/SuccessEnvelope'
                   - properties:
-                      data: { $ref: '#/components/schemas/AuditResult' }
+                      data:
+                        type: object
+                        required: [cached, auditId, result]
+                        properties:
+                          cached: { type: boolean, enum: [true] }
+                          auditId: { type: string }
+                          result: { $ref: '#/components/schemas/AuditResult' }
+        '202':
+          description: Auditoría arrancada en background
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        required: [cached, auditId, queued]
+                        properties:
+                          cached: { type: boolean, enum: [false] }
+                          auditId: { type: string, format: uuid }
+                          queued: { type: boolean }
         '400': { $ref: '#/components/responses/BadRequest' }
         '413': { $ref: '#/components/responses/BadRequest' }
         '422': { $ref: '#/components/responses/BadRequest' }
         '429': { $ref: '#/components/responses/RateLimited' }
+
+  /scan-progress.php:
+    get:
+      tags: [Public]
+      summary: Estado actual de un audit en curso (polling)
+      description: |
+        Retorna el estado del audit reportado por el orquestador antes de
+        cada analyzer. El cliente hace polling cada 1.5-2s mientras
+        `status=running`. Cuando `status=completed` puede leer el resultado
+        con `/audit-status.php?id=<auditId>`.
+
+        Los estados posibles son:
+        - `running`: audit en curso. Incluye `currentStep`, `currentLabel`,
+          `completedSteps`, `totalSteps`, `progress` (0-100).
+        - `completed`: audit terminado correctamente. El resultado está
+          guardado en la tabla `audits`.
+        - `failed`: audit abortado. `error` contiene un mensaje legible.
+
+        Expira a los 10 minutos de completarse.
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string }
+          description: auditId devuelto por POST /audit.php
+      responses:
+        '200':
+          description: Estado actual del audit
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data: { $ref: '#/components/schemas/AuditProgress' }
+        '404':
+          description: Audit no encontrado o progreso expirado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
 
   /audit-status.php:
     get:
@@ -851,6 +920,36 @@ components:
         leadWhatsapp: { type: string }
         leadCompany: { type: string }
         forceRefresh: { type: boolean, default: false }
+
+    AuditProgress:
+      type: object
+      required: [status, currentStep, currentLabel, completedSteps, totalSteps, progress, startedAt]
+      properties:
+        status:
+          type: string
+          enum: [running, completed, failed]
+        currentStep:
+          type: string
+          description: 'init | fetch | wordpress | security | performance | seo | mobile | infrastructure | conversion | page_health | wp_internal | techstack | compile'
+        currentLabel:
+          type: string
+          description: Texto legible para mostrar al usuario ("Analizando seguridad...")
+        completedSteps: { type: integer }
+        totalSteps: { type: integer }
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Porcentaje calculado (completedSteps / totalSteps × 100)
+        startedAt:
+          type: integer
+          description: Unix timestamp de cuando arrancó
+        auditId:
+          type: string
+          description: Presente cuando status=completed, apunta al resultado guardado
+        error:
+          type: string
+          description: Mensaje legible cuando status=failed
 
     LeadSummary:
       type: object
