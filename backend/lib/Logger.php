@@ -109,8 +109,9 @@ class Logger {
             $s
         ) ?? $s;
 
-        // Rutas absolutas del servidor (Linux). No tocamos URLs (empiezan con http).
-        $s = preg_replace('#(?<!https?:)/(?:home|var|srv|opt|usr)/[^\s"\']*#', '[path]', $s) ?? $s;
+        // Rutas absolutas del servidor (Linux). Solo las que arrancan tras un
+        // inicio de string, espacio o comilla — así no tocamos paths dentro de URLs.
+        $s = preg_replace('#(^|[\s\'"])/(?:home|var|srv|opt|usr)/[^\s"\']*#', '$1[path]', $s) ?? $s;
 
         // Tokens/hashes hexadecimales largos
         $s = preg_replace('/\b[a-f0-9]{32,}\b/i', '[redacted]', $s) ?? $s;

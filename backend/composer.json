@@ -1,0 +1,20 @@
+{
+    "name": "imaginawp/imagina-audit",
+    "description": "Backend dependencies — only used for local development/testing. Production runs without Composer.",
+    "type": "project",
+    "require": {
+        "php": "^8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5"
+    },
+    "autoload-dev": {
+        "classmap": [
+            "lib/",
+            "analyzers/"
+        ]
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

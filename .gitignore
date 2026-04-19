@@ -24,3 +24,9 @@ backend/cache/*.json
 
 # Build
 *.tsbuildinfo
+
+# Test dependencies (dev only, never deployed)
+backend/vendor/
+backend/.phpunit.cache/
+backend/composer.lock
+frontend/coverage/
