@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, memo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ExternalLink, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -49,14 +49,19 @@ export default function TechnicalReport() {
 
   const toggleCheck = useCallback((metricId: string) => {
     if (!id) return
-    const current = checklist[metricId]?.completed ?? false
-    const newVal = !current
-    setChecklist(prev => ({ ...prev, [metricId]: { completed: newVal, notes: prev[metricId]?.notes ?? null, completedAt: newVal ? new Date().toISOString() : null } }))
-    api.put('/admin/checklist.php', { auditId: id, metricId, completed: newVal }).catch(() => {
-      // Revert on error
-      setChecklist(prev => ({ ...prev, [metricId]: { completed: current, notes: prev[metricId]?.notes ?? null, completedAt: null } }))
+    let previousCompleted = false
+    setChecklist(prev => {
+      previousCompleted = prev[metricId]?.completed ?? false
+      const newVal = !previousCompleted
+      return { ...prev, [metricId]: { completed: newVal, notes: prev[metricId]?.notes ?? null, completedAt: newVal ? new Date().toISOString() : null } }
     })
-  }, [id, checklist])
+    api.put('/admin/checklist.php', { auditId: id, metricId, completed: !previousCompleted }).catch(() => {
+      // Revertir en caso de error
+      setChecklist(prev => ({ ...prev, [metricId]: { completed: previousCompleted, notes: prev[metricId]?.notes ?? null, completedAt: null } }))
+    })
+  }, [id])
+
+  const handleBack = useCallback(() => navigate('/admin/leads'), [navigate])
 
   if (loading) {
     return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-48 rounded-2xl" /></div>
@@ -70,7 +75,7 @@ export default function TechnicalReport() {
 
   return (
     <div className="space-y-8">
-      <ReportHeader result={result} onBack={() => navigate('/admin/leads')} />
+      <ReportHeader result={result} onBack={handleBack} />
       <ExecutiveSummary result={result} criticalCount={criticalMetrics.length} warningCount={warningMetrics.length} snapshotModule={snapshotModule} />
       {result.techStack && <TechStackSummary techStack={result.techStack} scanDuration={result.scanDurationMs} />}
       {result.isWordPress && id && (
@@ -126,7 +131,7 @@ function levelDot(level: string) {
 
 /* === Sub-components === */
 
-function ReportHeader({ result, onBack }: { result: AuditResult; onBack: () => void }) {
+const ReportHeader = memo(function ReportHeader({ result, onBack }: { result: AuditResult; onBack: () => void }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div className="flex items-center gap-3">
@@ -150,9 +155,9 @@ function ReportHeader({ result, onBack }: { result: AuditResult; onBack: () => v
       </Button>
     </div>
   )
-}
+})
 
-function ExecutiveSummary({ result, criticalCount, warningCount, snapshotModule }: { result: AuditResult; criticalCount: number; warningCount: number; snapshotModule: ModuleResult | null }) {
+const ExecutiveSummary = memo(function ExecutiveSummary({ result, criticalCount, warningCount, snapshotModule }: { result: AuditResult; criticalCount: number; warningCount: number; snapshotModule: ModuleResult | null }) {
   const modules = snapshotModule ? [...result.modules, snapshotModule] : result.modules
   return (
     <div className="rounded-2xl border border-[var(--border-default)] bg-white p-6">
@@ -174,7 +179,7 @@ function ExecutiveSummary({ result, criticalCount, warningCount, snapshotModule 
       </div>
     </div>
   )
-}
+})
 
 function SummaryCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
@@ -185,7 +190,7 @@ function SummaryCard({ label, value, color }: { label: string; value: string; co
   )
 }
 
-function TechStackSummary({ techStack, scanDuration }: { techStack: NonNullable<AuditResult['techStack']>; scanDuration: number }) {
+const TechStackSummary = memo(function TechStackSummary({ techStack, scanDuration }: { techStack: NonNullable<AuditResult['techStack']>; scanDuration: number }) {
   const hosting = techStack.hostingInfo
   const domain = techStack.domainInfo
 
@@ -260,7 +265,7 @@ function TechStackSummary({ techStack, scanDuration }: { techStack: NonNullable<
       )}
     </div>
   )
-}
+})
 
 function ActionPlan({ critical, warning, checklist, onToggle }: { critical: MetricWithModule[]; warning: MetricWithModule[]; checklist: ChecklistState; onToggle: (metricId: string) => void }) {
   const allItems = [...critical, ...warning]
@@ -352,7 +357,7 @@ function ActionItem({ index, metric, checked, onToggle }: { index: number; metri
   )
 }
 
-function ModuleDetail({ module }: { module: ModuleResult }) {
+const ModuleDetail = memo(function ModuleDetail({ module }: { module: ModuleResult }) {
   const issues = module.metrics.filter(m => m.level === 'critical' || m.level === 'warning')
   const passed = module.metrics.filter(m => m.level === 'good' || m.level === 'excellent')
   const info = module.metrics.filter(m => m.level !== 'critical' && m.level !== 'warning' && m.level !== 'good' && m.level !== 'excellent')
@@ -409,7 +414,7 @@ function ModuleDetail({ module }: { module: ModuleResult }) {
       )}
     </div>
   )
-}
+})
 
 function MetricDetail({ metric }: { metric: MetricResult }) {
   const details = metric.details || {}
