@@ -4,7 +4,10 @@ frontend/dist/
 
 # Environment
 backend/.env
+backend/.env.*
+!backend/.env.example
 deploy/output/.env
+deploy/output/.env.*
 *.db
 
 # IDE

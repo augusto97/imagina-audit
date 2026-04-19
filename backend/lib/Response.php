@@ -40,12 +40,16 @@ class Response {
     }
 
     /**
-     * Envía headers CORS
+     * Envía headers CORS y de seguridad.
+     *
+     * CORS: por defecto restrictivo. Solo se emiten Access-Control-Allow-*
+     * si el Origin de la petición coincide con la whitelist (env + DB).
+     * Si la whitelist está en '*' se echa el origin de vuelta (nunca '*' con credenciales).
      */
     public static function cors(): void {
-        $allowedOrigin = env('ALLOWED_ORIGIN', '*');
+        $allowedOrigin = env('ALLOWED_ORIGIN', '');
 
-        // Prefer DB setting over .env
+        // La configuración en DB tiene prioridad sobre .env
         try {
             $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'allowed_origins'");
             if ($row && !empty($row['value'])) {
@@ -54,33 +58,41 @@ class Response {
         } catch (Throwable $e) {}
 
         $requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        $allowed = $allowedOrigin === '' ? [] : array_map('trim', explode(',', $allowedOrigin));
+        $wildcard = in_array('*', $allowed, true);
 
-        if ($allowedOrigin === '*') {
-            header('Access-Control-Allow-Origin: *');
-        } else {
-            $allowed = array_map('trim', explode(',', $allowedOrigin));
-            if (!empty($requestOrigin) && in_array($requestOrigin, $allowed, true)) {
-                header("Access-Control-Allow-Origin: $requestOrigin");
-                header('Access-Control-Allow-Credentials: true');
-                header('Vary: Origin');
-            } else {
-                header("Access-Control-Allow-Origin: {$allowed[0]}");
-                header('Access-Control-Allow-Credentials: true');
-                header('Vary: Origin');
-            }
+        if (!empty($requestOrigin) && ($wildcard || in_array($requestOrigin, $allowed, true))) {
+            // Reflejar origin (nunca '*' cuando hay credenciales)
+            header("Access-Control-Allow-Origin: $requestOrigin");
+            header('Access-Control-Allow-Credentials: true');
+            header('Vary: Origin');
+            header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-CSRF-Token');
+            header('Access-Control-Max-Age: 86400');
         }
+        // Si no hay match: no enviamos cabeceras CORS y el navegador bloquea la petición cross-origin.
+        // Las mismas-origin (sin cabecera Origin o mismo dominio) siguen funcionando con normalidad.
 
-        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization');
-
-        // Headers de seguridad
+        // Headers de seguridad (aplican a todas las respuestas)
         header('X-Content-Type-Options: nosniff');
         header('X-Frame-Options: DENY');
-        header('X-XSS-Protection: 1; mode=block');
+        header('Referrer-Policy: strict-origin-when-cross-origin');
+        header("Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()");
+        // CSP restrictiva para respuestas JSON — no se renderiza nada en el navegador
+        header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
+
+        // HSTS solo sobre HTTPS
+        $isHttps =
+            (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off') ||
+            (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443) ||
+            (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+        if ($isHttps) {
+            header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+        }
 
         // Responder a preflight OPTIONS
         if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            http_response_code(200);
+            http_response_code(204);
             exit;
         }
     }

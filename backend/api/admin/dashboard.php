@@ -42,22 +42,45 @@ try {
     $recurring = $db->query(
         "SELECT domain, COUNT(*) as total, MAX(global_score) as best_score, MIN(global_score) as worst_score, MAX(id) as last_audit_id FROM audits GROUP BY domain HAVING COUNT(*) > 1 ORDER BY COUNT(*) DESC LIMIT 10"
     );
-    $recurringDomains = array_map(function ($row) use ($db) {
-        // Calcular tendencia
-        $last2 = $db->query("SELECT global_score FROM audits WHERE domain = ? ORDER BY created_at DESC LIMIT 2", [$row['domain']]);
-        $trend = 'stable';
-        if (count($last2) >= 2) {
-            $diff = $last2[0]['global_score'] - $last2[1]['global_score'];
-            if ($diff > 5) $trend = 'improving';
-            elseif ($diff < -5) $trend = 'declining';
+
+    // Calcular tendencia en una sola query con window function (evita N+1)
+    $trendByDomain = [];
+    if (!empty($recurring)) {
+        $domains = array_column($recurring, 'domain');
+        $placeholders = implode(',', array_fill(0, count($domains), '?'));
+        $trendRows = $db->query(
+            "SELECT domain, global_score, rn FROM (
+                SELECT domain, global_score,
+                       ROW_NUMBER() OVER (PARTITION BY domain ORDER BY created_at DESC) AS rn
+                FROM audits
+                WHERE domain IN ($placeholders)
+            ) WHERE rn <= 2",
+            $domains
+        );
+        $scoresByDomain = [];
+        foreach ($trendRows as $r) {
+            $scoresByDomain[$r['domain']][(int) $r['rn']] = (int) $r['global_score'];
         }
+        foreach ($scoresByDomain as $domain => $scores) {
+            if (!isset($scores[1], $scores[2])) {
+                $trendByDomain[$domain] = 'stable';
+                continue;
+            }
+            $diff = $scores[1] - $scores[2];
+            if ($diff > 5) $trendByDomain[$domain] = 'improving';
+            elseif ($diff < -5) $trendByDomain[$domain] = 'declining';
+            else $trendByDomain[$domain] = 'stable';
+        }
+    }
+
+    $recurringDomains = array_map(function ($row) use ($trendByDomain) {
         return [
             'domain' => $row['domain'],
             'totalAudits' => (int) $row['total'],
             'bestScore' => (int) $row['best_score'],
             'worstScore' => (int) $row['worst_score'],
             'lastAuditId' => $row['last_audit_id'],
-            'trend' => $trend,
+            'trend' => $trendByDomain[$row['domain']] ?? 'stable',
         ];
     }, $recurring);
 

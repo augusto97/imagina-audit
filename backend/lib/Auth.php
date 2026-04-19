@@ -6,10 +6,25 @@
 
 class Auth {
     /**
-     * Inicia la sesión PHP si no está activa
+     * Inicia la sesión PHP si no está activa, con cookies endurecidas.
+     * Debe llamarse antes de cualquier header/output para que los flags apliquen.
      */
     private static function ensureSession(): void {
         if (session_status() === PHP_SESSION_NONE) {
+            $isHttps =
+                (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off') ||
+                (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443) ||
+                (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+
+            session_set_cookie_params([
+                'lifetime' => 0,
+                'path' => '/',
+                'domain' => '',
+                'secure' => $isHttps,
+                'httponly' => true,
+                'samesite' => 'Strict',
+            ]);
+
             session_start();
         }
     }
@@ -89,15 +104,14 @@ class Auth {
 
         if (ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
-            setcookie(
-                session_name(),
-                '',
-                time() - 42000,
-                $params['path'],
-                $params['domain'],
-                $params['secure'],
-                $params['httponly']
-            );
+            setcookie(session_name(), '', [
+                'expires' => time() - 42000,
+                'path' => $params['path'] ?: '/',
+                'domain' => $params['domain'] ?? '',
+                'secure' => $params['secure'] ?? false,
+                'httponly' => $params['httponly'] ?? true,
+                'samesite' => $params['samesite'] ?? 'Strict',
+            ]);
         }
 
         session_destroy();
