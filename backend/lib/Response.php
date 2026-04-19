@@ -129,19 +129,28 @@ class Response {
     }
 
     /**
-     * Obtiene el body JSON de la petición
+     * Obtiene el body JSON de la petición.
+     *
+     * @param int $maxBytes Tamaño máximo del body en bytes (default 1MB).
+     *                      Endpoints que reciben payloads grandes (p. ej. snapshots)
+     *                      pueden pasar un valor mayor.
+     * @param int $maxDepth Profundidad máxima del JSON (default 64).
      */
-    public static function getJsonBody(): array {
+    public static function getJsonBody(int $maxBytes = 1_048_576, int $maxDepth = 64): array {
         $body = file_get_contents('php://input');
         if (empty($body)) {
             return [];
         }
 
-        $data = json_decode($body, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            self::error('JSON inválido en el body de la petición', 400);
+        if (strlen($body) > $maxBytes) {
+            self::error('Payload demasiado grande', 413);
         }
 
-        return $data ?? [];
+        $data = json_decode($body, true, $maxDepth);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            self::error('JSON inválido en el body de la petición: ' . json_last_error_msg(), 400);
+        }
+
+        return is_array($data) ? $data : [];
     }
 }

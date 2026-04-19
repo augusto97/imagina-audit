@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { API_BASE_URL, DEFAULT_CONFIG } from './constants'
+import { useAuthStore } from '@/store/authStore'
 import type { AuditRequest, AuditResult } from '@/types/audit'
 
 /** Cliente HTTP configurado para el backend PHP */
@@ -10,6 +11,26 @@ const api = axios.create({
   },
   withCredentials: true,
   timeout: 90000, // 90 segundos para dar margen al escaneo
+})
+
+/**
+ * Interceptor que añade el CSRF token en requests a /admin/* que mutan estado.
+ * El token se obtiene de authStore (lo guarda useAuth tras login/session check).
+ */
+api.interceptors.request.use((config) => {
+  const url = config.url ?? ''
+  const method = (config.method ?? 'get').toLowerCase()
+  const isMutation = ['post', 'put', 'delete', 'patch'].includes(method)
+  const isAdmin = url.includes('/admin/')
+
+  if (isAdmin && isMutation) {
+    const token = useAuthStore.getState().csrfToken
+    if (token) {
+      config.headers = config.headers ?? {}
+      config.headers['X-CSRF-Token'] = token
+    }
+  }
+  return config
 })
 
 /** Ejecuta una auditoría */

@@ -57,7 +57,9 @@ if ($method === 'DELETE') {
 }
 
 if ($method === 'POST') {
-    $body = Response::getJsonBody();
+    // Snapshots del plugin wp-snapshot pueden ser grandes (29 métricas con listas
+    // de plugins, DB stats, etc.). Tope de 10MB + profundidad 128.
+    $body = Response::getJsonBody(10 * 1024 * 1024, 128);
     $auditId = $body['auditId'] ?? '';
     $source = $body['source'] ?? '';
 
@@ -115,7 +117,14 @@ if ($method === 'POST') {
         if (empty($jsonData)) Response::error('jsonData requerido', 400);
 
         if (is_string($jsonData)) {
-            $snapshotData = json_decode($jsonData, true);
+            // Verificar tamaño antes de decodificar
+            if (strlen($jsonData) > 10 * 1024 * 1024) {
+                Response::error('jsonData excede el tope de 10MB', 413);
+            }
+            $snapshotData = json_decode($jsonData, true, 128);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Response::error('JSON inválido: ' . json_last_error_msg(), 400);
+            }
         } elseif (is_array($jsonData)) {
             $snapshotData = $jsonData;
         }
@@ -125,9 +134,13 @@ if ($method === 'POST') {
         }
     }
 
-    // Validate snapshot structure
+    // Validate snapshot structure de wp-snapshot
     if (!isset($snapshotData['sections']) || !is_array($snapshotData['sections'])) {
         Response::error('El JSON no tiene la estructura esperada de wp-snapshot (falta "sections").', 422);
+    }
+    // Límite defensivo sobre el número de secciones (el plugin tiene ~29 fijas)
+    if (count($snapshotData['sections']) > 200) {
+        Response::error('El snapshot tiene demasiadas secciones (posible payload malicioso).', 422);
     }
 
     // Run standalone analyzer for preview

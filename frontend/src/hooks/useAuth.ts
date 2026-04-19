@@ -5,34 +5,41 @@ import api from '@/lib/api'
 
 export function useAuth() {
   const navigate = useNavigate()
-  const { isAuthenticated, isLoading, setAuthenticated, setLoading } = useAuthStore()
+  const { isAuthenticated, isLoading, setAuthenticated, setLoading, setCsrfToken } = useAuthStore()
 
   const checkSession = useCallback(async () => {
     try {
       const res = await api.get('/admin/session.php')
-      setAuthenticated(res.data?.data?.authenticated === true)
+      const data = res.data?.data
+      const authed = data?.authenticated === true
+      setAuthenticated(authed)
+      setCsrfToken(authed ? (data?.csrfToken ?? null) : null)
     } catch {
       setAuthenticated(false)
+      setCsrfToken(null)
     } finally {
       setLoading(false)
     }
-  }, [setAuthenticated, setLoading])
+  }, [setAuthenticated, setLoading, setCsrfToken])
 
   const login = useCallback(async (password: string) => {
     const res = await api.post('/admin/login.php', { password })
-    if (res.data?.data?.authenticated) {
+    const data = res.data?.data
+    if (data?.authenticated) {
       setAuthenticated(true)
+      setCsrfToken(data?.csrfToken ?? null)
       navigate('/admin/dashboard')
     }
-  }, [setAuthenticated, navigate])
+  }, [setAuthenticated, setCsrfToken, navigate])
 
   const logout = useCallback(async () => {
     try {
       await api.post('/admin/logout.php')
     } catch { /* ignorar */ }
     setAuthenticated(false)
+    setCsrfToken(null)
     navigate('/admin')
-  }, [setAuthenticated, navigate])
+  }, [setAuthenticated, setCsrfToken, navigate])
 
   // Verificar sesión al montar
   useEffect(() => {

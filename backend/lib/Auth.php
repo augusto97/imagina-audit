@@ -60,10 +60,42 @@ class Auth {
             session_regenerate_id(true);
             $_SESSION['admin_authenticated'] = true;
             $_SESSION['admin_login_time'] = time();
+            // Generar token CSRF nuevo en cada login
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * Retorna el token CSRF de la sesión actual. Genera uno si no existe.
+     */
+    public static function getCsrfToken(): string {
+        self::ensureSession();
+        if (empty($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['csrf_token'];
+    }
+
+    /**
+     * Verifica el token CSRF en métodos que modifican estado (POST/PUT/DELETE/PATCH).
+     * Responde 403 si no coincide. GET/HEAD/OPTIONS no se verifican.
+     */
+    public static function verifyCsrf(): void {
+        $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        if (!in_array($method, ['POST', 'PUT', 'DELETE', 'PATCH'], true)) {
+            return;
+        }
+
+        self::ensureSession();
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        $headerToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+
+        if (empty($sessionToken) || empty($headerToken) || !hash_equals($sessionToken, $headerToken)) {
+            Response::error('Token CSRF inválido o ausente', 403);
+        }
     }
 
     /**
@@ -87,12 +119,14 @@ class Auth {
     }
 
     /**
-     * Requiere autenticación o responde con error 401
+     * Requiere autenticación o responde con error 401.
+     * También verifica CSRF en métodos que modifican estado.
      */
     public static function requireAuth(): void {
         if (!self::checkAuth()) {
             Response::error('No autorizado', 401);
         }
+        self::verifyCsrf();
     }
 
     /**

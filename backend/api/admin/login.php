@@ -30,7 +30,10 @@ try {
 
 if (Auth::login($password)) {
     try { $db->execute("DELETE FROM login_attempts WHERE ip_address = ?", [$ip]); } catch (Throwable $e) {}
-    Response::success(['authenticated' => true]);
+    Response::success([
+        'authenticated' => true,
+        'csrfToken' => Auth::getCsrfToken(),
+    ]);
 } else {
     try { $db->execute("INSERT INTO login_attempts (ip_address) VALUES (?)", [$ip]); } catch (Throwable $e) {}
     Response::error('Contraseña incorrecta.', 401);

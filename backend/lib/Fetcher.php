@@ -63,7 +63,11 @@ class Fetcher {
     }
 
     /**
-     * Ejecuta una petición HTTP
+     * Ejecuta una petición HTTP con validación anti-SSRF en cada hop.
+     *
+     * Los redirects se siguen manualmente (no con CURLOPT_FOLLOWLOCATION) para
+     * re-validar cada URL destino contra SSRF. Esto cierra el hueco donde
+     * evil.com redirige a 127.0.0.1 / 169.254.169.254 / etc.
      */
     private static function request(
         string $method,
@@ -73,41 +77,13 @@ class Fetcher {
         bool $followRedirects,
         int $retries
     ): array {
-        // Validar URL contra SSRF antes de realizar la petición
-        $parsed = parse_url($url);
-        if ($parsed === false || empty($parsed['host'])) {
-            return self::createResult(0, [], '', $url, 0);
-        }
-
-        $host = $parsed['host'];
-        $port = $parsed['port'] ?? ($parsed['scheme'] === 'https' ? 443 : 80);
-        $resolvedIp = null;
-
-        // Verificar IP privada si es una IP directa
-        if (filter_var($host, FILTER_VALIDATE_IP)) {
-            if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-                Logger::warning("SSRF bloqueado: IP privada $host");
-                return self::createResult(0, [], '', $url, 0);
-            }
-        } else {
-            // Resolver DNS y verificar la IP — forzar esta IP en cURL para prevenir DNS rebinding
-            $resolvedIp = gethostbyname($host);
-            if ($resolvedIp === $host) {
-                Logger::warning("SSRF bloqueado: no se pudo resolver $host");
-                return self::createResult(0, [], '', $url, 0);
-            }
-            if (filter_var($resolvedIp, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-                Logger::warning("SSRF bloqueado: $host resuelve a IP privada $resolvedIp");
-                return self::createResult(0, [], '', $url, 0);
-            }
-        }
-
         $attempt = 0;
         $maxAttempts = 1 + $retries;
+        $result = self::createResult(0, [], '', $url, 0);
 
         while ($attempt < $maxAttempts) {
             $attempt++;
-            $result = self::executeRequest($method, $url, $body, $timeout, $followRedirects, $resolvedIp ? "$host:$port:$resolvedIp" : null);
+            $result = self::followChain($method, $url, $body, $timeout, $followRedirects);
 
             if ($result['statusCode'] > 0) {
                 return $result;
@@ -120,6 +96,152 @@ class Fetcher {
         }
 
         return $result;
+    }
+
+    /**
+     * Sigue la cadena de redirects manualmente, validando SSRF en cada hop.
+     */
+    private static function followChain(
+        string $method,
+        string $url,
+        ?string $body,
+        int $timeout,
+        bool $followRedirects
+    ): array {
+        $currentUrl = $url;
+        $hops = 0;
+
+        while (true) {
+            $ssrf = self::validateUrlForRequest($currentUrl);
+            if ($ssrf === null) {
+                // Bloqueado por SSRF
+                return self::createResult(0, [], '', $currentUrl, 0);
+            }
+
+            // Nunca dejamos que cURL siga redirects — los seguimos aquí
+            $result = self::executeRequest(
+                $method,
+                $currentUrl,
+                $body,
+                $timeout,
+                false,
+                $ssrf['dnsResolve']
+            );
+
+            $status = $result['statusCode'];
+            $isRedirect = $status >= 300 && $status < 400 && !empty($result['headers']['location']);
+
+            if (!$followRedirects || !$isRedirect || $hops >= self::MAX_REDIRECTS) {
+                return $result;
+            }
+
+            $nextUrl = self::resolveRedirectUrl($currentUrl, $result['headers']['location']);
+            if ($nextUrl === null) {
+                return $result; // Location inválida, devolvemos lo que tenemos
+            }
+
+            $currentUrl = $nextUrl;
+            $hops++;
+            // Solo GET para redirects (las normas HTTP permiten 307/308 preservar método,
+            // pero en auditoría queremos simplicidad: leemos, no operamos)
+            $method = 'GET';
+            $body = null;
+        }
+    }
+
+    /**
+     * Valida una URL contra SSRF. Retorna null si debe bloquearse.
+     * Si es válida, retorna ['host', 'port', 'resolvedIp', 'dnsResolve'].
+     * dnsResolve es la cadena para CURLOPT_RESOLVE (previene DNS rebinding).
+     */
+    private static function validateUrlForRequest(string $url): ?array {
+        $parsed = parse_url($url);
+        if ($parsed === false || empty($parsed['host']) || empty($parsed['scheme'])) {
+            return null;
+        }
+
+        $scheme = strtolower($parsed['scheme']);
+        if ($scheme !== 'http' && $scheme !== 'https') {
+            Logger::warning("SSRF bloqueado: esquema no permitido $scheme");
+            return null;
+        }
+
+        $host = $parsed['host'];
+        $port = $parsed['port'] ?? ($scheme === 'https' ? 443 : 80);
+        $resolvedIp = null;
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            // Es IP directa
+            if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+                Logger::warning("SSRF bloqueado: IP privada $host");
+                return null;
+            }
+        } else {
+            // Resolver DNS y fijar la IP en cURL (anti DNS-rebinding dentro del request)
+            $resolvedIp = gethostbyname($host);
+            if ($resolvedIp === $host) {
+                Logger::warning("SSRF bloqueado: no se pudo resolver $host");
+                return null;
+            }
+            if (filter_var($resolvedIp, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+                Logger::warning("SSRF bloqueado: $host resuelve a IP privada $resolvedIp");
+                return null;
+            }
+        }
+
+        return [
+            'host' => $host,
+            'port' => $port,
+            'resolvedIp' => $resolvedIp,
+            'dnsResolve' => $resolvedIp ? "$host:$port:$resolvedIp" : null,
+        ];
+    }
+
+    /**
+     * Resuelve una URL de redirect relativa o absoluta.
+     * Retorna null si es malformada o usa esquema no permitido.
+     */
+    private static function resolveRedirectUrl(string $currentUrl, string $location): ?string {
+        $location = trim($location);
+        if ($location === '') {
+            return null;
+        }
+
+        // URL absoluta
+        if (preg_match('#^https?://#i', $location)) {
+            return $location;
+        }
+
+        // Cualquier otro esquema absoluto (javascript:, data:, file:, ftp://...) → bloqueado
+        if (preg_match('#^[a-z][a-z0-9+.-]*:#i', $location) && !preg_match('#^//#', $location)) {
+            Logger::warning("SSRF bloqueado: redirect a esquema no permitido: $location");
+            return null;
+        }
+
+        $base = parse_url($currentUrl);
+        if ($base === false || empty($base['host']) || empty($base['scheme'])) {
+            return null;
+        }
+
+        // Protocol-relative: //host/path
+        if (str_starts_with($location, '//')) {
+            return $base['scheme'] . ':' . $location;
+        }
+
+        $authority = $base['scheme'] . '://' . $base['host'];
+        if (!empty($base['port'])) {
+            $authority .= ':' . $base['port'];
+        }
+
+        // Absolute path: /path
+        if (str_starts_with($location, '/')) {
+            return $authority . $location;
+        }
+
+        // Relative path: path or ../path
+        $basePath = $base['path'] ?? '/';
+        $dir = substr($basePath, 0, strrpos($basePath, '/') + 1) ?: '/';
+        return $authority . $dir . $location;
     }
 
     /**
