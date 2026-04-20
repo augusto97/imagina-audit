@@ -10,6 +10,12 @@ class Response {
     public static function success(mixed $data = null, int $statusCode = 200): void {
         http_response_code($statusCode);
         header('Content-Type: application/json; charset=utf-8');
+        // Las respuestas JSON del API nunca deben cachearse — pueden cambiar
+        // segundo a segundo (progreso de audit, stats de cola, diag, etc.).
+        // Sin esto, navegadores y proxies (Cloudflare, etc.) sirven stale data.
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Expires: 0');
 
         $response = ['success' => true];
         if ($data !== null) {
@@ -26,6 +32,9 @@ class Response {
     public static function error(string $message, int $statusCode = 400, ?array $details = null): void {
         http_response_code($statusCode);
         header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Expires: 0');
 
         $response = [
             'success' => false,

@@ -33,7 +33,9 @@ export default function SystemHealth() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await api.get('/diag.php')
+      // Cache-buster en query param: garantiza respuesta fresca incluso si
+      // un proxy intermedio ignora los headers no-cache del backend.
+      const res = await api.get('/diag.php', { params: { _t: Date.now() } })
       setDiag(res.data.data as Diag)
     } catch {
       toast.error('No se pudo cargar el diagnóstico')
