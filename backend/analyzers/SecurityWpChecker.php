@@ -15,12 +15,15 @@ class SecurityWpChecker {
     ) {}
 
     public function checkDirectoryListing(): array {
-        $listings = [];
-
         $dirs = ['/wp-content/uploads/', '/wp-content/plugins/'];
+        // PARALELIZADO
+        $urls = [];
+        foreach ($dirs as $dir) $urls[$dir] = $this->url . $dir;
+        $responses = Fetcher::multiGet($urls, 5);
+        $listings = [];
         foreach ($dirs as $dir) {
-            $response = Fetcher::get($this->url . $dir, 5, true, 0);
-            if ($response['statusCode'] === 200 && str_contains($response['body'], 'Index of')) {
+            $resp = $responses[$dir] ?? null;
+            if ($resp && ($resp['statusCode'] ?? 0) === 200 && str_contains($resp['body'] ?? '', 'Index of')) {
                 $listings[] = $dir;
             }
         }
@@ -43,10 +46,13 @@ class SecurityWpChecker {
 
     public function checkWpInfoFiles(): array {
         $files = ['/readme.html', '/license.txt', '/wp-config-sample.php'];
+        // PARALELIZADO: 3 HEAD paralelas en ~1s vs ~9s secuencial
+        $urls = [];
+        foreach ($files as $f) $urls[$f] = $this->url . $f;
+        $responses = Fetcher::multiGet($urls, 3);
         $exposed = [];
         foreach ($files as $f) {
-            $resp = Fetcher::head($this->url . $f, 3);
-            if ($resp['statusCode'] === 200) $exposed[] = $f;
+            if (($responses[$f]['statusCode'] ?? 0) === 200) $exposed[] = $f;
         }
         $count = count($exposed);
 
@@ -65,10 +71,13 @@ class SecurityWpChecker {
 
     public function checkWpInstallFiles(): array {
         $files = ['/wp-admin/install.php', '/wp-admin/upgrade.php', '/wp-admin/install-helper.php'];
+        // PARALELIZADO: 3 HEAD paralelas
+        $urls = [];
+        foreach ($files as $f) $urls[$f] = $this->url . $f;
+        $responses = Fetcher::multiGet($urls, 3);
         $exposed = [];
         foreach ($files as $f) {
-            $resp = Fetcher::head($this->url . $f, 3);
-            if ($resp['statusCode'] === 200) $exposed[] = $f;
+            if (($responses[$f]['statusCode'] ?? 0) === 200) $exposed[] = $f;
         }
         $count = count($exposed);
 
@@ -117,12 +126,15 @@ class SecurityWpChecker {
             '/wp-json/wp/v2/posts',
             '/wp-json/wp/v2/media',
         ];
+        // PARALELIZADO: 4 GET en paralelo ~3s vs 12s secuencial
+        $urls = [];
+        foreach ($endpoints as $ep) $urls[$ep] = $this->url . $ep;
+        $responses = Fetcher::multiGet($urls, 3);
         $exposed = [];
-
         foreach ($endpoints as $ep) {
-            $resp = Fetcher::get($this->url . $ep, 3, true, 0);
-            if ($resp['statusCode'] === 200) {
-                $data = json_decode($resp['body'], true);
+            $resp = $responses[$ep] ?? null;
+            if ($resp && ($resp['statusCode'] ?? 0) === 200) {
+                $data = json_decode($resp['body'] ?? '', true);
                 if (is_array($data) && !empty($data)) {
                     $exposed[] = ['endpoint' => $ep, 'count' => count($data)];
                 }
@@ -161,9 +173,12 @@ class SecurityWpChecker {
         }
 
         if (empty($detectedUsers)) {
-            for ($i = 1; $i <= 3; $i++) {
-                $resp = Fetcher::get($this->url . '/?author=' . $i, 3, false, 0);
-                if (in_array($resp['statusCode'], [301, 302])) {
+            // PARALELIZADO: 3 GET en paralelo ~1-3s vs 9s secuencial
+            $authorUrls = [];
+            for ($i = 1; $i <= 3; $i++) $authorUrls["a$i"] = $this->url . '/?author=' . $i;
+            $authorResponses = Fetcher::multiGet($authorUrls, 3);
+            foreach ($authorResponses as $resp) {
+                if (in_array($resp['statusCode'] ?? 0, [301, 302], true)) {
                     $location = $resp['headers']['location'] ?? '';
                     if (preg_match('#/author/([^/]+)/?#i', $location, $m)) {
                         $slug = strtolower($m[1]);

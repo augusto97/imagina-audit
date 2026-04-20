@@ -454,7 +454,6 @@ class WordPressDetector {
      * Verifica archivos sensibles accesibles
      */
     private function checkSensitiveFiles(): array {
-        $found = [];
         $filesToCheck = [
             '/wp-config.php.bak',
             '/wp-config.old',
@@ -465,12 +464,13 @@ class WordPressDetector {
             '/backup.zip',
             '/backup.sql',
         ];
-
+        // PARALELIZADO: 8 HEAD en paralelo ~1s vs 24s secuencial
+        $urls = [];
+        foreach ($filesToCheck as $file) $urls[$file] = $this->url . $file;
+        $responses = Fetcher::multiGet($urls, 3);
+        $found = [];
         foreach ($filesToCheck as $file) {
-            $response = Fetcher::head($this->url . $file, 3);
-            if ($response['statusCode'] === 200) {
-                $found[] = $file;
-            }
+            if (($responses[$file]['statusCode'] ?? 0) === 200) $found[] = $file;
         }
 
         return $found;

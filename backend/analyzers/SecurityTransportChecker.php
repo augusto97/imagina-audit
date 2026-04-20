@@ -173,10 +173,13 @@ class SecurityTransportChecker {
 
     public function checkSourceCodeExposure(): array {
         $paths = ['/.git/config', '/.git/HEAD', '/.svn/entries', '/.hg/hgrc', '/.DS_Store'];
+        // PARALELIZADO: 5 HEAD en paralelo ~1s vs 15s secuencial
+        $urls = [];
+        foreach ($paths as $p) $urls[$p] = $this->url . $p;
+        $responses = Fetcher::multiGet($urls, 3);
         $found = [];
         foreach ($paths as $p) {
-            $resp = Fetcher::head($this->url . $p, 3);
-            if ($resp['statusCode'] === 200) $found[] = $p;
+            if (($responses[$p]['statusCode'] ?? 0) === 200) $found[] = $p;
         }
         $count = count($found);
         return Scoring::createMetric(
