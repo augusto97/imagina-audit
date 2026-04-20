@@ -13,7 +13,9 @@ echo ""
 # 1. Compilar frontend
 echo "[1/3] Compilando frontend..."
 cd "$PROJECT_DIR/frontend"
-npm install --production=false
+# --legacy-peer-deps: openapi-typescript pide TS 5.x pero usamos TS 6.x.
+# El mismatch de peer es inofensivo en dev — solo afecta a la instalación.
+npm install --legacy-peer-deps
 npm run build
 echo "[OK] Frontend compilado en frontend/dist/"
 

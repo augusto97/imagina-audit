@@ -104,26 +104,37 @@ session hijacking en redes públicas.
 
 ## 8. Mantenimiento recomendado
 
-Configura estos crons en cPanel:
+Configura estos crons en cPanel → Cron Jobs (todos usan el mismo
+`CRON_SECRET_TOKEN` si se invocan por HTTP; por CLI no hace falta):
 
 ```
-# Cleanup de rate_limits y logs antiguos (diario, 3 AM)
+# Drenar cola de audits + reapear jobs huérfanos (cada 5 min)
+*/5 * * * * php /home/USER/public_html/audit/cron/drain-queue.php
+
+# Cleanup diario: rate_limits, login_attempts, audit_jobs viejos,
+# cache expirado, log rotation, retención de informes si está habilitada
 0 3 * * * php /home/USER/public_html/audit/cron/cleanup.php
 
-# VACUUM de SQLite (semanal, domingo 4 AM)
+# Compactación semanal de SQLite (domingo 4 AM)
 0 4 * * 0 php /home/USER/public_html/audit/cron/vacuum.php
 
-# Update de base de vulnerabilidades (diario, 5 AM)
+# Actualización de base de vulnerabilidades (diario 5 AM)
 0 5 * * * php /home/USER/public_html/audit/cron/update-vulnerabilities.php
 ```
 
-(Los scripts de `cron/` se crean como parte de la tarea 6.11 del plan de reestructuración.)
+El `drain-queue` es el más crítico — asegura que la cola fluya aunque
+un proceso PHP muera a mitad de audit (dead-man switch). Si nunca
+tienes picos de concurrencia, actúa como no-op y sale rápido.
 
 ## 9. Verificación post-deploy
 
 - [ ] `GET /audit/api/health` retorna `{"success":true}`
 - [ ] `/audit/` carga la home y permite auditar un sitio de prueba
 - [ ] `/audit/admin` pide contraseña y tras login muestra el dashboard
+- [ ] En `/audit/admin/queue` se ve la RAM detectada y la recomendación
+      coincide con tu hosting (en 1.5 GB debería marcar 3 slots)
+- [ ] En `/audit/admin/retention` puedes activar/desactivar el toggle
+      y el preview calcula en vivo
 - [ ] Cabeceras de seguridad presentes (ver con `curl -I`):
   - `Strict-Transport-Security`
   - `X-Content-Type-Options: nosniff`
@@ -131,3 +142,21 @@ Configura estos crons en cPanel:
   - `Referrer-Policy`
   - `Content-Security-Policy`
 - [ ] `.env` y `audit.db` no son accesibles por URL directa
+- [ ] Los 4 crons aparecen en cPanel → Cron Jobs y ejecutan sin errores
+      (revisa `/audit/logs/` tras 5-10 min)
+
+## 10. Primera auditoría de prueba
+
+Tras configurar todo:
+
+1. Desde `/audit/` lanza un audit a `https://imaginawp.com` (o cualquier
+   sitio conocido). Debe:
+   - Responder en <1s con la pantalla de "Escaneando..."
+   - Mostrar progreso real paso a paso (ahora viene del backend, no es
+     fake con timers)
+   - Completar en ~40s y redirigir a resultados
+2. Abre `/audit/admin/queue` en otra pestaña y verifica que mientras
+   corre ves `running: 1 / 3` y el job aparece en la lista de activos.
+3. Lanza 4 audits seguidos desde distintas URLs — la 4ª debe aparecer
+   con pantalla "Posición #1 en cola" y procesarse cuando alguna de
+   las primeras 3 termine.

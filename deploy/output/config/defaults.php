@@ -28,6 +28,7 @@ return [
     'weight_infrastructure' => 0.08,
     'weight_conversion' => 0.10,
     'weight_page_health' => 0.12,
+    'weight_wp_internal' => 0.10, // Solo aplica si el admin subió un wp-snapshot
 
     // Mensajes de venta por módulo
     'sales_wordpress' => 'Con nuestros planes de soporte, mantenemos tu WordPress actualizado y seguro. Actualizamos core, plugins y temas cada semana con testing previo para evitar problemas de compatibilidad.',
@@ -38,6 +39,7 @@ return [
     'sales_infrastructure' => 'Recomendamos y migramos tu sitio al hosting más adecuado, configuramos CDN, HTTP/2, compresión y todas las optimizaciones de servidor necesarias.',
     'sales_conversion' => 'Instalamos y configuramos las herramientas esenciales: Google Analytics, chat en vivo, formularios optimizados, píxeles de tracking y cumplimiento legal (cookies, GDPR).',
     'sales_page_health' => 'Corregimos todos los errores técnicos de tu sitio: recursos rotos, contenido mixto, errores HTML, problemas de codificación y todo lo que afecta la salud técnica de tus páginas.',
+    'sales_wp_internal' => 'Analizamos el estado interno de tu WordPress y lo optimizamos a nivel de plugins, base de datos, configuración y rendimiento.',
     'sales_backups' => 'Configuramos backups automáticos diarios con retención de 30 días, almacenados fuera del servidor. Incluimos restauración gratuita en caso de emergencia.',
 
     // CTA
@@ -55,4 +57,15 @@ return [
 
     // Versión más reciente conocida de WordPress
     'latest_wp_version' => '6.7.2',
+
+    // Cola de auditorías
+    'audit_max_concurrent' => 3,           // Audits que pueden correr en paralelo
+    'audit_stale_seconds' => 180,          // Tras esto, un job 'running' se considera huérfano
+    'audit_failure_cache_minutes' => 10,   // Si una URL falló en los últimos N min, devolvemos el mismo error sin reprocesar
+    'audit_max_attempts' => 3,             // Tras N intentos fallidos, se marca como permanently_failed
+    'audit_jobs_retention_days' => 7,      // Cuánto retener jobs completed/failed antes de borrar
+
+    // Retención de informes de auditoría (resultados guardados en `audits`)
+    'audits_retention_enabled' => false,   // Master switch del borrado automático
+    'audits_retention_months' => 6,        // Informes > N meses se borran (excepto los pinned)
 ];

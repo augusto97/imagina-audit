@@ -27,6 +27,7 @@ class Database {
         $this->pdo->exec('PRAGMA journal_mode = WAL');
         $this->pdo->exec('PRAGMA synchronous = NORMAL');
         $this->pdo->exec('PRAGMA foreign_keys = ON');
+        $this->pdo->exec('PRAGMA busy_timeout = 5000');
     }
 
     /**
@@ -107,6 +108,23 @@ class Database {
         if (file_exists($schemaPath)) {
             $sql = file_get_contents($schemaPath);
             $this->pdo->exec($sql);
+        }
+        $this->runMigrations();
+    }
+
+    /**
+     * Migraciones defensive para bases ya instaladas. SQLite no soporta
+     * ADD COLUMN IF NOT EXISTS, así que cada ALTER va en try/catch.
+     * Se ejecuta tras initSchema cada bootstrap — los ALTERs ya aplicados
+     * fallan silenciosamente.
+     */
+    private function runMigrations(): void {
+        $migrations = [
+            // Columna `is_pinned` añadida para proteger informes del borrado por retención
+            "ALTER TABLE audits ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0",
+        ];
+        foreach ($migrations as $sql) {
+            try { $this->pdo->exec($sql); } catch (Throwable $e) { /* columna ya existe */ }
         }
     }
 
