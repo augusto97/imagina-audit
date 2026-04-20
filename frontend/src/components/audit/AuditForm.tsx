@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAudit } from '@/hooks/useAudit'
+import { useConfigStore } from '@/store/configStore'
 
 const auditSchema = z.object({
   url: z.string().min(1, 'La URL es obligatoria').refine(
@@ -29,7 +30,10 @@ type AuditFormData = z.infer<typeof auditSchema>
 
 export default function AuditForm() {
   const { startAudit, status } = useAudit()
+  const home = useConfigStore((s) => s.config.home)
   const isScanning = status === 'scanning'
+  const microItems = (home.formMicrocopy || 'Sin instalar nada · 100% externo · Resultados en 30 seg')
+    .split(/\s*[·•|]\s*/).filter(Boolean)
 
   const { register, handleSubmit, formState: { errors } } = useForm<AuditFormData>({
     resolver: zodResolver(auditSchema),
@@ -111,14 +115,14 @@ export default function AuditForm() {
             disabled={isScanning}
           >
             <Search className="h-5 w-5" strokeWidth={1.5} />
-            {isScanning ? 'Analizando...' : 'Auditar Mi Sitio Gratis'}
+            {isScanning ? 'Analizando...' : home.formButtonText || 'Auditar Mi Sitio Gratis'}
           </Button>
 
           {/* Micro-copy */}
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-[var(--text-tertiary)]">
-            <span>Sin instalar nada</span>
-            <span>100% externo</span>
-            <span>Resultados en 30 seg</span>
+            {microItems.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
           </div>
         </form>
       </CardContent>

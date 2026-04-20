@@ -1,0 +1,10 @@
+# Solo servir imágenes estáticas. Si alguien lograra subir un PHP,
+# Apache no lo ejecutaría como script aquí.
+<FilesMatch "\.(php|php\d|phtml|phar|inc|env)$">
+    Require all denied
+</FilesMatch>
+
+# Desactivar ejecución de scripts CGI / handlers PHP
+Options -ExecCGI
+RemoveHandler .php .phtml .phar
+php_flag engine off

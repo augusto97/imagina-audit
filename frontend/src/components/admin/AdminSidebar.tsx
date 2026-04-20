@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Settings, MessageSquare,
-  CreditCard, SlidersHorizontal, ShieldAlert, Shield, Server, Archive, Activity,
+  CreditCard, SlidersHorizontal, ShieldAlert, Shield, Server, Archive, Activity, Palette, Home,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { useConfigStore } from '@/store/configStore'
 
 const navSections = [
   {
@@ -18,6 +19,8 @@ const navSections = [
     title: 'Configuración',
     items: [
       { to: '/admin/settings', icon: Settings, label: 'General' },
+      { to: '/admin/branding', icon: Palette, label: 'Branding' },
+      { to: '/admin/home', icon: Home, label: 'Home pública' },
       { to: '/admin/messages', icon: MessageSquare, label: 'Textos y Mensajes' },
       { to: '/admin/plans', icon: CreditCard, label: 'Planes y Precios' },
       { to: '/admin/scoring', icon: SlidersHorizontal, label: 'Scoring' },
@@ -40,18 +43,29 @@ interface AdminSidebarProps {
 }
 
 export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSidebarProps) {
+  const { logoUrl, logoCollapsedUrl, companyName } = useConfigStore((s) => s.config)
+  const displayLogo = collapsed ? (logoCollapsedUrl || logoUrl) : logoUrl
+
   return (
     <div className="flex h-full flex-col">
       {/* Logo */}
       <div className={cn("h-11 flex items-center border-b border-[#e5e5e5]", collapsed ? "px-2 justify-center" : "px-4")}>
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--accent-primary)] to-[#0a9db8]">
-            <Shield className="h-4 w-4 text-white" strokeWidth={2} />
+        {displayLogo ? (
+          <img
+            src={displayLogo}
+            alt={companyName || 'Logo'}
+            className={collapsed ? "h-7 w-7 object-contain" : "h-7 max-w-[160px] object-contain"}
+          />
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--accent-primary)] to-[#0a9db8]">
+              <Shield className="h-4 w-4 text-white" strokeWidth={2} />
+            </div>
+            {!collapsed && (
+              <span className="text-[13px] font-semibold text-[#333]">{companyName || 'Imagina Audit'}</span>
+            )}
           </div>
-          {!collapsed && (
-            <span className="text-[13px] font-semibold text-[#333]">Imagina Audit</span>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Nav */}

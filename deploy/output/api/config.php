@@ -31,6 +31,9 @@ $config = [
     'companyEmail' => $settings['company_email'] ?? $defaults['company_email'],
     'companyPlansUrl' => $settings['company_plans_url'] ?? $defaults['company_plans_url'],
     'logoUrl' => $settings['logo_url'] ?? $defaults['logo_url'],
+    'logoCollapsedUrl' => $settings['logo_collapsed_url'] ?? $defaults['logo_collapsed_url'],
+    'faviconUrl' => $settings['favicon_url'] ?? $defaults['favicon_url'],
+    'brandPrimaryColor' => $settings['brand_primary_color'] ?? $defaults['brand_primary_color'],
     'ctaTitle' => $settings['cta_title'] ?? $defaults['cta_title'],
     'ctaDescription' => $settings['cta_description'] ?? $defaults['cta_description'],
     'ctaButtonWhatsappText' => $settings['cta_button_whatsapp_text'] ?? $defaults['cta_button_whatsapp_text'],
@@ -45,6 +48,17 @@ $config = [
         'infrastructure' => $settings['sales_infrastructure'] ?? $defaults['sales_infrastructure'],
         'conversion' => $settings['sales_conversion'] ?? $defaults['sales_conversion'],
         'backups' => $settings['sales_backups'] ?? $defaults['sales_backups'],
+    ],
+    'home' => [
+        'seoTitle'        => $settings['home_seo_title']        ?? $defaults['home_seo_title'],
+        'seoDescription'  => $settings['home_seo_description']  ?? $defaults['home_seo_description'],
+        'seoOgImage'      => $settings['home_seo_og_image']     ?? $defaults['home_seo_og_image'],
+        'heroHeadline'    => $settings['home_hero_headline']    ?? $defaults['home_hero_headline'],
+        'heroSubheadline' => $settings['home_hero_subheadline'] ?? $defaults['home_hero_subheadline'],
+        'formButtonText'  => $settings['home_form_button_text'] ?? $defaults['home_form_button_text'],
+        'formMicrocopy'   => $settings['home_form_microcopy']   ?? $defaults['home_form_microcopy'],
+        'featuresTitle'   => $settings['home_features_title']   ?? $defaults['home_features_title'],
+        'trustText'       => $settings['home_trust_text']       ?? $defaults['home_trust_text'],
     ],
 ];
 

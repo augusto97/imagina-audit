@@ -68,4 +68,23 @@ return [
     // Retención de informes de auditoría (resultados guardados en `audits`)
     'audits_retention_enabled' => false,   // Master switch del borrado automático
     'audits_retention_months' => 6,        // Informes > N meses se borran (excepto los pinned)
+
+    // Branding — color principal y assets subibles
+    'brand_primary_color' => '#3B82F6',
+    'logo_url' => '',                      // Imagen del logo (subida por el admin)
+    'logo_collapsed_url' => '',            // Logo reducido / marca para sidebar colapsado
+    'favicon_url' => '',                   // Favicon público
+
+    // SEO del home público
+    'home_seo_title' => 'Auditoría WordPress gratuita · Imagina Audit',
+    'home_seo_description' => 'Analiza tu sitio WordPress en 30 segundos. Seguridad, rendimiento, SEO y más. Recibe un informe gratuito con recomendaciones.',
+    'home_seo_og_image' => '',
+
+    // Textos editables del home público
+    'home_hero_headline' => 'Auditoría Gratuita de tu WordPress',
+    'home_hero_subheadline' => 'Descubre en 30 segundos qué tan seguro, rápido y optimizado está tu sitio web',
+    'home_form_button_text' => 'Auditar Mi Sitio Gratis',
+    'home_form_microcopy' => 'Sin instalar nada · 100% externo · Resultados en 30 seg',
+    'home_features_title' => 'Analizamos 8 áreas clave de tu sitio',
+    'home_trust_text' => 'Con la experiencia de 15 años de maestría exclusiva en WordPress',
 ];

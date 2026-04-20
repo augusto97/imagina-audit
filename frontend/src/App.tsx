@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { Loader2 } from 'lucide-react'
@@ -6,10 +6,17 @@ import HomePage from './pages/HomePage'
 import ResultsPage from './pages/ResultsPage'
 import ComparePage from './pages/ComparePage'
 import NotFoundPage from './pages/NotFoundPage'
+import { useConfigStore } from './store/configStore'
 
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 
 function App() {
+  const reloadConfig = useConfigStore((s) => s.reload)
+
+  // Carga inicial del config público (color, logos, textos del home, SEO).
+  // Al mismo tiempo aplica el color primario al CSS y el favicon al DOM.
+  useEffect(() => { reloadConfig() }, [reloadConfig])
+
   return (
     <>
       <Routes>

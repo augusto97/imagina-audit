@@ -33,7 +33,7 @@ if (!class_exists('Database')) {
 // el check de /api/diag.php detectará el problema y lo reportará.
 (function () {
     $base = dirname(__DIR__);
-    foreach (['cache', 'logs', 'database'] as $dir) {
+    foreach (['cache', 'logs', 'database', 'uploads'] as $dir) {
         $path = "$base/$dir";
         if (!is_dir($path)) {
             @mkdir($path, 0755, true);

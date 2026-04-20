@@ -109,10 +109,27 @@ export function useAdmin() {
     } catch (err) { handleError(err) }
   }, [handleError])
 
+  /**
+   * Sube un asset de branding (logo, logo_collapsed, favicon).
+   * Retorna la URL pública relativa donde quedó guardado.
+   */
+  const uploadBrandAsset = useCallback(async (type: 'logo' | 'logo_collapsed' | 'favicon', file: File) => {
+    try {
+      const form = new FormData()
+      form.append('type', type)
+      form.append('file', file)
+      const res = await api.post('/admin/upload.php', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return res.data.data as { url: string; type: string; filename: string }
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
   return {
     fetchDashboard, fetchLeads, fetchLeadDetail, deleteLead,
     fetchSettings, updateSettings, fetchQueueStatus,
     pinAudit, fetchRetentionPreview,
     fetchVulnerabilities, createVulnerability, updateVulnerability, deleteVulnerability,
+    uploadBrandAsset,
   }
 }
