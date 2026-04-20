@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Eye, MessageCircle, Trash2, Copy, ChevronLeft, ChevronRight, SearchX, Download, FileText, BarChart3 } from 'lucide-react'
+import { Search, Eye, MessageCircle, Trash2, Copy, ChevronLeft, ChevronRight, SearchX, Download, FileText, BarChart3, Pin, PinOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,7 @@ interface Lead {
   id: string; url: string; domain: string; leadName: string | null
   leadEmail: string | null; leadWhatsapp: string | null; globalScore: number
   globalLevel: string; createdAt: string; hasContactInfo: boolean
+  isPinned: boolean
 }
 
 function ScorePill({ score, level }: { score: number; level: string }) {
@@ -34,7 +35,7 @@ function ScorePill({ score, level }: { score: number; level: string }) {
 
 export default function LeadsTable() {
   const navigate = useNavigate()
-  const { fetchLeads, deleteLead } = useAdmin()
+  const { fetchLeads, deleteLead, pinAudit } = useAdmin()
   const [leads, setLeads] = useState<Lead[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
@@ -70,7 +71,23 @@ export default function LeadsTable() {
       toast.success('Auditoría eliminada')
       setDeleteId(null)
       loadLeads()
-    } catch { toast.error('Error al eliminar') }
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: { error?: string } } }
+      if (axiosErr.response?.status === 409) {
+        toast.error(axiosErr.response.data?.error || 'Informe protegido. Desprotégelo antes de eliminar.')
+      } else {
+        toast.error('Error al eliminar')
+      }
+      setDeleteId(null)
+    }
+  }
+
+  const handleTogglePin = async (id: string, currentlyPinned: boolean) => {
+    try {
+      await pinAudit(id, !currentlyPinned)
+      toast.success(currentlyPinned ? 'Protección retirada' : 'Informe protegido')
+      loadLeads()
+    } catch { toast.error('Error al cambiar protección') }
   }
 
   const copyEmail = (email: string) => {
@@ -166,7 +183,17 @@ export default function LeadsTable() {
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">
-                      <a href={l.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{l.domain}</a>
+                      <div className="flex items-center gap-1.5">
+                        <a href={l.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{l.domain}</a>
+                        {l.isPinned && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Pin className="h-3.5 w-3.5 text-amber-500 fill-amber-500 shrink-0" strokeWidth={2} />
+                            </TooltipTrigger>
+                            <TooltipContent>Protegido del borrado automático</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-[var(--text-secondary)] hidden md:table-cell">{l.leadName || '—'}</TableCell>
                     <TableCell className="hidden lg:table-cell">
@@ -218,6 +245,22 @@ export default function LeadsTable() {
                             <TooltipContent>WhatsApp</TooltipContent>
                           </Tooltip>
                         )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost" size="icon"
+                              className={`h-8 w-8 ${l.isPinned ? 'text-amber-500 hover:text-amber-600' : 'text-[var(--text-tertiary)] hover:text-amber-500'}`}
+                              onClick={() => handleTogglePin(l.id, l.isPinned)}
+                            >
+                              {l.isPinned
+                                ? <PinOff className="h-4 w-4" strokeWidth={1.5} />
+                                : <Pin className="h-4 w-4" strokeWidth={1.5} />}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {l.isPinned ? 'Quitar protección' : 'Proteger del borrado automático'}
+                          </TooltipContent>
+                        </Tooltip>
                         {deleteId === l.id ? (
                           <div className="flex gap-1">
                             <Button variant="destructive" size="sm" className="h-8 text-xs" onClick={() => handleDelete(l.id)}>Confirmar</Button>
@@ -226,9 +269,18 @@ export default function LeadsTable() {
                         ) : (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-600" onClick={() => setDeleteId(l.id)}><Trash2 className="h-4 w-4" strokeWidth={1.5} /></Button>
+                              <Button
+                                variant="ghost" size="icon"
+                                className="h-8 w-8 text-red-400 hover:text-red-600 disabled:opacity-30"
+                                disabled={l.isPinned}
+                                onClick={() => setDeleteId(l.id)}
+                              >
+                                <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                              </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Eliminar</TooltipContent>
+                            <TooltipContent>
+                              {l.isPinned ? 'Desprotege primero' : 'Eliminar'}
+                            </TooltipContent>
                           </Tooltip>
                         )}
                       </div>

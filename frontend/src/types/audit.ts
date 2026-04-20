@@ -136,3 +136,26 @@ export interface AuditRequest {
 
 /** Estado de la auditoría en curso */
 export type AuditStatus = 'idle' | 'scanning' | 'completed' | 'error'
+
+/**
+ * Progreso reportado por el backend durante un audit en background.
+ * Se lee vía GET /api/scan-progress?id=X con polling cada 1.5s.
+ */
+export interface AuditProgress {
+  status: 'queued' | 'running' | 'completed' | 'failed'
+  currentStep: string
+  /** Texto legible: "Analizando seguridad..." */
+  currentLabel: string
+  completedSteps: number
+  totalSteps: number
+  progress: number
+  startedAt: number
+  /** Solo si status=queued: posición 1-indexed en la cola */
+  position?: number
+  /** Solo si status=queued: total de audits esperando turno */
+  totalInQueue?: number
+  /** Presente cuando status=completed */
+  auditId?: string
+  /** Presente cuando status=failed */
+  error?: string
+}

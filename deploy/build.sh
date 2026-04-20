@@ -13,7 +13,9 @@ echo ""
 # 1. Compilar frontend
 echo "[1/3] Compilando frontend..."
 cd "$PROJECT_DIR/frontend"
-npm install --production=false
+# --legacy-peer-deps: openapi-typescript pide TS 5.x pero usamos TS 6.x.
+# El mismatch de peer es inofensivo en dev — solo afecta a la instalación.
+npm install --legacy-peer-deps
 npm run build
 echo "[OK] Frontend compilado en frontend/dist/"
 
@@ -35,6 +37,11 @@ cp -r "$PROJECT_DIR/backend/analyzers" "$DEPLOY_DIR/analyzers"
 cp -r "$PROJECT_DIR/backend/config" "$DEPLOY_DIR/config"
 cp -r "$PROJECT_DIR/backend/data" "$DEPLOY_DIR/data"
 cp -r "$PROJECT_DIR/backend/database" "$DEPLOY_DIR/database"
+# NUNCA incluir archivos .db en el artefacto — al subir por FTP sobrescribirían
+# la DB real del servidor. Solo el schema se distribuye, el .db se crea al arrancar.
+find "$DEPLOY_DIR/database" -name "*.db" -delete 2>/dev/null || true
+find "$DEPLOY_DIR/database" -name "*.db-wal" -delete 2>/dev/null || true
+find "$DEPLOY_DIR/database" -name "*.db-shm" -delete 2>/dev/null || true
 cp -r "$PROJECT_DIR/backend/cron" "$DEPLOY_DIR/cron"
 mkdir -p "$DEPLOY_DIR/cache"
 mkdir -p "$DEPLOY_DIR/logs"
@@ -61,24 +68,51 @@ echo "[OK] Archivos copiados a deploy/output/"
 
 # 3. Crear .htaccess para React Router
 cat > "$DEPLOY_DIR/.htaccess" << 'EOF'
+# ═══════════════════════════════════════════════════════════════════
+# Imagina Audit — .htaccess raíz (Apache 2.4+, requiere mod_rewrite)
+# Si la app vive bajo /audit/ en lugar de la raíz, ajusta RewriteBase.
+# ═══════════════════════════════════════════════════════════════════
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  # IMPORTANTE: Si la app vive en /audit/, cambiar a: RewriteBase /audit/
   RewriteBase /
+  # Si el sitio vive en subcarpeta: RewriteBase /audit/
 
-  # No tocar archivos reales ni carpetas que existen en disco
+  # IMPORTANTE: NO tocar /api/* — ese tiene su propio .htaccess que
+  # rutea al backend PHP. Sin esta exclusión, el fallback SPA secuestra
+  # todas las requests al backend.
+  RewriteCond %{REQUEST_URI} ^/api/
+  RewriteRule ^ - [L]
+
+  # Dejar pasar archivos reales (assets compilados, widget, etc.)
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
 
-  # Redirigir todo lo demás a index.html (React Router)
+  # Todo lo demás → SPA (React Router)
   RewriteRule ^(.*)$ index.html [L]
 </IfModule>
 
-# Bloquear acceso a archivos sensibles
+# Cache largo para assets compilados (tienen hash en el nombre)
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+# Bloquear acceso directo a archivos sensibles
 <FilesMatch "\.(env|db|sqlite|log|sql)$">
-    Order Allow,Deny
-    Deny from all
+    Require all denied
 </FilesMatch>
+
+# Bloquear archivos de versionado si quedaron copiados
+<FilesMatch "^\.(git|htaccess-bak|env.*)$">
+    Require all denied
+</FilesMatch>
+
+# Deshabilitar listado de directorios
+Options -Indexes
 EOF
 
 echo "[3/3] .htaccess creado"

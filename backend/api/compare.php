@@ -66,7 +66,7 @@ function getOrRunAudit(string $url): array {
     );
 
     if ($cached) {
-        return json_decode($cached['result_json'], true);
+        return JsonStore::decode($cached['result_json']) ?? [];
     }
 
     // Ejecutar auditoría nueva
@@ -81,7 +81,7 @@ function getOrRunAudit(string $url): array {
             $result['id'], $result['url'], $result['domain'],
             $result['globalScore'], $result['globalLevel'],
             $result['isWordPress'] ? 1 : 0, $result['scanDurationMs'],
-            json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $ip,
+            JsonStore::encode($result), $ip,
         ]
     );
 

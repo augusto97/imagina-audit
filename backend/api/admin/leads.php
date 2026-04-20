@@ -10,6 +10,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     if (empty($id)) {
         Response::error('El parámetro id es obligatorio.');
     }
+
+    // Bloquear borrado manual de informes protegidos — el admin debe
+    // desprotegerlos primero, evitando accidentes.
+    $row = $db->queryOne("SELECT is_pinned FROM audits WHERE id = ?", [$id]);
+    if ($row && (int) $row['is_pinned'] === 1) {
+        Response::error('Este informe está protegido. Desprotégelo antes de eliminarlo.', 409);
+    }
+
     $db->execute("DELETE FROM audits WHERE id = ?", [$id]);
     Response::success();
 }
@@ -67,7 +75,7 @@ try {
     $totalPages = (int) ceil($total / $limit);
 
     $rows = $db->query(
-        "SELECT id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, created_at FROM audits WHERE $where ORDER BY $orderBy LIMIT ? OFFSET ?",
+        "SELECT id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_pinned, created_at FROM audits WHERE $where ORDER BY $orderBy LIMIT ? OFFSET ?",
         array_merge($params, [$limit, $offset])
     );
 
@@ -84,6 +92,7 @@ try {
             'globalLevel' => $row['global_level'],
             'createdAt' => $row['created_at'],
             'hasContactInfo' => !empty($row['lead_email']) || !empty($row['lead_whatsapp']),
+            'isPinned' => (bool) (int) ($row['is_pinned'] ?? 0),
         ];
     }, $rows);
 

@@ -26,9 +26,15 @@ class PerformanceAnalyzer {
     public function analyze(): array {
         $metrics = [];
 
-        // Consultar PageSpeed API (mobile y desktop)
-        $mobileResult = $this->queryPageSpeed('mobile');
-        $desktopResult = $this->queryPageSpeed('desktop');
+        // PageSpeed mobile y desktop en paralelo (antes era secuencial: 16-30s → 8-15s)
+        $apiKey = $this->resolveApiKey();
+        $urls = [
+            'mobile' => $this->buildPageSpeedUrl('mobile', $apiKey),
+            'desktop' => $this->buildPageSpeedUrl('desktop', $apiKey),
+        ];
+        $responses = Fetcher::multiGet($urls, 30);
+        $mobileResult = $this->parsePageSpeedResponse($responses['mobile'] ?? [], 'mobile');
+        $desktopResult = $this->parsePageSpeedResponse($responses['desktop'] ?? [], 'desktop');
 
         // Score PageSpeed Mobile
         $this->mobileScore = $mobileResult['score'] ?? null;
@@ -266,9 +272,44 @@ class PerformanceAnalyzer {
     }
 
     /**
-     * Consulta la API de Google PageSpeed Insights
+     * Resuelve la API key de Google PageSpeed (env primero, luego DB)
      */
-    private function queryPageSpeed(string $strategy): array {
+    private function resolveApiKey(): string {
+        $apiKey = env('GOOGLE_PAGESPEED_API_KEY', '');
+        if (!empty($apiKey)) return $apiKey;
+
+        try {
+            $db = Database::getInstance();
+            $row = $db->queryOne("SELECT value FROM settings WHERE key = 'google_pagespeed_api_key'");
+            if ($row && !empty($row['value'])) {
+                return $row['value'];
+            }
+        } catch (Throwable $e) {
+            // Continuar sin key
+        }
+        return '';
+    }
+
+    /**
+     * Construye la URL del endpoint de PageSpeed Insights para una estrategia.
+     */
+    private function buildPageSpeedUrl(string $strategy, string $apiKey = ''): string {
+        $params = [
+            'url' => $this->url,
+            'category' => 'performance',
+            'strategy' => $strategy,
+            'locale' => 'es',
+        ];
+        if (!empty($apiKey)) {
+            $params['key'] = $apiKey;
+        }
+        return 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?' . http_build_query($params);
+    }
+
+    /**
+     * Parsea la respuesta cruda de PageSpeed en el formato interno.
+     */
+    private function parsePageSpeedResponse(array $response, string $strategy): array {
         $result = [
             'score' => null,
             'fcp' => null,
@@ -280,43 +321,15 @@ class PerformanceAnalyzer {
             'ttfb' => null,
         ];
 
-        $apiKey = env('GOOGLE_PAGESPEED_API_KEY', '');
-
-        // Si no hay key en .env, intentar obtenerla de la tabla settings
-        if (empty($apiKey)) {
-            try {
-                $db = Database::getInstance();
-                $row = $db->queryOne("SELECT value FROM settings WHERE key = 'google_pagespeed_api_key'");
-                if ($row && !empty($row['value'])) {
-                    $apiKey = $row['value'];
-                }
-            } catch (Throwable $e) {
-                // Continuar sin key
-            }
-        }
-
-        $params = [
-            'url' => $this->url,
-            'category' => 'performance',
-            'strategy' => $strategy,
-            'locale' => 'es',
-        ];
-        if (!empty($apiKey)) {
-            $params['key'] = $apiKey;
-        }
-
-        $apiUrl = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?' . http_build_query($params);
-        $response = Fetcher::get($apiUrl, 30, true, 1);
-
-        if ($response['statusCode'] !== 200) {
+        if (empty($response) || ($response['statusCode'] ?? 0) !== 200) {
             Logger::warning("PageSpeed API ($strategy) falló", [
-                'status' => $response['statusCode'],
+                'status' => $response['statusCode'] ?? 0,
                 'url' => $this->url,
             ]);
             return $result;
         }
 
-        $data = json_decode($response['body'], true);
+        $data = json_decode($response['body'] ?? '', true);
         if ($data === null) {
             return $result;
         }

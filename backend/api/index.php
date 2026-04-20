@@ -62,12 +62,24 @@ switch ($endpoint) {
         require __DIR__ . '/audit-status.php';
         break;
 
+    case 'scan-progress':
+        require __DIR__ . '/scan-progress.php';
+        break;
+
     case 'config':
         require __DIR__ . '/config.php';
         break;
 
     case 'health':
         require __DIR__ . '/health.php';
+        break;
+
+    case 'diag':
+        require __DIR__ . '/diag.php';
+        break;
+
+    case 'setup':
+        require __DIR__ . '/setup.php';
         break;
 
     case 'admin/login':
@@ -112,6 +124,18 @@ switch ($endpoint) {
 
     case 'admin/snapshot':
         require __DIR__ . '/admin/snapshot.php';
+        break;
+
+    case 'admin/queue-status':
+        require __DIR__ . '/admin/queue-status.php';
+        break;
+
+    case 'admin/pin-audit':
+        require __DIR__ . '/admin/pin-audit.php';
+        break;
+
+    case 'admin/retention-preview':
+        require __DIR__ . '/admin/retention-preview.php';
         break;
 
     default:

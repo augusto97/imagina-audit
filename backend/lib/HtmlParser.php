@@ -260,22 +260,66 @@ class HtmlParser {
     }
 
     /**
-     * Obtiene el texto visible del body (sin scripts ni estilos)
+     * Obtiene el texto visible del body (sin scripts ni estilos).
+     *
+     * IMPORTANTE: usa DOM walking en vez de regex con `.*?` + flag DOTALL.
+     * La implementación regex anterior causaba catastrophic backtracking en
+     * HTMLs grandes con muchos scripts inline (típico en WordPress moderno),
+     * llegando a colgarse indefinidamente. Síntoma observado: audit se queda
+     * "Verificando SEO" sin avanzar nunca.
+     *
+     * El walker es O(n) sobre los nodos del DOM, sin regex en HTML.
      */
     public function getTextContent(): string {
-        // Remover scripts y estilos del HTML crudo
-        $html = preg_replace('#<script[^>]*>.*?</script>#si', '', $this->rawHtml);
-        $html = preg_replace('#<style[^>]*>.*?</style>#si', '', $html);
-        $html = preg_replace('#<noscript[^>]*>.*?</noscript>#si', '', $html);
+        if ($this->dom === null) return '';
 
-        // Remover tags y decodificar entidades
-        $text = strip_tags($html);
+        $bodyNodes = $this->dom->getElementsByTagName('body');
+        $root = $bodyNodes->length > 0 ? $bodyNodes->item(0) : $this->dom->documentElement;
+        if ($root === null) return '';
+
+        $text = $this->extractVisibleText($root);
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-        // Limpiar espacios múltiples
-        $text = preg_replace('/\s+/', ' ', $text);
+        // Normalizar whitespace — regex simple y segura (sin DOTALL, sin backtracking)
+        $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
 
         return trim($text);
+    }
+
+    /**
+     * Walker recursivo del DOM. Ignora scripts, estilos y noscript.
+     * Usa una pila explícita para evitar stack overflow en DOMs profundos.
+     */
+    private function extractVisibleText(\DOMNode $root): string {
+        $excluded = ['script' => true, 'style' => true, 'noscript' => true, 'template' => true];
+        $out = '';
+        $stack = [$root];
+
+        while (!empty($stack)) {
+            $node = array_pop($stack);
+            if ($node === null) continue;
+
+            if ($node->nodeType === XML_TEXT_NODE) {
+                $out .= ' ' . $node->textContent;
+                continue;
+            }
+
+            if ($node->nodeType === XML_ELEMENT_NODE) {
+                if (isset($excluded[strtolower($node->nodeName)])) {
+                    continue;
+                }
+            }
+
+            // Empujar hijos en reverso para procesarlos en orden natural al pop()
+            if ($node->hasChildNodes()) {
+                $children = [];
+                foreach ($node->childNodes as $child) $children[] = $child;
+                for ($i = count($children) - 1; $i >= 0; $i--) {
+                    $stack[] = $children[$i];
+                }
+            }
+        }
+
+        return $out;
     }
 
     /**

@@ -19,7 +19,7 @@ if (!$row) {
     Response::error('Auditoría no encontrada', 404);
 }
 
-$data = $row['waterfall_json'] ? json_decode($row['waterfall_json'], true) : [];
+$data = $row['waterfall_json'] ? (JsonStore::decode($row['waterfall_json']) ?? []) : [];
 
 // Handle old format (array of requests) vs new format (object with waterfall + crux + etc)
 if (isset($data['waterfall'])) {

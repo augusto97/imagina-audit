@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AuditResult, AuditStatus, AuditRequest } from '@/types/audit'
+import type { AuditResult, AuditStatus, AuditRequest, AuditProgress } from '@/types/audit'
 import { DEFAULT_CONFIG } from '@/lib/constants'
 
 interface AuditState {
@@ -11,11 +11,13 @@ interface AuditState {
   result: AuditResult | null
   /** Mensaje de error si falló */
   error: string | null
+  /** Progreso real reportado por el backend durante el scan */
+  progress: AuditProgress | null
   /** Configuración del backend (branding, textos) */
   config: typeof DEFAULT_CONFIG
 
-  // Acciones
   setScanning: (request: AuditRequest) => void
+  setProgress: (progress: AuditProgress) => void
   setResult: (result: AuditResult) => void
   setError: (error: string) => void
   reset: () => void
@@ -27,6 +29,7 @@ export const useAuditStore = create<AuditState>((set) => ({
   request: null,
   result: null,
   error: null,
+  progress: null,
   config: DEFAULT_CONFIG,
 
   setScanning: (request) => set({
@@ -34,7 +37,10 @@ export const useAuditStore = create<AuditState>((set) => ({
     request,
     result: null,
     error: null,
+    progress: null,
   }),
+
+  setProgress: (progress) => set({ progress }),
 
   setResult: (result) => set({
     status: 'completed',
@@ -52,6 +58,7 @@ export const useAuditStore = create<AuditState>((set) => ({
     request: null,
     result: null,
     error: null,
+    progress: null,
   }),
 
   setConfig: (config) => set({ config }),
