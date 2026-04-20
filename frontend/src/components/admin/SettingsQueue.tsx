@@ -22,6 +22,15 @@ interface QueueStatus {
     phpMemoryLimitMb: number
     phpVersion: string
     recommendedConcurrency: number | null
+    diagnostics: {
+      openBasedir: string
+      disableFunctions: string
+      procMeminfo: 'ok' | 'not_found' | 'not_readable' | 'blocked_by_open_basedir'
+      cgroupV2: string
+      cgroupV1: string
+      shellExec: 'ok' | 'missing_function' | 'disabled'
+      hint: string
+    }
   }
   recommendationTable: Array<{ minMb: number; maxMb: number; concurrency: number; label: string }>
 }
@@ -209,26 +218,46 @@ export default function SettingsQueue() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-[var(--border-default)] p-3 bg-[var(--bg-secondary)]">
-            <Label className="text-sm">Forzar RAM total (MB)</Label>
-            <div className="flex items-center gap-2 mt-1">
-              <Input
-                type="number" min={256} max={131072} step={256}
-                value={manualRamMb}
-                onChange={(e) => setManualRamMb(e.target.value)}
-                placeholder="ej. 1536 para 1.5 GB"
-                className="w-48"
-              />
-              {manualRamMb && (
-                <Button variant="ghost" size="sm" onClick={() => setManualRamMb('')}>Limpiar</Button>
-              )}
+          {detectionSource === 'none' && status?.system.diagnostics && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-amber-900">No se pudo detectar la RAM automáticamente</p>
+                  <p className="text-amber-900">{status.system.diagnostics.hint}</p>
+                </div>
+              </div>
+              <details className="text-xs text-amber-900/80 pl-6">
+                <summary className="cursor-pointer font-medium">Diagnóstico técnico</summary>
+                <dl className="mt-1 space-y-0.5 font-mono">
+                  <div>/proc/meminfo: <b>{status.system.diagnostics.procMeminfo}</b></div>
+                  <div>cgroup v2: <b>{status.system.diagnostics.cgroupV2}</b></div>
+                  <div>cgroup v1: <b>{status.system.diagnostics.cgroupV1}</b></div>
+                  <div>shell_exec: <b>{status.system.diagnostics.shellExec}</b></div>
+                  {status.system.diagnostics.openBasedir && (
+                    <div className="break-all">open_basedir: <b>{status.system.diagnostics.openBasedir}</b></div>
+                  )}
+                </dl>
+              </details>
+              <details className="text-xs pl-6">
+                <summary className="cursor-pointer font-medium text-amber-900/80">
+                  Fallback: ingresar manualmente la RAM
+                </summary>
+                <div className="flex items-center gap-2 mt-2">
+                  <Input
+                    type="number" min={256} max={131072} step={256}
+                    value={manualRamMb}
+                    onChange={(e) => setManualRamMb(e.target.value)}
+                    placeholder="ej. 1536 para 1.5 GB"
+                    className="w-48 h-8"
+                  />
+                  {manualRamMb && (
+                    <Button variant="ghost" size="sm" onClick={() => setManualRamMb('')}>Limpiar</Button>
+                  )}
+                </div>
+              </details>
             </div>
-            <p className="text-xs text-[var(--text-tertiary)] mt-1">
-              {detectionSource === 'none'
-                ? 'Tu hosting restringe la lectura de /proc/meminfo. Ingresa la RAM total (en MB) de tu plan de hosting — normalmente aparece en la confirmación del proveedor (ServerAvatar, cPanel, etc.).'
-                : 'Sobrescribe la RAM detectada automáticamente. Útil si el valor detectado no coincide con el plan contratado.'}
-            </p>
-          </div>
+          )}
 
           {recommended !== null && recommended !== undefined && (
             <div className={`rounded-lg border p-3 text-sm ${isAtRecommended ? 'bg-emerald-50 border-emerald-200' : isOverRecommended ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'}`}>

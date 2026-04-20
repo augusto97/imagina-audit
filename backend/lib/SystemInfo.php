@@ -213,7 +213,75 @@ class SystemInfo {
             'phpMemoryLimitMb' => (int) round(self::parseIniBytes(ini_get('memory_limit') ?: '128M') / 1048576),
             'phpVersion' => PHP_VERSION,
             'recommendedConcurrency' => $total !== null ? self::recommendedConcurrency($total) : null,
+            'diagnostics' => self::diagnoseDetection(),
         ];
+    }
+
+    /**
+     * Diagnóstico del porqué cada método de detección falló.
+     * Usado por la UI admin para darle al usuario instrucciones específicas
+     * (por ej. en ServerAvatar suele ser open_basedir bloqueando /proc).
+     */
+    public static function diagnoseDetection(): array {
+        $diag = [
+            'openBasedir'       => (string) (ini_get('open_basedir') ?: ''),
+            'disableFunctions'  => (string) (ini_get('disable_functions') ?: ''),
+            'procMeminfo'       => self::probeFileReason('/proc/meminfo'),
+            'cgroupV2'          => self::probeFileReason('/sys/fs/cgroup/memory.max'),
+            'cgroupV1'          => self::probeFileReason('/sys/fs/cgroup/memory/memory.limit_in_bytes'),
+            'shellExec'         => self::probeShellExecReason(),
+        ];
+
+        // Causa más probable (el primer bloqueo detectado)
+        $hint = null;
+        $openBd = $diag['openBasedir'];
+        if ($openBd !== '' && $diag['procMeminfo'] === 'blocked_by_open_basedir') {
+            $hint = 'open_basedir en PHP impide leer /proc/meminfo. '
+                  . 'En ServerAvatar: Sites → (tu sitio) → PHP Settings → PHP Directives → '
+                  . 'agregar ":/proc/" al final de open_basedir, o desactivar open_basedir. '
+                  . 'Como alternativa, ingresa la RAM manualmente en el input de abajo.';
+        } elseif ($openBd === '' && $diag['procMeminfo'] === 'not_readable') {
+            $hint = '/proc/meminfo no es legible desde el usuario PHP. Puede ser un kernel '
+                  . 'con /proc ocultado o restricción del hosting. Ingresa la RAM manualmente.';
+        } elseif ($diag['shellExec'] === 'disabled') {
+            $hint = 'shell_exec está deshabilitado (normal en shared hosting) y /proc tampoco '
+                  . 'es accesible. Usa el input manual.';
+        } else {
+            $hint = 'No fue posible detectar la RAM automáticamente desde PHP. '
+                  . 'Ingresa la RAM total de tu plan de hosting en el input manual.';
+        }
+        $diag['hint'] = $hint;
+        return $diag;
+    }
+
+    /**
+     * Clasifica por qué un path no es legible (open_basedir vs permisos
+     * vs archivo ausente). Útil para el diagnóstico.
+     */
+    private static function probeFileReason(string $path): string {
+        $openBd = (string) (ini_get('open_basedir') ?: '');
+        if ($openBd !== '') {
+            // ¿El path está dentro de alguna ruta permitida?
+            $allowed = false;
+            foreach (explode(PATH_SEPARATOR, $openBd) as $prefix) {
+                $prefix = rtrim(trim($prefix), '/');
+                if ($prefix === '') continue;
+                if (str_starts_with($path, $prefix . '/') || $path === $prefix) {
+                    $allowed = true; break;
+                }
+            }
+            if (!$allowed) return 'blocked_by_open_basedir';
+        }
+        if (!@file_exists($path)) return 'not_found';
+        if (!@is_readable($path)) return 'not_readable';
+        return 'ok';
+    }
+
+    private static function probeShellExecReason(): string {
+        if (!function_exists('shell_exec')) return 'missing_function';
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+        if (in_array('shell_exec', $disabled, true)) return 'disabled';
+        return 'ok';
     }
 
     /**
