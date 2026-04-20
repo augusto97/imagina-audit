@@ -55,16 +55,15 @@ export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSid
       </div>
 
       {/* Nav */}
-      <nav className={cn("flex-1 overflow-y-auto py-2", collapsed ? "px-1.5" : "px-2")}>
-        {navSections.map((section) => (
-          <div key={section.title} className="mb-2">
+      <nav className={cn("flex-1 overflow-y-auto", collapsed ? "px-1.5 py-3" : "px-2 py-2")}>
+        {navSections.map((section, sectionIdx) => (
+          <div key={section.title} className={collapsed ? (sectionIdx > 0 ? "mt-3" : "") : "mb-2"}>
             {!collapsed && (
               <p className="mb-0.5 px-2 pt-2 text-[11px] font-medium text-[#999] uppercase tracking-wide">
                 {section.title}
               </p>
             )}
-            {collapsed && <div className="my-1 mx-1 border-t border-[#e5e5e5]" />}
-            <div className="space-y-px">
+            <div className={collapsed ? "space-y-0.5" : "space-y-px"}>
               {section.items.map(({ to, icon: Icon, label }) => {
                 const link = (
                   <NavLink
@@ -74,14 +73,14 @@ export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSid
                     className={({ isActive }) =>
                       cn(
                         'group flex items-center rounded text-[13px] transition-colors',
-                        collapsed ? 'justify-center p-2' : 'gap-2 px-2 py-1.5',
+                        collapsed ? 'justify-center h-9 w-9 mx-auto' : 'gap-2 px-2 py-1.5',
                         isActive
                           ? 'bg-[#e8e8e8] text-[#111] font-medium'
                           : 'text-[#555] hover:bg-[#ebebeb] hover:text-[#111]'
                       )
                     }
                   >
-                    <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                    <Icon className={cn("shrink-0", collapsed ? "h-[18px] w-[18px]" : "h-4 w-4")} strokeWidth={1.5} />
                     {!collapsed && label}
                   </NavLink>
                 )
