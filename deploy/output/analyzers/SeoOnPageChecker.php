@@ -557,11 +557,44 @@ class SeoOnPageChecker {
     }
 
     public function checkKeywordDensity(): array {
-        $text = $this->extractVisibleText();
-        $words = preg_split('/\s+/', mb_strtolower($text));
-        $words = array_filter($words, fn($w) => mb_strlen($w) > 3);
-        $totalWords = count($words);
+        // LÍMITES DE MEMORIA: en sitios grandes (blogs, e-commerce, páginas
+        // muy extensas) el texto visible puede pasar 500KB. Procesar todo
+        // con array_count_values + bigrams + arsort se come 150-250 MB y
+        // mata el proceso PHP por OOM silenciosamente (sin log de error).
+        // Por eso capamos agresivamente — análisis de keywords con 8000
+        // palabras es igual de representativo que con 50000.
+        $MAX_TEXT_CHARS = 80_000;   // ~12k palabras típicas
+        $MAX_WORDS = 8_000;
+        $MAX_BIGRAM_KEYS = 15_000;
 
+        $stopwords = [
+            'para', 'como', 'este', 'esta', 'pero', 'más', 'todo', 'todos',
+            'tiene', 'puede', 'hace', 'cada', 'entre', 'desde', 'hasta',
+            'sobre', 'también', 'cuando', 'donde', 'the', 'and', 'for',
+            'that', 'with', 'are', 'from', 'your', 'this', 'have', 'will',
+            'been', 'more', 'which', 'their', 'they', 'what', 'than',
+            'other', 'into', 'could', 'would', 'make', 'like', 'just', 'some',
+        ];
+        $stopwordSet = array_flip($stopwords);
+
+        $text = $this->extractVisibleText();
+        if (mb_strlen($text) > $MAX_TEXT_CHARS) {
+            $text = mb_substr($text, 0, $MAX_TEXT_CHARS);
+        }
+
+        // Tokenizar en lower-case y filtrar (cortos + stopwords) de una pasada
+        $allWords = preg_split('/\s+/', mb_strtolower($text)) ?: [];
+        $words = [];
+        $count = 0;
+        foreach ($allWords as $w) {
+            if ($count >= $MAX_WORDS) break;
+            if (mb_strlen($w) < 4) continue;
+            $words[] = $w;
+            $count++;
+        }
+        unset($allWords); // liberar memoria
+
+        $totalWords = count($words);
         if ($totalWords < 20) {
             return Scoring::createMetric(
                 'keyword_density', 'Análisis de palabras clave', 0, 'Contenido insuficiente', 30,
@@ -571,34 +604,33 @@ class SeoOnPageChecker {
             );
         }
 
-        $freq = array_count_values($words);
+        // Frecuencias — filtrar stopwords aquí para no acumular claves
+        $freq = [];
+        foreach ($words as $w) {
+            if (isset($stopwordSet[$w])) continue;
+            $freq[$w] = ($freq[$w] ?? 0) + 1;
+        }
         arsort($freq);
+        $topWords = array_slice($freq, 0, 10, true);
+        unset($freq);
 
+        // Bigrams — límite duro al tamaño del array para no explotar
         $bigrams = [];
-        for ($i = 0; $i < count($words) - 1; $i++) {
+        $len = $totalWords - 1;
+        for ($i = 0; $i < $len; $i++) {
+            if (count($bigrams) >= $MAX_BIGRAM_KEYS) break;
             $phrase = $words[$i] . ' ' . $words[$i + 1];
             $bigrams[$phrase] = ($bigrams[$phrase] ?? 0) + 1;
         }
+        // Solo conservar bigrams con count >= 2 y top 5
+        $bigrams = array_filter($bigrams, fn($c) => $c >= 2);
         arsort($bigrams);
-
-        $stopwords = ['para', 'como', 'este', 'esta', 'esta', 'pero', 'más', 'todo', 'todos', 'tiene', 'puede', 'hace', 'cada', 'entre', 'desde', 'hasta', 'sobre', 'también', 'cuando', 'donde', 'the', 'and', 'for', 'that', 'with', 'are', 'from', 'your', 'this', 'have', 'will', 'been', 'more', 'which', 'their', 'they', 'what', 'than', 'other', 'into', 'could', 'would', 'make', 'like', 'just', 'some'];
-        $topWords = [];
-        foreach ($freq as $word => $count) {
-            if (count($topWords) >= 10) break;
-            if (in_array($word, $stopwords) || mb_strlen($word) < 4) continue;
-            $topWords[$word] = $count;
-        }
-
-        $topPhrases = [];
-        foreach ($bigrams as $phrase => $count) {
-            if (count($topPhrases) >= 5) break;
-            if ($count < 2) continue;
-            $topPhrases[$phrase] = $count;
-        }
+        $topPhrases = array_slice($bigrams, 0, 5, true);
+        unset($bigrams, $words);
 
         $title = $this->parser->getTitle() ?? '';
         $h1s = array_filter($this->parser->getHeadings(), fn($h) => $h['level'] === 1);
-        $h1Text = !empty($h1s) ? mb_strtolower($h1s[0]['text'] ?? '') : '';
+        $h1Text = !empty($h1s) ? mb_strtolower(reset($h1s)['text'] ?? '') : '';
 
         $topKeyword = array_key_first($topWords);
         $inTitle = $topKeyword && str_contains(mb_strtolower($title), $topKeyword);
@@ -615,7 +647,7 @@ class SeoOnPageChecker {
         if (!empty($phraseList)) $desc .= ' Frases: ' . implode(', ', array_slice($phraseList, 0, 3)) . '.';
         if ($topKeyword) {
             $desc .= $inTitle ? " \"$topKeyword\" aparece en el título." : " \"$topKeyword\" NO aparece en el título.";
-            $desc .= $inH1 ? " Aparece en H1." : " NO aparece en H1.";
+            $desc .= $inH1 ? ' Aparece en H1.' : ' NO aparece en H1.';
         }
 
         return Scoring::createMetric(
