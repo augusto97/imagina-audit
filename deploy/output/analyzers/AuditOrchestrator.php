@@ -66,7 +66,7 @@ class AuditOrchestrator {
         $wpDetector = null;
         try {
             $wpDetector = new WordPressDetector($finalUrl, $html, $headers);
-            $wpResult = $wpDetector->analyze();
+            $wpResult = $this->timed('WordPressDetector', fn() => $wpDetector->analyze());
             $modules[] = $wpResult;
             $isWordPress = $wpDetector->isWordPress();
         } catch (Throwable $e) {
@@ -84,7 +84,7 @@ class AuditOrchestrator {
                 'wpVersion' => $wpDetector ? $wpDetector->getDetectedWpVersion() : null,
             ];
             $securityAnalyzer = new SecurityAnalyzer($finalUrl, $html, $headers, $wpData);
-            $modules[] = $securityAnalyzer->analyze();
+            $modules[] = $this->timed('SecurityAnalyzer', fn() => $securityAnalyzer->analyze());
         } catch (Throwable $e) {
             Logger::error('SecurityAnalyzer falló: ' . $e->getMessage());
             $modules[] = $this->createFailedModule('security', 'Seguridad', 'shield');
@@ -95,7 +95,7 @@ class AuditOrchestrator {
         $performanceAnalyzer = null;
         try {
             $performanceAnalyzer = new PerformanceAnalyzer($finalUrl, array_merge($headers, ['_html' => $html]), $fetchTime);
-            $modules[] = $performanceAnalyzer->analyze();
+            $modules[] = $this->timed('PerformanceAnalyzer', fn() => $performanceAnalyzer->analyze());
         } catch (Throwable $e) {
             Logger::error('PerformanceAnalyzer falló: ' . $e->getMessage());
             $modules[] = $this->createFailedModule('performance', 'Rendimiento', 'gauge');
@@ -105,7 +105,7 @@ class AuditOrchestrator {
         $this->reportProgress($auditId, 'seo', 4, $totalSteps, $startTime);
         try {
             $seoAnalyzer = new SeoAnalyzer($finalUrl, $html, $headers);
-            $modules[] = $seoAnalyzer->analyze();
+            $modules[] = $this->timed('SeoAnalyzer', fn() => $seoAnalyzer->analyze());
         } catch (Throwable $e) {
             Logger::error('SeoAnalyzer falló: ' . $e->getMessage());
             $modules[] = $this->createFailedModule('seo', 'SEO', 'search');
@@ -249,5 +249,23 @@ class AuditOrchestrator {
             'totalSteps' => $totalSteps,
             'startedAt' => (int) $startTime,
         ]);
+    }
+
+    /**
+     * Ejecuta un analyzer midiendo tiempo y loggeando el resultado.
+     * Imprescindible para diagnosticar cuellos de botella en producción.
+     */
+    private function timed(string $name, callable $fn): mixed {
+        $t0 = microtime(true);
+        try {
+            $result = $fn();
+            $elapsed = (microtime(true) - $t0) * 1000;
+            Logger::info("$name OK", ['elapsed_ms' => (int) $elapsed]);
+            return $result;
+        } catch (Throwable $e) {
+            $elapsed = (microtime(true) - $t0) * 1000;
+            Logger::error("$name FAIL: " . $e->getMessage(), ['elapsed_ms' => (int) $elapsed]);
+            throw $e;
+        }
     }
 }

@@ -313,7 +313,11 @@ class WordPressDetector {
     }
 
     /**
-     * Detecta plugins a partir de rutas en el HTML
+     * Detecta plugins a partir de rutas en el HTML.
+     *
+     * PARALELIZADO: antes hacía 15 plugins × 2 fetches secuenciales ≈ 30s.
+     * Ahora dispara las 15 peticiones a wp.org API en paralelo (~3-5s) y
+     * luego los 15 readme.txt también en paralelo. Total: ~8-10s.
      */
     private function detectPlugins(): array {
         $plugins = [];
@@ -323,13 +327,18 @@ class WordPressDetector {
             return $plugins;
         }
 
-        $slugs = array_unique($matches[1]);
-        $count = 0;
+        $slugs = array_slice(array_values(array_unique($matches[1])), 0, 15);
 
+        // 1. Batch 1: todas las wp.org API en paralelo
+        $apiUrls = [];
         foreach ($slugs as $slug) {
-            if ($count >= 15) break;
-            $count++;
+            $apiUrls[$slug] = 'https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&slug=' . urlencode($slug);
+        }
+        $apiResponses = Fetcher::multiGet($apiUrls, 5);
 
+        // Procesar respuestas y preparar batch 2
+        $readmeUrls = [];
+        foreach ($slugs as $slug) {
             $plugin = [
                 'slug' => $slug,
                 'name' => str_replace('-', ' ', ucfirst($slug)),
@@ -337,35 +346,33 @@ class WordPressDetector {
                 'latestVersion' => null,
                 'outdated' => false,
             ];
-
-            // Consultar API de WordPress.org (incluye versión latest)
-            $apiUrl = 'https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&slug=' . urlencode($slug);
-            $api = Fetcher::get($apiUrl, 5, true, 0);
-            if ($api['statusCode'] === 200) {
+            $api = $apiResponses[$slug] ?? null;
+            if ($api && $api['statusCode'] === 200) {
                 $data = json_decode($api['body'], true);
                 if ($data && isset($data['version'])) {
                     $plugin['name'] = $data['name'] ?? $plugin['name'];
                     $plugin['latestVersion'] = $data['version'];
+                    // Solo buscamos readme si la API nos dio una versión con la que comparar
+                    $readmeUrls[$slug] = $this->url . '/wp-content/plugins/' . $slug . '/readme.txt';
                 }
             }
+            $plugins[$slug] = $plugin;
+        }
 
-            // Solo buscar readme.txt si la API dio versión (para comparar)
-            if ($plugin['latestVersion']) {
-                $readmeUrl = $this->url . '/wp-content/plugins/' . $slug . '/readme.txt';
-                $readme = Fetcher::get($readmeUrl, 3, false, 0);
+        // 2. Batch 2: todos los readme.txt del sitio auditado en paralelo
+        if (!empty($readmeUrls)) {
+            $readmeResponses = Fetcher::multiGet($readmeUrls, 3);
+            foreach ($readmeResponses as $slug => $readme) {
                 if ($readme['statusCode'] === 200 && preg_match('/Stable tag:\s*([\d.]+)/i', $readme['body'], $m)) {
-                    $plugin['detectedVersion'] = $m[1];
-                    if (version_compare($m[1], $plugin['latestVersion'], '<')) {
-                        $plugin['outdated'] = true;
+                    $plugins[$slug]['detectedVersion'] = $m[1];
+                    if (version_compare($m[1], $plugins[$slug]['latestVersion'], '<')) {
+                        $plugins[$slug]['outdated'] = true;
                     }
                 }
             }
-
-            $plugins[] = $plugin;
-            usleep(100000); // 100ms entre plugins
         }
 
-        return $plugins;
+        return array_values($plugins);
     }
 
     /**
