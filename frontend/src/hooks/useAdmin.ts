@@ -56,6 +56,13 @@ export function useAdmin() {
     } catch (err) { handleError(err) }
   }, [handleError])
 
+  const fetchQueueStatus = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/queue-status.php')
+      return res.data.data
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
   const updateSettings = useCallback(async (data: Record<string, unknown>) => {
     try {
       await api.put('/admin/settings.php', data)
@@ -90,7 +97,7 @@ export function useAdmin() {
 
   return {
     fetchDashboard, fetchLeads, fetchLeadDetail, deleteLead,
-    fetchSettings, updateSettings,
+    fetchSettings, updateSettings, fetchQueueStatus,
     fetchVulnerabilities, createVulnerability, updateVulnerability, deleteVulnerability,
   }
 }

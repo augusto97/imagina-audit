@@ -509,6 +509,79 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/SuccessEnvelope' }
 
+  /admin/queue-status.php:
+    get:
+      tags: [Admin Data]
+      summary: Estado de la cola de auditorías en vivo + recomendaciones
+      description: |
+        Stats agregadas para mostrar en el admin dashboard. Incluye:
+        - Concurrencia actual (running, queued, max, % utilización)
+        - Throughput última hora (completados, fallidos, duración media)
+        - Jobs corriendo ahora con su edad (para detectar stuck)
+        - URLs problemáticas (≥3 fallos en la última hora)
+        - Info del sistema (RAM total/disponible, memory_limit de PHP)
+        - Tabla de recomendaciones de max_concurrent por RAM
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200':
+          description: Snapshot del estado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          concurrency:
+                            type: object
+                            properties:
+                              running: { type: integer }
+                              queued: { type: integer }
+                              maxConcurrent: { type: integer }
+                              utilizationPct: { type: integer }
+                          lastHour:
+                            type: object
+                            properties:
+                              completed: { type: integer }
+                              failed: { type: integer }
+                              avgDurationSec: { type: number }
+                          runningJobs:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                auditId: { type: string }
+                                url: { type: string }
+                                startedAt: { type: string }
+                                ageSec: { type: number }
+                          problematicUrls:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                url: { type: string }
+                                failures: { type: integer }
+                                lastError: { type: string }
+                          system:
+                            type: object
+                            properties:
+                              totalRamMb: { type: integer, nullable: true }
+                              availableRamMb: { type: integer, nullable: true }
+                              phpMemoryLimitMb: { type: integer }
+                              phpVersion: { type: string }
+                              recommendedConcurrency: { type: integer, nullable: true }
+                          recommendationTable:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                minMb: { type: integer }
+                                maxMb: { type: integer }
+                                concurrency: { type: integer }
+                                label: { type: string }
+
   /admin/update-vulnerabilities.php:
     post:
       tags: [Admin Config]

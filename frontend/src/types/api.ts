@@ -874,6 +874,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/queue-status.php": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Estado de la cola de auditorías en vivo + recomendaciones
+         * @description Stats agregadas para mostrar en el admin dashboard. Incluye:
+         *     - Concurrencia actual (running, queued, max, % utilización)
+         *     - Throughput última hora (completados, fallidos, duración media)
+         *     - Jobs corriendo ahora con su edad (para detectar stuck)
+         *     - URLs problemáticas (≥3 fallos en la última hora)
+         *     - Info del sistema (RAM total/disponible, memory_limit de PHP)
+         *     - Tabla de recomendaciones de max_concurrent por RAM
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Snapshot del estado */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SuccessEnvelope"] & {
+                            data?: {
+                                concurrency?: {
+                                    running?: number;
+                                    queued?: number;
+                                    maxConcurrent?: number;
+                                    utilizationPct?: number;
+                                };
+                                lastHour?: {
+                                    completed?: number;
+                                    failed?: number;
+                                    avgDurationSec?: number;
+                                };
+                                runningJobs?: {
+                                    auditId?: string;
+                                    url?: string;
+                                    startedAt?: string;
+                                    ageSec?: number;
+                                }[];
+                                problematicUrls?: {
+                                    url?: string;
+                                    failures?: number;
+                                    lastError?: string;
+                                }[];
+                                system?: {
+                                    totalRamMb?: number | null;
+                                    availableRamMb?: number | null;
+                                    phpMemoryLimitMb?: number;
+                                    phpVersion?: string;
+                                    recommendedConcurrency?: number | null;
+                                };
+                                recommendationTable?: {
+                                    minMb?: number;
+                                    maxMb?: number;
+                                    concurrency?: number;
+                                    label?: string;
+                                }[];
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/update-vulnerabilities.php": {
         parameters: {
             query?: never;

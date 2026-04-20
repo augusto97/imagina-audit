@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Settings, MessageSquare,
-  CreditCard, SlidersHorizontal, ShieldAlert, Shield,
+  CreditCard, SlidersHorizontal, ShieldAlert, Shield, Server,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
@@ -21,6 +21,7 @@ const navSections = [
       { to: '/admin/messages', icon: MessageSquare, label: 'Textos y Mensajes' },
       { to: '/admin/plans', icon: CreditCard, label: 'Planes y Precios' },
       { to: '/admin/scoring', icon: SlidersHorizontal, label: 'Scoring' },
+      { to: '/admin/queue', icon: Server, label: 'Cola de Auditorías' },
     ],
   },
   {

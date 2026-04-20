@@ -11,6 +11,7 @@ import SettingsGeneral from '@/components/admin/SettingsGeneral'
 import SettingsMessages from '@/components/admin/SettingsMessages'
 import SettingsPlans from '@/components/admin/SettingsPlans'
 import SettingsScoring from '@/components/admin/SettingsScoring'
+import SettingsQueue from '@/components/admin/SettingsQueue'
 import VulnerabilityManager from '@/components/admin/VulnerabilityManager'
 import TechnicalReport from '@/components/admin/TechnicalReport'
 import WaterfallPage from '@/components/admin/WaterfallPage'
@@ -58,6 +59,7 @@ export default function AdminPage() {
         <Route path="messages" element={<SettingsMessages />} />
         <Route path="plans" element={<SettingsPlans />} />
         <Route path="scoring" element={<SettingsScoring />} />
+        <Route path="queue" element={<SettingsQueue />} />
         <Route path="vulnerabilities" element={<VulnerabilityManager />} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Routes>

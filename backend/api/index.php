@@ -118,6 +118,10 @@ switch ($endpoint) {
         require __DIR__ . '/admin/snapshot.php';
         break;
 
+    case 'admin/queue-status':
+        require __DIR__ . '/admin/queue-status.php';
+        break;
+
     default:
         Response::error('Endpoint no encontrado', 404);
 }
