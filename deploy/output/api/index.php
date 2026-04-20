@@ -74,6 +74,14 @@ switch ($endpoint) {
         require __DIR__ . '/health.php';
         break;
 
+    case 'diag':
+        require __DIR__ . '/diag.php';
+        break;
+
+    case 'setup':
+        require __DIR__ . '/setup.php';
+        break;
+
     case 'admin/login':
         require __DIR__ . '/admin/login.php';
         break;

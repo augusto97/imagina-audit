@@ -63,24 +63,51 @@ echo "[OK] Archivos copiados a deploy/output/"
 
 # 3. Crear .htaccess para React Router
 cat > "$DEPLOY_DIR/.htaccess" << 'EOF'
+# ═══════════════════════════════════════════════════════════════════
+# Imagina Audit — .htaccess raíz (Apache 2.4+, requiere mod_rewrite)
+# Si la app vive bajo /audit/ en lugar de la raíz, ajusta RewriteBase.
+# ═══════════════════════════════════════════════════════════════════
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  # IMPORTANTE: Si la app vive en /audit/, cambiar a: RewriteBase /audit/
   RewriteBase /
+  # Si el sitio vive en subcarpeta: RewriteBase /audit/
 
-  # No tocar archivos reales ni carpetas que existen en disco
+  # IMPORTANTE: NO tocar /api/* — ese tiene su propio .htaccess que
+  # rutea al backend PHP. Sin esta exclusión, el fallback SPA secuestra
+  # todas las requests al backend.
+  RewriteCond %{REQUEST_URI} ^/api/
+  RewriteRule ^ - [L]
+
+  # Dejar pasar archivos reales (assets compilados, widget, etc.)
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
 
-  # Redirigir todo lo demás a index.html (React Router)
+  # Todo lo demás → SPA (React Router)
   RewriteRule ^(.*)$ index.html [L]
 </IfModule>
 
-# Bloquear acceso a archivos sensibles
+# Cache largo para assets compilados (tienen hash en el nombre)
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+# Bloquear acceso directo a archivos sensibles
 <FilesMatch "\.(env|db|sqlite|log|sql)$">
-    Order Allow,Deny
-    Deny from all
+    Require all denied
 </FilesMatch>
+
+# Bloquear archivos de versionado si quedaron copiados
+<FilesMatch "^\.(git|htaccess-bak|env.*)$">
+    Require all denied
+</FilesMatch>
+
+# Deshabilitar listado de directorios
+Options -Indexes
 EOF
 
 echo "[3/3] .htaccess creado"
