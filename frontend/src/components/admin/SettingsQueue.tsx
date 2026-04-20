@@ -17,6 +17,8 @@ interface QueueStatus {
   system: {
     totalRamMb: number | null
     availableRamMb: number | null
+    detectionSource: 'proc' | 'cgroup' | 'free' | 'manual' | 'none'
+    manualOverrideMb: number | null
     phpMemoryLimitMb: number
     phpVersion: string
     recommendedConcurrency: number | null
@@ -33,6 +35,7 @@ export default function SettingsQueue() {
   const [staleSeconds, setStaleSeconds] = useState(180)
   const [failureCacheMin, setFailureCacheMin] = useState(10)
   const [maxAttempts, setMaxAttempts] = useState(3)
+  const [manualRamMb, setManualRamMb] = useState<string>('')
 
   // Carga inicial: settings + status
   useEffect(() => {
@@ -42,6 +45,8 @@ export default function SettingsQueue() {
         setStaleSeconds(Number(settings.auditStaleSeconds ?? settings.audit_stale_seconds ?? 180))
         setFailureCacheMin(Number(settings.auditFailureCacheMinutes ?? settings.audit_failure_cache_minutes ?? 10))
         setMaxAttempts(Number(settings.auditMaxAttempts ?? settings.audit_max_attempts ?? 3))
+        const ramOverride = settings.systemTotalRamMb ?? settings.system_total_ram_mb
+        setManualRamMb(ramOverride ? String(ramOverride) : '')
       }
       if (queueStatus) setStatus(queueStatus as QueueStatus)
       setLoading(false)
@@ -60,12 +65,16 @@ export default function SettingsQueue() {
   const save = async () => {
     setSaving(true)
     try {
-      await updateSettings({
+      const payload: Record<string, unknown> = {
         auditMaxConcurrent: maxConcurrent,
         auditStaleSeconds: staleSeconds,
         auditFailureCacheMinutes: failureCacheMin,
         auditMaxAttempts: maxAttempts,
-      })
+      }
+      const ramNum = manualRamMb.trim() === '' ? 0 : parseInt(manualRamMb, 10)
+      payload.systemTotalRamMb = Number.isFinite(ramNum) && ramNum > 0 ? ramNum : ''
+      await updateSettings(payload)
+      fetchQueueStatus().then((s) => { if (s) setStatus(s as QueueStatus) })
       toast.success('Configuración de cola guardada')
     } catch { toast.error('Error al guardar') }
     setSaving(false)
@@ -76,6 +85,14 @@ export default function SettingsQueue() {
   const recommended = status?.system.recommendedConcurrency
   const ramMb = status?.system.totalRamMb
   const ramLabel = ramMb ? `${(ramMb / 1024).toFixed(1)} GB (${ramMb} MB)` : 'No detectada'
+  const detectionSource = status?.system.detectionSource ?? 'none'
+  const sourceLabel: Record<string, string> = {
+    proc: '/proc/meminfo',
+    cgroup: 'cgroup',
+    free: 'free -m',
+    manual: 'configurado manualmente',
+    none: 'sin detección',
+  }
   const isOverRecommended = recommended !== null && recommended !== undefined && maxConcurrent > recommended
   const isAtRecommended = recommended === maxConcurrent
 
@@ -178,6 +195,7 @@ export default function SettingsQueue() {
             <div>
               <p className="text-xs text-[var(--text-tertiary)]">RAM del servidor</p>
               <p className="font-bold text-[var(--text-primary)]">{ramLabel}</p>
+              <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5">Fuente: {sourceLabel[detectionSource]}</p>
             </div>
             <div>
               <p className="text-xs text-[var(--text-tertiary)]">RAM disponible</p>
@@ -189,6 +207,27 @@ export default function SettingsQueue() {
               <p className="text-xs text-[var(--text-tertiary)]">PHP memory_limit</p>
               <p className="font-bold text-[var(--text-primary)]">{status?.system.phpMemoryLimitMb ?? '?'} MB</p>
             </div>
+          </div>
+
+          <div className="rounded-lg border border-[var(--border-default)] p-3 bg-[var(--bg-secondary)]">
+            <Label className="text-sm">Forzar RAM total (MB)</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Input
+                type="number" min={256} max={131072} step={256}
+                value={manualRamMb}
+                onChange={(e) => setManualRamMb(e.target.value)}
+                placeholder="ej. 1536 para 1.5 GB"
+                className="w-48"
+              />
+              {manualRamMb && (
+                <Button variant="ghost" size="sm" onClick={() => setManualRamMb('')}>Limpiar</Button>
+              )}
+            </div>
+            <p className="text-xs text-[var(--text-tertiary)] mt-1">
+              {detectionSource === 'none'
+                ? 'Tu hosting restringe la lectura de /proc/meminfo. Ingresa la RAM total (en MB) de tu plan de hosting — normalmente aparece en la confirmación del proveedor (ServerAvatar, cPanel, etc.).'
+                : 'Sobrescribe la RAM detectada automáticamente. Útil si el valor detectado no coincide con el plan contratado.'}
+            </p>
           </div>
 
           {recommended !== null && recommended !== undefined && (

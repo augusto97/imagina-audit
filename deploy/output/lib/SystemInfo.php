@@ -9,41 +9,144 @@
 
 class SystemInfo {
     /**
-     * RAM total del servidor en MB. null si no se puede detectar.
-     * Lee /proc/meminfo (disponible en la mayoría de hostings Linux).
+     * RAM total del servidor en MB.
+     *
+     * Orden de detección (muchos hostings compartidos restringen unos u otros):
+     *   1. Override manual en settings (`system_total_ram_mb`)
+     *   2. /proc/meminfo
+     *   3. /sys/fs/cgroup/memory.max (cgroup v2) o memory.limit_in_bytes (v1)
+     *   4. shell_exec('free -m')
+     *   5. null → el admin lo configura manualmente
      */
     public static function totalRamMb(): ?int {
-        $path = '/proc/meminfo';
-        if (!@is_readable($path)) return null;
+        // 1. Override manual desde admin
+        $override = self::manualOverride('system_total_ram_mb');
+        if ($override !== null) return $override;
 
-        $content = @file_get_contents($path);
-        if (empty($content)) return null;
-
-        if (preg_match('/^MemTotal:\s+(\d+)\s+kB/m', $content, $m)) {
-            return (int) round((int) $m[1] / 1024);
+        // 2. /proc/meminfo
+        $mem = self::readProcMeminfo();
+        if ($mem !== null && isset($mem['MemTotal'])) {
+            return (int) round($mem['MemTotal'] / 1024);
         }
+
+        // 3. cgroup (algunos VPS / containers)
+        $cgroup = self::readCgroupMemory();
+        if ($cgroup !== null) {
+            return (int) round($cgroup / 1048576);
+        }
+
+        // 4. free -m (si shell_exec está habilitado)
+        $free = self::readFreeMb();
+        if ($free !== null && isset($free['total'])) {
+            return $free['total'];
+        }
+
         return null;
     }
 
     /**
      * RAM disponible (después de descontar lo que usa el SO + otros procesos).
-     * Útil para un snapshot en vivo del hosting. null si no se puede.
+     * Mismo flujo de fallbacks que totalRamMb().
      */
     public static function availableRamMb(): ?int {
+        $mem = self::readProcMeminfo();
+        if ($mem !== null) {
+            if (isset($mem['MemAvailable'])) return (int) round($mem['MemAvailable'] / 1024);
+            if (isset($mem['MemFree']))       return (int) round($mem['MemFree'] / 1024);
+        }
+
+        $free = self::readFreeMb();
+        if ($free !== null) {
+            if (isset($free['available'])) return $free['available'];
+            if (isset($free['free']))      return $free['free'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Lee /proc/meminfo y retorna todos los campos numéricos (en KB).
+     * null si no es legible (hosting restrictivo).
+     */
+    private static function readProcMeminfo(): ?array {
         $path = '/proc/meminfo';
         if (!@is_readable($path)) return null;
-
         $content = @file_get_contents($path);
         if (empty($content)) return null;
 
-        // MemAvailable está presente en kernels modernos (>= 3.14). Fallback a MemFree.
-        if (preg_match('/^MemAvailable:\s+(\d+)\s+kB/m', $content, $m)) {
-            return (int) round((int) $m[1] / 1024);
+        $data = [];
+        foreach (preg_split('/\r\n|\n/', $content) as $line) {
+            if (preg_match('/^([A-Za-z_()]+):\s+(\d+)\s+kB/', $line, $m)) {
+                $data[$m[1]] = (int) $m[2];
+            }
         }
-        if (preg_match('/^MemFree:\s+(\d+)\s+kB/m', $content, $m)) {
-            return (int) round((int) $m[1] / 1024);
+        return !empty($data) ? $data : null;
+    }
+
+    /**
+     * Lee límite de memoria del cgroup (útil en hostings containerizados).
+     * Retorna bytes o null.
+     */
+    private static function readCgroupMemory(): ?int {
+        $candidates = [
+            '/sys/fs/cgroup/memory.max',           // cgroup v2
+            '/sys/fs/cgroup/memory/memory.limit_in_bytes', // cgroup v1
+        ];
+        foreach ($candidates as $path) {
+            if (!@is_readable($path)) continue;
+            $raw = trim((string) @file_get_contents($path));
+            if ($raw === '' || $raw === 'max') continue;
+            if (!ctype_digit($raw)) continue;
+            $bytes = (int) $raw;
+            // cgroup v1 usa un valor absurdamente grande cuando no hay límite
+            if ($bytes > 0 && $bytes < PHP_INT_MAX / 2) {
+                return $bytes;
+            }
         }
         return null;
+    }
+
+    /**
+     * Parsea `free -m` si shell_exec está disponible.
+     * Retorna array con total/used/free/available o null.
+     */
+    private static function readFreeMb(): ?array {
+        if (!function_exists('shell_exec')) return null;
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+        if (in_array('shell_exec', $disabled, true)) return null;
+
+        $output = @shell_exec('free -m 2>/dev/null');
+        if (!$output) return null;
+
+        foreach (preg_split('/\r\n|\n/', $output) as $line) {
+            if (!str_starts_with(trim($line), 'Mem:')) continue;
+            $cols = preg_split('/\s+/', trim($line));
+            if (count($cols) < 4) return null;
+            return [
+                'total'     => (int) ($cols[1] ?? 0),
+                'used'      => (int) ($cols[2] ?? 0),
+                'free'      => (int) ($cols[3] ?? 0),
+                'available' => isset($cols[6]) ? (int) $cols[6] : null,
+            ];
+        }
+        return null;
+    }
+
+    /**
+     * Override manual desde la tabla settings.
+     * El admin puede configurar la RAM total cuando la auto-detección falla.
+     */
+    private static function manualOverride(string $key): ?int {
+        try {
+            if (!class_exists('Database')) return null;
+            $db = Database::getInstance();
+            $val = $db->scalar('SELECT value FROM settings WHERE key = ?', [$key]);
+            if ($val === null || $val === '' || $val === false) return null;
+            $num = (int) $val;
+            return $num > 0 ? $num : null;
+        } catch (Throwable $e) {
+            return null;
+        }
     }
 
     /**
@@ -83,13 +186,30 @@ class SystemInfo {
 
     /**
      * Snapshot compacto para el endpoint admin.
+     *
+     * `detectionSource` indica de dónde salió el valor (útil para debuggear
+     * cuando un hosting no expone /proc/meminfo).
      */
     public static function snapshot(): array {
+        $override = self::manualOverride('system_total_ram_mb');
+        $proc = self::readProcMeminfo();
+        $cgroup = self::readCgroupMemory();
+        $free = self::readFreeMb();
+
+        $source = 'none';
+        if ($override !== null) $source = 'manual';
+        elseif ($proc !== null && isset($proc['MemTotal'])) $source = 'proc';
+        elseif ($cgroup !== null) $source = 'cgroup';
+        elseif ($free !== null) $source = 'free';
+
         $total = self::totalRamMb();
         $available = self::availableRamMb();
+
         return [
             'totalRamMb' => $total,
             'availableRamMb' => $available,
+            'detectionSource' => $source,
+            'manualOverrideMb' => $override,
             'phpMemoryLimitMb' => (int) round(self::parseIniBytes(ini_get('memory_limit') ?: '128M') / 1048576),
             'phpVersion' => PHP_VERSION,
             'recommendedConcurrency' => $total !== null ? self::recommendedConcurrency($total) : null,

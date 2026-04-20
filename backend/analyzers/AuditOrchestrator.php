@@ -115,7 +115,7 @@ class AuditOrchestrator {
         $this->reportProgress($auditId, 'mobile', 5, $totalSteps, $startTime);
         try {
             $mobileScore = $performanceAnalyzer ? $performanceAnalyzer->getMobileScore() : null;
-            $mobileAnalyzer = new MobileAnalyzer($html, $mobileScore);
+            $mobileAnalyzer = new MobileAnalyzer($html, $mobileScore, $finalUrl);
             $modules[] = $mobileAnalyzer->analyze();
         } catch (Throwable $e) {
             Logger::error('MobileAnalyzer falló: ' . $e->getMessage());

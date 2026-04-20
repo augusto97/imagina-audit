@@ -205,37 +205,118 @@ class SecurityWpChecker {
     }
 
     public function checkSecurityPlugin(): array {
+        // Un plugin de seguridad se puede detectar por 4 señales:
+        //   1. Slug en /wp-content/plugins/ del HTML (fácil, pero muchos plugins
+        //      de seguridad no cargan assets en el frontend).
+        //   2. Cookies set-cookie típicas (Wordfence, iThemes).
+        //   3. Headers HTTP específicos (Sucuri, Wordfence, Jetpack, Cloudflare).
+        //   4. HEAD request a /wp-content/plugins/<slug>/readme.txt (más caro pero
+        //      detecta plugins silenciosos como Wordfence que suelen bloquearlo o
+        //      devolverlo con 200).
         $plugins = [
-            'wordfence' => 'Wordfence',
-            'sucuri' => 'Sucuri',
-            'ithemes-security' => 'Solid Security (iThemes)',
-            'better-wp-security' => 'Solid Security (iThemes)',
-            'all-in-one-wp-security' => 'All In One WP Security',
-            'really-simple-ssl' => 'Really Simple SSL',
-            'defender-security' => 'Defender Security',
-            'shield-security' => 'Shield Security',
-            'jetpack' => 'Jetpack (incluye security)',
+            'wordfence'              => ['name' => 'Wordfence',                  'cookie' => 'wfwaf-authcookie|wordfence_verifiedHuman', 'header' => 'x-wf-'],
+            'sucuri-scanner'         => ['name' => 'Sucuri Security',            'cookie' => null, 'header' => 'x-sucuri-'],
+            'ithemes-security'       => ['name' => 'Solid Security (iThemes)',   'cookie' => 'ithemes-security|itsec-',                 'header' => null],
+            'better-wp-security'     => ['name' => 'Solid Security (iThemes)',   'cookie' => null, 'header' => null],
+            'all-in-one-wp-security' => ['name' => 'All In One WP Security',     'cookie' => 'aiowps_',                                  'header' => null],
+            'really-simple-ssl'      => ['name' => 'Really Simple SSL',          'cookie' => null, 'header' => null],
+            'defender-security'      => ['name' => 'Defender Security (WPMUdev)', 'cookie' => null, 'header' => null],
+            'shield-security'        => ['name' => 'Shield Security',            'cookie' => 'icwp-wpsf-',                               'header' => null],
+            'malcare-security'       => ['name' => 'MalCare',                    'cookie' => null, 'header' => null],
+            'jetpack'                => ['name' => 'Jetpack (incluye security)', 'cookie' => null, 'header' => null],
+            'wp-cerber'              => ['name' => 'WP Cerber',                  'cookie' => 'cerber_groove',                            'header' => null],
+            'limit-login-attempts-reloaded' => ['name' => 'Limit Login Attempts Reloaded', 'cookie' => null, 'header' => null],
         ];
 
         $detected = [];
-        foreach ($plugins as $slug => $name) {
-            if (str_contains($this->html, "/$slug/") || stripos($this->html, $slug) !== false) {
-                $detected[] = $name;
+        $signals = [];  // Por qué señal se detectó cada uno
+
+        // 1. HTML: slug exacto en /wp-content/plugins/<slug>/
+        foreach ($plugins as $slug => $info) {
+            if (str_contains($this->html, "/wp-content/plugins/$slug/")) {
+                $detected[$info['name']] = true;
+                $signals[$info['name']] = 'asset en HTML';
             }
         }
-        $detected = array_unique($detected);
-        $count = count($detected);
+
+        // 2. Cookies: Set-Cookie o Cookie headers del fetch inicial
+        $cookieHeader = '';
+        if (isset($this->headers['set-cookie'])) {
+            $cookieHeader = is_array($this->headers['set-cookie'])
+                ? implode('; ', $this->headers['set-cookie'])
+                : (string) $this->headers['set-cookie'];
+        }
+        foreach ($plugins as $slug => $info) {
+            if ($info['cookie'] === null || isset($detected[$info['name']])) continue;
+            foreach (explode('|', $info['cookie']) as $token) {
+                if (stripos($cookieHeader, $token) !== false) {
+                    $detected[$info['name']] = true;
+                    $signals[$info['name']] = 'cookie';
+                    break;
+                }
+            }
+        }
+
+        // 3. Headers HTTP: algunos security plugins/WAFs dejan fingerprint
+        foreach ($plugins as $slug => $info) {
+            if ($info['header'] === null || isset($detected[$info['name']])) continue;
+            foreach ($this->headers as $hName => $hVal) {
+                if (stripos($hName, $info['header']) !== false) {
+                    $detected[$info['name']] = true;
+                    $signals[$info['name']] = 'header';
+                    break;
+                }
+            }
+        }
+
+        // 4. Probe directo a readme.txt de los principales (sin bloquear mucho
+        //    el audit). Solo para los 4 más comunes que suelen ser invisibles
+        //    en el HTML público.
+        $silentSlugs = ['wordfence', 'sucuri-scanner', 'ithemes-security', 'better-wp-security', 'all-in-one-wp-security', 'shield-security'];
+        $probeUrls = [];
+        foreach ($silentSlugs as $slug) {
+            $name = $plugins[$slug]['name'];
+            if (isset($detected[$name])) continue;
+            $probeUrls[$slug] = $this->url . "/wp-content/plugins/$slug/readme.txt";
+        }
+        if (!empty($probeUrls)) {
+            $responses = Fetcher::multiGet($probeUrls, 3);
+            foreach ($probeUrls as $slug => $_) {
+                $resp = $responses[$slug] ?? null;
+                if (!$resp) continue;
+                $sc = (int) ($resp['statusCode'] ?? 0);
+                $body = (string) ($resp['body'] ?? '');
+                // 200 con contenido de readme.txt = instalado y accesible
+                if ($sc === 200 && stripos($body, '=== ') !== false) {
+                    $name = $plugins[$slug]['name'];
+                    $detected[$name] = true;
+                    $signals[$name] = 'readme accesible';
+                }
+                // 403 Forbidden protegido por el propio plugin = también instalado
+                elseif ($sc === 403) {
+                    $name = $plugins[$slug]['name'];
+                    $detected[$name] = true;
+                    $signals[$name] = 'readme bloqueado por plugin';
+                }
+            }
+        }
+
+        $detectedList = array_keys($detected);
+        $count = count($detectedList);
+        $displayDetail = $count > 0
+            ? implode(', ', array_map(fn($n) => "$n ({$signals[$n]})", $detectedList))
+            : 'No detectado';
 
         return Scoring::createMetric(
             'security_plugin', 'Plugin de seguridad', $count,
-            $count === 0 ? 'No detectado' : implode(', ', $detected),
-            $count > 0 ? 100 : 70,
+            $count === 0 ? 'No detectado' : implode(', ', $detectedList),
+            $count > 0 ? 100 : 60,
             $count > 0
-                ? 'Se detectó plugin de seguridad: ' . implode(', ', $detected) . '. Ayuda a proteger contra malware, brute force y vulnerabilidades.'
-                : 'No se detectó ningún plugin de seguridad instalado. Se recomienda usar Wordfence, Solid Security u otro.',
+                ? 'Se detectó: ' . $displayDetail . '. Ayuda a proteger contra malware, brute force y vulnerabilidades.'
+                : 'No se detectó ningún plugin de seguridad (búsqueda en HTML, cookies, headers y readme.txt). Puede haber uno instalado que no sea detectable externamente; para confirmar, revisa dentro del admin de WordPress.',
             $count === 0 ? 'Instalar un plugin de seguridad como Wordfence o Solid Security para protección adicional.' : '',
             'Instalamos y configuramos plugins de seguridad para protección en múltiples capas.',
-            ['detected' => $detected]
+            ['detected' => $detectedList, 'signals' => $signals]
         );
     }
 }
