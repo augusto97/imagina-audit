@@ -63,6 +63,20 @@ export function useAdmin() {
     } catch (err) { handleError(err) }
   }, [handleError])
 
+  const pinAudit = useCallback(async (auditId: string, pinned: boolean) => {
+    try {
+      const res = await api.post('/admin/pin-audit.php', { auditId, pinned })
+      return res.data.data as { auditId: string; isPinned: boolean }
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const fetchRetentionPreview = useCallback(async (months: number) => {
+    try {
+      const res = await api.get('/admin/retention-preview.php', { params: { months } })
+      return res.data.data
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
   const updateSettings = useCallback(async (data: Record<string, unknown>) => {
     try {
       await api.put('/admin/settings.php', data)
@@ -98,6 +112,7 @@ export function useAdmin() {
   return {
     fetchDashboard, fetchLeads, fetchLeadDetail, deleteLead,
     fetchSettings, updateSettings, fetchQueueStatus,
+    pinAudit, fetchRetentionPreview,
     fetchVulnerabilities, createVulnerability, updateVulnerability, deleteVulnerability,
   }
 }

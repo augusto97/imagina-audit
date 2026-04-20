@@ -26,12 +26,13 @@ import { getAllMetricsByLevel, type ChecklistState } from './report/helpers'
 function TechnicalReport() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { fetchLeadDetail } = useAdmin()
+  const { fetchLeadDetail, pinAudit } = useAdmin()
   const [result, setResult] = useState<AuditResult | null>(null)
   const [checklist, setChecklist] = useState<ChecklistState>({})
   const [loading, setLoading] = useState(true)
   const [snapshotModule, setSnapshotModule] = useState<ModuleResult | null>(null)
   const [snapshotReloadKey, setSnapshotReloadKey] = useState(0)
+  const [isPinned, setIsPinned] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -45,8 +46,9 @@ function TechnicalReport() {
     Promise.all([
       fetchLeadDetail(id),
       api.get('/admin/checklist.php', { params: { audit_id: id } }).then(r => r.data?.data).catch(() => [])
-    ]).then(([audit, items]: [AuditResult, Array<{ metric_id: string; completed: number; notes: string | null; completed_at: string | null }>]) => {
+    ]).then(([audit, items]: [AuditResult & { isPinned?: boolean }, Array<{ metric_id: string; completed: number; notes: string | null; completed_at: string | null }>]) => {
       setResult(audit)
+      setIsPinned(!!audit?.isPinned)
       const state: ChecklistState = {}
       for (const item of items || []) {
         state[item.metric_id] = { completed: item.completed === 1, notes: item.notes, completedAt: item.completed_at }
@@ -72,6 +74,17 @@ function TechnicalReport() {
 
   const handleBack = useCallback(() => navigate('/admin/leads'), [navigate])
 
+  const handleTogglePin = useCallback(async () => {
+    if (!id) return
+    const newVal = !isPinned
+    setIsPinned(newVal) // optimista
+    try {
+      await pinAudit(id, newVal)
+    } catch {
+      setIsPinned(!newVal) // revertir si falla
+    }
+  }, [id, isPinned, pinAudit])
+
   if (loading) {
     return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-48 rounded-2xl" /></div>
   }
@@ -84,7 +97,7 @@ function TechnicalReport() {
 
   return (
     <div className="space-y-8">
-      <ReportHeader result={result} onBack={handleBack} />
+      <ReportHeader result={result} isPinned={isPinned} onBack={handleBack} onTogglePin={handleTogglePin} />
       <ExecutiveSummary result={result} criticalCount={criticalMetrics.length} warningCount={warningMetrics.length} snapshotModule={snapshotModule} />
       {result.techStack && <TechStackSummary techStack={result.techStack} scanDuration={result.scanDurationMs} />}
       {result.isWordPress && id && (

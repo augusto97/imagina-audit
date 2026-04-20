@@ -33,7 +33,7 @@ spl_autoload_register(function (string $class) {
 
 set_time_limit(120);
 
-$stats = ['rate_limits' => 0, 'login_attempts' => 0, 'audit_jobs' => 0, 'cache_files' => 0, 'log_files' => 0, 'errors' => []];
+$stats = ['rate_limits' => 0, 'login_attempts' => 0, 'audit_jobs' => 0, 'audits_retention' => 0, 'cache_files' => 0, 'log_files' => 0, 'errors' => []];
 
 try {
     $db = Database::getInstance();
@@ -65,6 +65,36 @@ try {
         }
     } catch (Throwable $e) {
         $stats['errors'][] = 'audit_jobs cleanup: ' . $e->getMessage();
+    }
+
+    // Retención de INFORMES de auditoría (tabla `audits`).
+    // Configurable desde el admin: master switch `audits_retention_enabled`
+    // + ventana en meses `audits_retention_months`. Los informes con
+    // is_pinned=1 quedan excluidos del borrado.
+    try {
+        $enabledRow = $db->queryOne("SELECT value FROM settings WHERE key = 'audits_retention_enabled'");
+        $monthsRow = $db->queryOne("SELECT value FROM settings WHERE key = 'audits_retention_months'");
+
+        // Settings en DB ganan sobre defaults
+        $enabled = $enabledRow ? filter_var($enabledRow['value'], FILTER_VALIDATE_BOOLEAN) : (bool) ($defaults['audits_retention_enabled'] ?? false);
+        $months = $monthsRow && is_numeric($monthsRow['value'])
+            ? (int) $monthsRow['value']
+            : (int) ($defaults['audits_retention_months'] ?? 6);
+
+        if ($enabled && $months >= 1) {
+            $days = $months * 30;
+            $stats['audits_retention'] = $db->execute(
+                "DELETE FROM audits
+                 WHERE created_at < datetime('now', ?)
+                 AND is_pinned = 0",
+                ["-$days days"]
+            );
+            if ($stats['audits_retention'] > 0) {
+                Logger::info("Retención: eliminados {$stats['audits_retention']} informes >$months meses");
+            }
+        }
+    } catch (Throwable $e) {
+        $stats['errors'][] = 'audits retention: ' . $e->getMessage();
     }
 } catch (Throwable $e) {
     $stats['errors'][] = 'DB cleanup: ' . $e->getMessage();
@@ -98,10 +128,10 @@ try {
 }
 
 $msg = sprintf(
-    '[%s] cleanup: rate_limits=%d login_attempts=%d audit_jobs=%d cache_files=%d log_files=%d errors=%d',
+    '[%s] cleanup: rate_limits=%d login_attempts=%d audit_jobs=%d audits_retention=%d cache_files=%d log_files=%d errors=%d',
     date('Y-m-d H:i:s'),
     $stats['rate_limits'], $stats['login_attempts'], $stats['audit_jobs'],
-    $stats['cache_files'], $stats['log_files'],
+    $stats['audits_retention'], $stats['cache_files'], $stats['log_files'],
     count($stats['errors'])
 );
 

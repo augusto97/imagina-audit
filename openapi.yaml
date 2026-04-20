@@ -582,6 +582,72 @@ paths:
                                 concurrency: { type: integer }
                                 label: { type: string }
 
+  /admin/pin-audit.php:
+    post:
+      tags: [Admin Data]
+      summary: Alterna la protección anti-borrado de un informe
+      security: [{ SessionCookie: [], CsrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [auditId]
+              properties:
+                auditId: { type: string }
+                pinned: { type: boolean, default: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          auditId: { type: string }
+                          isPinned: { type: boolean }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '403': { $ref: '#/components/responses/CsrfInvalid' }
+
+  /admin/retention-preview.php:
+    get:
+      tags: [Admin Config]
+      summary: Preview de cuántos informes se eliminarían con una política dada
+      description: |
+        Devuelve un resumen del impacto sin ejecutar nada: cuántos audits
+        caen bajo la ventana de retención, cuántos están protegidos, cuánto
+        espacio se liberaría aproximadamente.
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - name: months
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 120 }
+      responses:
+        '200':
+          description: Preview del impacto
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          months: { type: integer }
+                          cutoffDate: { type: string, format: date-time }
+                          totalAudits: { type: integer }
+                          pinnedAudits: { type: integer }
+                          wouldDelete: { type: integer }
+                          wouldKeep: { type: integer }
+                          estimatedBytesFreed: { type: integer }
+
   /admin/update-vulnerabilities.php:
     post:
       tags: [Admin Config]
@@ -1055,6 +1121,9 @@ components:
         globalLevel: { $ref: '#/components/schemas/SemaphoreLevel' }
         timestamp: { type: string, format: date-time }
         hasContactInfo: { type: boolean }
+        isPinned:
+          type: boolean
+          description: Si true, el informe está protegido del borrado automático por retención.
 
     DashboardStats:
       type: object

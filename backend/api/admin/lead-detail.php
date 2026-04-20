@@ -9,7 +9,7 @@ if (empty($id)) {
 
 try {
     $db = Database::getInstance();
-    $audit = $db->queryOne("SELECT result_json, lead_name, lead_email, lead_whatsapp, lead_company, created_at FROM audits WHERE id = ?", [$id]);
+    $audit = $db->queryOne("SELECT result_json, lead_name, lead_email, lead_whatsapp, lead_company, is_pinned, created_at FROM audits WHERE id = ?", [$id]);
 
     if (!$audit) {
         Response::error('Auditoría no encontrada.', 404);
@@ -22,6 +22,7 @@ try {
     $result['leadWhatsapp'] = $audit['lead_whatsapp'];
     $result['leadCompany'] = $audit['lead_company'];
     $result['createdAt'] = $audit['created_at'];
+    $result['isPinned'] = (bool) (int) ($audit['is_pinned'] ?? 0);
 
     Response::success($result);
 } catch (Throwable $e) {

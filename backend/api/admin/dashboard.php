@@ -20,7 +20,7 @@ try {
         'excellent' => (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE global_score BETWEEN 90 AND 100"),
     ];
 
-    $recent = $db->query("SELECT id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, created_at FROM audits ORDER BY created_at DESC LIMIT 10");
+    $recent = $db->query("SELECT id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_pinned, created_at FROM audits ORDER BY created_at DESC LIMIT 10");
 
     $recentAudits = array_map(function ($row) {
         return [
@@ -35,6 +35,7 @@ try {
             'globalLevel' => $row['global_level'],
             'createdAt' => $row['created_at'],
             'hasContactInfo' => !empty($row['lead_email']) || !empty($row['lead_whatsapp']),
+            'isPinned' => (bool) (int) ($row['is_pinned'] ?? 0),
         ];
     }, $recent);
 

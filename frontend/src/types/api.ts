@@ -957,6 +957,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/pin-audit.php": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Alterna la protección anti-borrado de un informe */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        auditId: string;
+                        /** @default true */
+                        pinned?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SuccessEnvelope"] & {
+                            data?: {
+                                auditId?: string;
+                                isPinned?: boolean;
+                            };
+                        };
+                    };
+                };
+                403: components["responses"]["CsrfInvalid"];
+                404: components["responses"]["NotFound"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/retention-preview.php": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview de cuántos informes se eliminarían con una política dada
+         * @description Devuelve un resumen del impacto sin ejecutar nada: cuántos audits
+         *     caen bajo la ventana de retención, cuántos están protegidos, cuánto
+         *     espacio se liberaría aproximadamente.
+         */
+        get: {
+            parameters: {
+                query: {
+                    months: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Preview del impacto */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SuccessEnvelope"] & {
+                            data?: {
+                                months?: number;
+                                /** Format: date-time */
+                                cutoffDate?: string;
+                                totalAudits?: number;
+                                pinnedAudits?: number;
+                                wouldDelete?: number;
+                                wouldKeep?: number;
+                                estimatedBytesFreed?: number;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/update-vulnerabilities.php": {
         parameters: {
             query?: never;
@@ -1469,6 +1574,8 @@ export interface components {
             /** Format: date-time */
             timestamp: string;
             hasContactInfo: boolean;
+            /** @description Si true, el informe está protegido del borrado automático por retención. */
+            isPinned?: boolean;
         };
         DashboardStats: {
             totalAudits: number;

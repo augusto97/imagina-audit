@@ -122,6 +122,14 @@ switch ($endpoint) {
         require __DIR__ . '/admin/queue-status.php';
         break;
 
+    case 'admin/pin-audit':
+        require __DIR__ . '/admin/pin-audit.php';
+        break;
+
+    case 'admin/retention-preview':
+        require __DIR__ . '/admin/retention-preview.php';
+        break;
+
     default:
         Response::error('Endpoint no encontrado', 404);
 }

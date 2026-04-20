@@ -64,4 +64,8 @@ return [
     'audit_failure_cache_minutes' => 10,   // Si una URL falló en los últimos N min, devolvemos el mismo error sin reprocesar
     'audit_max_attempts' => 3,             // Tras N intentos fallidos, se marca como permanently_failed
     'audit_jobs_retention_days' => 7,      // Cuánto retener jobs completed/failed antes de borrar
+
+    // Retención de informes de auditoría (resultados guardados en `audits`)
+    'audits_retention_enabled' => false,   // Master switch del borrado automático
+    'audits_retention_months' => 6,        // Informes > N meses se borran (excepto los pinned)
 ];

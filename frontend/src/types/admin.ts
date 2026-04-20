@@ -31,6 +31,8 @@ export interface LeadSummary {
   globalLevel: SemaphoreLevel
   timestamp: string
   hasContactInfo: boolean
+  /** Si true, el informe está protegido del borrado automático por retención. */
+  isPinned: boolean
 }
 
 export interface AppSettings {

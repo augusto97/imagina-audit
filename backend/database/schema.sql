@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS audits (
     scan_duration_ms INTEGER NOT NULL DEFAULT 0,
     result_json TEXT NOT NULL,
     waterfall_json TEXT,
+    is_pinned INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     ip_address TEXT
 );
@@ -101,3 +102,4 @@ CREATE INDEX IF NOT EXISTS idx_checklist_audit ON checklist_items(audit_id);
 CREATE INDEX IF NOT EXISTS idx_wp_snapshots_audit ON wp_snapshots(audit_id);
 CREATE INDEX IF NOT EXISTS idx_audit_jobs_status ON audit_jobs(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_jobs_started ON audit_jobs(started_at);
+CREATE INDEX IF NOT EXISTS idx_audits_pinned ON audits(is_pinned, created_at);
