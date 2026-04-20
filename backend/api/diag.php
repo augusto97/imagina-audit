@@ -9,19 +9,24 @@
  * contenido de audits, nunca tokens). Cada check es un semáforo verde/
  * amarillo/rojo con un mensaje corto.
  */
+// Diag debe responder SIEMPRE. Errores los reportamos en el JSON, no como 500.
 require_once __DIR__ . '/bootstrap.php';
 
 $checks = [];
 
-function addCheck(array &$checks, string $id, string $label, string $status, string $message, array $details = []): void {
-    $checks[] = [
-        'id' => $id,
-        'label' => $label,
-        'status' => $status, // 'ok' | 'warn' | 'fail'
-        'message' => $message,
-        'details' => $details,
-    ];
+if (!function_exists('addCheck')) {
+    function addCheck(array &$checks, string $id, string $label, string $status, string $message, array $details = []): void {
+        $checks[] = [
+            'id' => $id,
+            'label' => $label,
+            'status' => $status,
+            'message' => $message,
+            'details' => $details,
+        ];
+    }
 }
+
+try {
 
 // 1. PHP version
 $phpOk = version_compare(PHP_VERSION, '8.0.0', '>=');
@@ -215,7 +220,15 @@ try {
     }
 } catch (Throwable $e) {}
 
-// Resumen
+} catch (Throwable $globalError) {
+    // Cualquier cosa que haya roto el flujo normal — la reportamos en el JSON
+    // en vez de dejar que PHP devuelva 500. El admin puede verlo en la UI.
+    addCheck($checks, 'diag_internal_error', 'Error interno del diagnóstico', 'fail',
+        'Diag abortó prematuramente: ' . $globalError->getMessage(),
+        ['file' => basename($globalError->getFile()), 'line' => $globalError->getLine()]
+    );
+}
+
 $summary = [
     'ok' => count(array_filter($checks, fn($c) => $c['status'] === 'ok')),
     'warn' => count(array_filter($checks, fn($c) => $c['status'] === 'warn')),

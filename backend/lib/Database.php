@@ -101,22 +101,65 @@ class Database {
     }
 
     /**
-     * Ejecuta el schema SQL para crear las tablas
+     * Inicializa el schema y aplica migraciones.
+     *
+     * Dos pasos clave:
+     *
+     * 1. `runMigrations()` PRIMERO — aplica ALTERs sobre tablas existentes
+     *    (p.ej. `ADD COLUMN is_pinned`). Si la tabla no existe aún, el ALTER
+     *    falla silenciosamente (try/catch) y se creará completa en el paso 2.
+     *
+     * 2. Ejecutamos schema.sql **statement por statement**, no en bloque. Si un
+     *    CREATE INDEX referencia una columna que no existe (instalación vieja
+     *    sin migrar), ese INDEX falla pero los siguientes siguen corriendo.
+     *    Antes, un solo `pdo->exec($sql)` abortaba todo al primer error.
      */
     public function initSchema(): void {
+        // 1. Migraciones sobre tablas existentes (si las hay)
+        $this->runMigrations();
+
+        // 2. Schema completo — tolerante a fallos por statement
         $schemaPath = dirname(__DIR__) . '/database/schema.sql';
         if (file_exists($schemaPath)) {
             $sql = file_get_contents($schemaPath);
-            $this->pdo->exec($sql);
+            $statements = $this->splitSqlStatements($sql);
+            foreach ($statements as $stmt) {
+                try {
+                    $this->pdo->exec($stmt);
+                } catch (Throwable $e) {
+                    // Ignorar fallos por statement (IF NOT EXISTS que no aplica,
+                    // índices sobre columnas aún no migradas, etc.)
+                }
+            }
         }
+
+        // 3. Repetir migraciones por si alguna no aplicó por el orden
+        //    (p.ej. ALTER sobre tabla que solo existe tras el schema)
         $this->runMigrations();
+    }
+
+    /**
+     * Parte un dump SQL en statements individuales, respetando strings.
+     * Tolerante a strings con ';' internos (no los hay en nuestro schema
+     * pero por si acaso).
+     */
+    private function splitSqlStatements(string $sql): array {
+        // Quitar comentarios de línea completa
+        $sql = preg_replace('/^\s*--.*$/m', '', $sql) ?? $sql;
+        // Split por ';' + newline (preserva strings simples multi-línea)
+        $parts = preg_split('/;\s*\n/', $sql) ?: [];
+        $out = [];
+        foreach ($parts as $p) {
+            $p = trim(rtrim(trim($p), ';'));
+            if ($p !== '') $out[] = $p;
+        }
+        return $out;
     }
 
     /**
      * Migraciones defensive para bases ya instaladas. SQLite no soporta
      * ADD COLUMN IF NOT EXISTS, así que cada ALTER va en try/catch.
-     * Se ejecuta tras initSchema cada bootstrap — los ALTERs ya aplicados
-     * fallan silenciosamente.
+     * Se ejecuta en initSchema — los ALTERs ya aplicados fallan en silencio.
      */
     private function runMigrations(): void {
         $migrations = [
