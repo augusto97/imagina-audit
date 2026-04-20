@@ -7,6 +7,9 @@
  */
 
 class SeoOnPageChecker {
+    /** Cache del texto visible extraído (se calcula una vez, se reusa en varios checks). */
+    private ?string $cachedText = null;
+
     public function __construct(
         private string $url,
         private string $html,
@@ -474,8 +477,53 @@ class SeoOnPageChecker {
         );
     }
 
+    /**
+     * Extrae texto visible del HTML usando DOM walking. Indepediente del
+     * HtmlParser::getTextContent para que el SEO no se cuelgue si esa
+     * versión está desactualizada en producción (regex con backtracking
+     * catastrófico). Implementación O(n) iterativa.
+     */
+    private function extractVisibleText(): string {
+        if ($this->cachedText !== null) return $this->cachedText;
+
+        $dom = new \DOMDocument();
+        $prev = libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8">' . $this->html, LIBXML_NOWARNING | LIBXML_NOERROR);
+        libxml_clear_errors();
+        libxml_use_internal_errors($prev);
+
+        $bodyNodes = $dom->getElementsByTagName('body');
+        $root = $bodyNodes->length > 0 ? $bodyNodes->item(0) : $dom->documentElement;
+        if ($root === null) return '';
+
+        $excluded = ['script' => true, 'style' => true, 'noscript' => true, 'template' => true];
+        $out = '';
+        $stack = [$root];
+        while (!empty($stack)) {
+            $node = array_pop($stack);
+            if ($node === null) continue;
+            if ($node->nodeType === XML_TEXT_NODE) {
+                $out .= ' ' . $node->textContent;
+                continue;
+            }
+            if ($node->nodeType === XML_ELEMENT_NODE && isset($excluded[strtolower($node->nodeName)])) {
+                continue;
+            }
+            if ($node->hasChildNodes()) {
+                $kids = [];
+                foreach ($node->childNodes as $c) $kids[] = $c;
+                for ($i = count($kids) - 1; $i >= 0; $i--) $stack[] = $kids[$i];
+            }
+        }
+
+        $out = html_entity_decode($out, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $this->cachedText = trim(preg_replace('/\s+/u', ' ', $out) ?? $out);
+        return $this->cachedText;
+    }
+
     public function checkContent(): array {
-        $wordCount = $this->parser->getWordCount();
+        $text = $this->extractVisibleText();
+        $wordCount = $text === '' ? 0 : str_word_count($text);
 
         if ($wordCount < 100) {
             return Scoring::createMetric(
@@ -509,7 +557,7 @@ class SeoOnPageChecker {
     }
 
     public function checkKeywordDensity(): array {
-        $text = $this->parser->getTextContent();
+        $text = $this->extractVisibleText();
         $words = preg_split('/\s+/', mb_strtolower($text));
         $words = array_filter($words, fn($w) => mb_strlen($w) > 3);
         $totalWords = count($words);
