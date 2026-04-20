@@ -130,7 +130,7 @@ $envKeys = [
 $envProblems = [];
 $hasAdminHash = false;
 foreach ($envKeys as $key => $critical) {
-    $val = env($key, null);
+    $val = env($key, '');
     if (empty($val)) {
         if ($critical) $envProblems[] = "$key (crítico)";
         else $envProblems[] = $key;
