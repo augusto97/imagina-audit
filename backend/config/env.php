@@ -45,10 +45,18 @@ function loadEnv(string $path): void {
 }
 
 /**
- * Obtiene una variable de entorno con valor por defecto
+ * Obtiene una variable de entorno con valor por defecto.
+ *
+ * El segundo argumento es `mixed` a propósito — acepta string, null,
+ * int, bool, etc. — y se convierte a string solo si efectivamente se usa
+ * como fallback. Esto evita TypeErrors si algún caller pasa null.
  */
-function env(string $key, string $default = ''): string {
-    return $_ENV[$key] ?? getenv($key) ?: $default;
+function env(string $key, mixed $default = ''): string {
+    $val = $_ENV[$key] ?? getenv($key);
+    if ($val === false || $val === null || $val === '') {
+        return (string) ($default ?? '');
+    }
+    return (string) $val;
 }
 
 // Cargar .env automáticamente
