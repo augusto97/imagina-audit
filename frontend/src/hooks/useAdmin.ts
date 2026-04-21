@@ -112,6 +112,10 @@ export function useAdmin() {
   /**
    * Sube un asset de branding (logo, logo_collapsed, favicon).
    * Retorna la URL pública relativa donde quedó guardado.
+   *
+   * Importante: NO fijamos Content-Type. Axios detecta FormData y genera
+   * `multipart/form-data; boundary=...` automáticamente. Si lo forzamos
+   * nosotros, el servidor no encuentra el boundary y el parsing falla.
    */
   const uploadBrandAsset = useCallback(async (type: 'logo' | 'logo_collapsed' | 'favicon', file: File) => {
     try {
@@ -119,7 +123,7 @@ export function useAdmin() {
       form.append('type', type)
       form.append('file', file)
       const res = await api.post('/admin/upload.php', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': undefined as unknown as string },
       })
       return res.data.data as { url: string; type: string; filename: string }
     } catch (err) { handleError(err) }

@@ -204,35 +204,17 @@ export default function SettingsHomeCMS() {
           </Card>
         </TabsContent>
 
-        {/* Preview */}
+        {/* Preview — una maqueta visual del home real con los textos editados */}
         <TabsContent value="preview">
           <Card>
-            <CardHeader><CardTitle>Vista previa del hero</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Vista previa del home</CardTitle>
+              <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                Muestra cómo quedará el home con los textos editados. No refleja los cambios hasta que guardes.
+              </p>
+            </CardHeader>
             <CardContent>
-              <div className="rounded-lg border border-[var(--border-default)] bg-gradient-to-b from-white to-[var(--bg-secondary)] p-8 text-center">
-                <h1 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)]">
-                  {form.heroHeadline || 'Titular principal'}
-                </h1>
-                <p className="mt-3 text-sm sm:text-base text-[var(--text-secondary)] max-w-xl mx-auto">
-                  {form.heroSubheadline || 'Subtítulo'}
-                </p>
-                <div className="mt-6">
-                  <button className="rounded px-5 py-2.5 text-sm font-medium text-white" style={{ backgroundColor: 'var(--accent-primary)' }}>
-                    {form.formButtonText || 'Botón'}
-                  </button>
-                </div>
-                <p className="mt-3 text-xs text-[var(--text-tertiary)]">
-                  {form.formMicrocopy || 'micro-copy...'}
-                </p>
-                <hr className="my-6 border-[var(--border-default)]" />
-                <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                  {form.featuresTitle || 'Título de features'}
-                </h2>
-                <hr className="my-6 border-[var(--border-default)]" />
-                <p className="text-sm text-[var(--text-secondary)]">
-                  {form.trustText || 'Trust bar'}
-                </p>
-              </div>
+              <HomePreview form={form} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -242,6 +224,89 @@ export default function SettingsHomeCMS() {
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" strokeWidth={1.5} />}
         Guardar cambios
       </Button>
+    </div>
+  )
+}
+
+/**
+ * Maqueta simplificada del home público con los textos que el admin está
+ * editando. Replica la estructura visual del HomePage real: hero + grid
+ * de 8 módulos + trust bar.
+ */
+function HomePreview({ form }: { form: HomeForm }) {
+  const moduleIds = ['security', 'performance', 'seo', 'wordpress', 'mobile', 'infrastructure', 'conversion', 'page_health']
+  const moduleLabels: Record<string, { icon: string; name: string }> = {
+    security: { icon: '🛡️', name: 'Seguridad' },
+    performance: { icon: '⚡', name: 'Rendimiento' },
+    seo: { icon: '🔍', name: 'SEO' },
+    wordpress: { icon: '🧩', name: 'WordPress' },
+    mobile: { icon: '📱', name: 'Móvil' },
+    infrastructure: { icon: '🖥️', name: 'Infraestructura' },
+    conversion: { icon: '📊', name: 'Conversión' },
+    page_health: { icon: '🩺', name: 'Salud de Página' },
+  }
+  const microItems = (form.formMicrocopy || '').split(/\s*[·•|]\s*/).filter(Boolean)
+  const tools = ['Elementor', 'WP Rocket', 'Rank Math', 'Gravity Forms', 'Cloudflare', 'WooCommerce']
+
+  return (
+    <div className="rounded-xl border border-[var(--border-default)] overflow-hidden shadow-sm">
+      {/* Fake browser chrome */}
+      <div className="flex items-center gap-1.5 bg-[#ececec] px-3 py-1.5 border-b border-[var(--border-default)]">
+        <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
+        <span className="ml-3 text-[11px] text-[#666] font-mono">{window.location.hostname}/</span>
+      </div>
+
+      {/* Hero */}
+      <div className="bg-gradient-to-b from-white to-[var(--bg-secondary)] px-8 py-12 text-center">
+        <h1 className="text-2xl sm:text-4xl font-bold text-[var(--text-primary)]">
+          {form.heroHeadline || <span className="italic text-[var(--text-tertiary)]">Titular principal (vacío)</span>}
+        </h1>
+        <p className="mx-auto mt-3 max-w-xl text-sm sm:text-base text-[var(--text-secondary)]">
+          {form.heroSubheadline || <span className="italic">Subtítulo (vacío)</span>}
+        </p>
+
+        {/* Form fake */}
+        <div className="mx-auto mt-8 max-w-md rounded-xl border border-[var(--border-default)] bg-white p-4 shadow-sm">
+          <div className="rounded border border-[var(--border-default)] px-3 py-2 text-left text-xs text-[var(--text-tertiary)]">
+            https://tusitio.com
+          </div>
+          <button className="mt-3 w-full rounded px-5 py-2.5 text-sm font-medium text-white" style={{ backgroundColor: 'var(--accent-primary)' }}>
+            {form.formButtonText || 'Botón del formulario'}
+          </button>
+          <div className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11px] text-[var(--text-tertiary)]">
+            {microItems.length > 0 ? microItems.map((m) => <span key={m}>{m}</span>) : <span className="italic">micro-copy (vacío)</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Features */}
+      <div className="bg-white px-8 py-10">
+        <h2 className="mb-6 text-center text-lg sm:text-xl font-bold text-[var(--text-primary)]">
+          {form.featuresTitle || <span className="italic text-[var(--text-tertiary)]">Título de features (vacío)</span>}
+        </h2>
+        <div className="mx-auto grid max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+          {moduleIds.map((id) => (
+            <div key={id} className="flex flex-col items-center gap-1 rounded-lg border border-[var(--border-default)] bg-white p-3 text-center">
+              <span className="text-xl">{moduleLabels[id].icon}</span>
+              <span className="text-[11px] font-semibold text-[var(--text-primary)]">{moduleLabels[id].name}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Trust bar */}
+      <div className="border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-8 py-8 text-center">
+        <p className="text-xs sm:text-sm font-medium text-[var(--text-secondary)]">
+          {form.trustText || <span className="italic text-[var(--text-tertiary)]">Trust bar (vacío)</span>}
+        </p>
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          {tools.map((t) => (
+            <span key={t} className="rounded-full border border-[var(--border-default)] bg-white px-3 py-1 text-[10px] font-medium text-[var(--text-secondary)]">{t}</span>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

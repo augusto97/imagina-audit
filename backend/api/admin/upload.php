@@ -80,19 +80,24 @@ if (!move_uploaded_file($file['tmp_name'], $destPath)) {
 }
 @chmod($destPath, 0644);
 
-// Ruta pública relativa a la raíz del proyecto. El frontend concatena
-// con window.location.origin + base path para formar la URL final.
-$publicUrl = '/uploads/' . $filename;
+// Ruta pública absoluta con detección del base path de la app.
+// Si la app vive en subdominio (audit.ej.com) → $appBase = ''
+// Si la app vive en subcarpeta (ej.com/audit) → $appBase = '/audit'
+$script = $_SERVER['SCRIPT_NAME'] ?? '/api/admin/upload.php';
+$appBase = rtrim(str_replace('\\', '/', dirname($script, 3)), '/');
+if ($appBase === '' || $appBase === '.') $appBase = '';
+$publicUrl = $appBase . '/uploads/' . $filename;
 
 // Actualizar setting correspondiente
 try {
     $db = Database::getInstance();
     $settingKey = $validTypes[$type];
 
-    // Borrar archivo anterior (si existía) para no acumular basura
+    // Borrar archivo anterior (si existía) para no acumular basura.
+    // Extraemos solo el nombre de archivo para evitar path traversal.
     $oldUrl = (string) $db->scalar("SELECT value FROM settings WHERE key = ?", [$settingKey]);
-    if ($oldUrl !== '' && str_starts_with($oldUrl, '/uploads/')) {
-        $oldPath = $publicRoot . $oldUrl;
+    if ($oldUrl !== '' && preg_match('#/uploads/([^/]+)$#', $oldUrl, $oldMatch)) {
+        $oldPath = $uploadsDir . '/' . $oldMatch[1];
         if (is_file($oldPath)) @unlink($oldPath);
     }
 

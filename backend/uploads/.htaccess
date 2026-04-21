@@ -1,10 +1,22 @@
-# Solo servir imágenes estáticas. Si alguien lograra subir un PHP,
-# Apache no lo ejecutaría como script aquí.
-<FilesMatch "\.(php|php\d|phtml|phar|inc|env)$">
+# Bloquear ejecución de scripts dinámicos en uploads/.
+# Si alguien lograra subir un PHP, no se podría ejecutar al pedirlo.
+# Estas directivas son compatibles con mod_php y PHP-FPM.
+
+# 1. Denegar acceso HTTP a archivos con extensiones de script
+<FilesMatch "\.(php|php\d|phtml|phar|inc|env|sh|cgi|pl|py|rb|asp|aspx)$">
     Require all denied
 </FilesMatch>
 
-# Desactivar ejecución de scripts CGI / handlers PHP
+# 2. Quitar handlers de PHP si algún módulo los heredó de la config global
+<IfModule mod_mime.c>
+    RemoveHandler .php .phtml .phar .php3 .php4 .php5 .php7 .php8
+    RemoveType .php .phtml .phar
+</IfModule>
+
+# 3. Desactivar ejecución CGI
 Options -ExecCGI
-RemoveHandler .php .phtml .phar
-php_flag engine off
+
+# 4. Forzar MIME type correcto para imágenes (evita sniffing mal intencionado)
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>
