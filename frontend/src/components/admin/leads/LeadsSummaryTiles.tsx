@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { FileSearch, UserCheck, AlertCircle, Blocks, Pin, Database, CalendarDays, type LucideIcon } from 'lucide-react'
 import type { LeadsSummary } from '@/types/lead'
 
@@ -43,14 +44,15 @@ export function LeadsSummaryTiles({
   activeFilter: string
   onFilter: (filter: string) => void
 }) {
+  const { t } = useTranslation()
   const tiles: TileDef[] = [
-    { key: 'total',       filterKey: 'all',          label: 'Total',         value: summary.total,        icon: FileSearch,   staticTone: 'accent' },
-    { key: 'withContact', filterKey: 'with_contact', label: 'Con contacto',  value: summary.withContact,  icon: UserCheck,    staticTone: 'good' },
-    { key: 'critical',    filterKey: 'critical',     label: 'Score crítico', value: summary.critical,     icon: AlertCircle,  staticTone: 'neutral', valueToneWhenPositive: 'critical' },
-    { key: 'wordpress',   filterKey: 'wp_yes',       label: 'WordPress',     value: summary.wordpress,    icon: Blocks,       staticTone: 'accent' },
-    { key: 'snapshot',    filterKey: 'snap_yes',     label: 'Con snapshot',  value: summary.withSnapshot, icon: Database,     staticTone: 'good' },
-    { key: 'pinned',      filterKey: 'pin_yes',      label: 'Protegidos',    value: summary.pinned,       icon: Pin,          staticTone: 'amber' },
-    { key: 'thisWeek',    filterKey: 'this_week',    label: 'Últimos 7 días', value: summary.thisWeek,    icon: CalendarDays, staticTone: 'neutral' },
+    { key: 'total',       filterKey: 'all',          label: t('leads.tile_total'),           value: summary.total,        icon: FileSearch,   staticTone: 'accent' },
+    { key: 'withContact', filterKey: 'with_contact', label: t('leads.tile_with_contact'),    value: summary.withContact,  icon: UserCheck,    staticTone: 'good' },
+    { key: 'critical',    filterKey: 'critical',     label: t('leads.tile_critical_score'),  value: summary.critical,     icon: AlertCircle,  staticTone: 'neutral', valueToneWhenPositive: 'critical' },
+    { key: 'wordpress',   filterKey: 'wp_yes',       label: t('leads.tile_wordpress'),       value: summary.wordpress,    icon: Blocks,       staticTone: 'accent' },
+    { key: 'snapshot',    filterKey: 'snap_yes',     label: t('leads.tile_with_snapshot'),   value: summary.withSnapshot, icon: Database,     staticTone: 'good' },
+    { key: 'pinned',      filterKey: 'pin_yes',      label: t('leads.tile_protected'),       value: summary.pinned,       icon: Pin,          staticTone: 'amber' },
+    { key: 'thisWeek',    filterKey: 'this_week',    label: t('leads.tile_last_7_days'),     value: summary.thisWeek,     icon: CalendarDays, staticTone: 'neutral' },
   ]
 
   return (

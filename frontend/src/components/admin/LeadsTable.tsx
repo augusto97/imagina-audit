@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Search, ChevronLeft, ChevronRight, SearchX, Download, Copy } from 'lucide-react'
 import { toast } from 'sonner'
@@ -35,6 +36,7 @@ type Dimensional = 'any' | 'yes' | 'no'
  * (un solo filtro activo a la vez, para que sea fácil entender el estado).
  */
 export default function LeadsTable() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { fetchLeads, deleteLead, pinAudit, bulkLeads } = useAdmin()
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -85,26 +87,26 @@ export default function LeadsTable() {
   const handleTogglePin = useCallback(async (lead: Lead) => {
     try {
       await pinAudit(lead.id, !lead.isPinned)
-      toast.success(lead.isPinned ? 'Protección retirada' : 'Informe protegido')
+      toast.success(lead.isPinned ? t('leads.toast_unprotected') : t('leads.toast_protected'))
       loadLeads()
-    } catch { toast.error('Error al cambiar protección') }
-  }, [pinAudit, loadLeads])
+    } catch { toast.error(t('leads.toast_protect_failed')) }
+  }, [pinAudit, loadLeads, t])
 
   const handleDelete = useCallback(async (lead: Lead) => {
     try {
       await deleteLead(lead.id)
-      toast.success('Auditoría eliminada')
+      toast.success(t('common.success'))
       loadLeads()
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number; data?: { error?: string } } }
-      toast.error(axiosErr.response?.data?.error || 'Error al eliminar')
+      toast.error(axiosErr.response?.data?.error || t('common.error'))
     }
-  }, [deleteLead, loadLeads])
+  }, [deleteLead, loadLeads, t])
 
   const copyEmail = (email: string, e: React.MouseEvent) => {
     e.stopPropagation()
     navigator.clipboard.writeText(email)
-    toast.success('Email copiado')
+    toast.success(t('leads.toast_email_copied'))
   }
 
   // ─── Selección múltiple (C.1) ──────────────────────────────────
@@ -137,7 +139,7 @@ export default function LeadsTable() {
   const runBulk = async (action: 'delete' | 'pin' | 'unpin') => {
     const ids = Array.from(selected)
     if (ids.length === 0) return
-    if (action === 'delete' && !window.confirm(`¿Eliminar ${ids.length} auditoría${ids.length > 1 ? 's' : ''}? (los protegidos se saltarán)`)) return
+    if (action === 'delete' && !window.confirm(t('leads.bulk_confirm_delete', { count: ids.length }))) return
 
     setBulkBusy(true)
     try {
@@ -145,16 +147,18 @@ export default function LeadsTable() {
       if (res) {
         if (action === 'delete') {
           const msg = res.skipped > 0
-            ? `${res.processed} eliminadas, ${res.skipped} saltadas (protegidas)`
-            : `${res.processed} eliminadas`
+            ? t('leads.bulk_result_delete_with_skipped', { processed: res.processed, skipped: res.skipped })
+            : t('leads.bulk_result_delete', { processed: res.processed })
           toast.success(msg)
         } else {
-          toast.success(`${res.processed} ${action === 'pin' ? 'protegidas' : 'desprotegidas'}`)
+          toast.success(action === 'pin'
+            ? t('leads.bulk_result_protected', { count: res.processed })
+            : t('leads.bulk_result_unprotected', { count: res.processed }))
         }
       }
       clearSelection()
       loadLeads()
-    } catch { toast.error('Error al ejecutar la acción en lote') }
+    } catch { toast.error(t('leads.toast_bulk_failed')) }
     setBulkBusy(false)
   }
 
@@ -171,12 +175,12 @@ export default function LeadsTable() {
   }
 
   const mainFilterLabels: Record<MainFilter, string> = {
-    all:          'Todos',
-    with_contact: 'Con contacto',
-    critical:     'Score crítico',
-    warning:      'Score bajo',
-    this_week:    'Últimos 7 días',
-    this_month:   'Últimos 30 días',
+    all:          t('common.all'),
+    with_contact: t('leads.filter_label_with_contact'),
+    critical:     t('leads.filter_label_critical'),
+    warning:      t('leads.filter_label_warning'),
+    this_week:    t('leads.filter_label_this_week'),
+    this_month:   t('leads.filter_label_this_month'),
   }
 
   const chips: FilterChip[] = []
@@ -184,13 +188,13 @@ export default function LeadsTable() {
     chips.push({ key: 'main', label: mainFilterLabels[mainFilter], onRemove: () => { setMainFilter('all'); setPage(1) } })
   }
   if (filterWp !== 'any') {
-    chips.push({ key: 'wp', label: filterWp === 'yes' ? 'WordPress' : 'Sin WordPress', onRemove: () => { setFilterWp('any'); setPage(1) } })
+    chips.push({ key: 'wp', label: filterWp === 'yes' ? t('leads.filter_chip_wp_yes') : t('leads.filter_chip_wp_no'), onRemove: () => { setFilterWp('any'); setPage(1) } })
   }
   if (filterSnap !== 'any') {
-    chips.push({ key: 'snap', label: filterSnap === 'yes' ? 'Con snapshot' : 'Sin snapshot', onRemove: () => { setFilterSnap('any'); setPage(1) } })
+    chips.push({ key: 'snap', label: filterSnap === 'yes' ? t('leads.filter_chip_snapshot_yes') : t('leads.filter_chip_snapshot_no'), onRemove: () => { setFilterSnap('any'); setPage(1) } })
   }
   if (filterPinned !== 'any') {
-    chips.push({ key: 'pin', label: filterPinned === 'yes' ? 'Protegidos' : 'Sin proteger', onRemove: () => { setFilterPinned('any'); setPage(1) } })
+    chips.push({ key: 'pin', label: filterPinned === 'yes' ? t('leads.filter_chip_pinned_yes') : t('leads.filter_chip_pinned_no'), onRemove: () => { setFilterPinned('any'); setPage(1) } })
   }
   if (search) {
     chips.push({ key: 'search', label: `"${search}"`, onRemove: () => { setSearchInput(''); setSearch(''); setPage(1) } })
@@ -221,18 +225,16 @@ export default function LeadsTable() {
       a.download = `imagina-audit-leads-${new Date().toISOString().slice(0, 10)}.csv`
       a.click()
       URL.revokeObjectURL(url)
-      toast.success('CSV exportado')
-    } catch { toast.error('Error al exportar') }
+      toast.success(t('leads.toast_csv_ok'))
+    } catch { toast.error(t('leads.toast_csv_failed')) }
     setExporting(false)
   }
 
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Leads y Auditorías</h1>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">
-          Click en una fila para abrir el lead. Usa los tiles para filtrar rápido por dimensión.
-        </p>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('leads.title')}</h1>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">{t('leads.subtitle_click_row')}</p>
       </div>
 
       {/* Summary tiles (clickeables) */}
@@ -251,18 +253,18 @@ export default function LeadsTable() {
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Buscar por dominio, nombre, email o empresa..."
+            placeholder={t('leads.search_placeholder')}
             className="pl-9"
           />
         </div>
         <Select value={sort} onValueChange={(v) => { setSort(v as Sort); setPage(1) }}>
           <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="date_desc">Más recientes</SelectItem>
-            <SelectItem value="date_asc">Más antiguos</SelectItem>
-            <SelectItem value="score_asc">Peor score</SelectItem>
-            <SelectItem value="score_desc">Mejor score</SelectItem>
-            <SelectItem value="domain_asc">Dominio A-Z</SelectItem>
+            <SelectItem value="date_desc">{t('leads.sort_date_desc')}</SelectItem>
+            <SelectItem value="date_asc">{t('leads.sort_date_asc')}</SelectItem>
+            <SelectItem value="score_asc">{t('leads.sort_score_asc')}</SelectItem>
+            <SelectItem value="score_desc">{t('leads.sort_score_desc')}</SelectItem>
+            <SelectItem value="domain_asc">{t('leads.sort_domain_asc')}</SelectItem>
           </SelectContent>
         </Select>
         <MoreFiltersPopover
@@ -277,7 +279,7 @@ export default function LeadsTable() {
         />
         <Button variant="outline" size="sm" onClick={exportCsv} disabled={exporting}>
           <Download className="h-4 w-4" strokeWidth={1.5} />
-          <span className="hidden sm:inline">{exporting ? 'Exportando...' : 'CSV'}</span>
+          <span className="hidden sm:inline">{exporting ? t('leads.exporting') : t('leads.export_csv')}</span>
         </Button>
       </div>
 
@@ -304,9 +306,9 @@ export default function LeadsTable() {
           ) : leads.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-16 text-[var(--text-tertiary)]">
               <SearchX className="h-10 w-10" strokeWidth={1} />
-              <p className="text-sm">No se encontraron resultados</p>
+              <p className="text-sm">{t('leads.empty_no_results')}</p>
               {chips.length > 0 && (
-                <Button variant="outline" size="sm" onClick={resetAll}>Limpiar filtros</Button>
+                <Button variant="outline" size="sm" onClick={resetAll}>{t('leads.clear_filters')}</Button>
               )}
             </div>
           ) : (
@@ -323,12 +325,12 @@ export default function LeadsTable() {
                       className="h-4 w-4 cursor-pointer accent-[var(--accent-primary)]"
                     />
                   </TableHead>
-                  <TableHead className="w-[110px]">Fecha</TableHead>
-                  <TableHead>Dominio</TableHead>
-                  <TableHead className="hidden lg:table-cell">Email</TableHead>
-                  <TableHead className="hidden lg:table-cell">WhatsApp</TableHead>
-                  <TableHead className="w-[80px]">Score</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead className="w-[110px]">{t('leads.col_date')}</TableHead>
+                  <TableHead>{t('leads.col_domain')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('leads.col_email')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('leads.col_whatsapp')}</TableHead>
+                  <TableHead className="w-[80px]">{t('leads.col_score')}</TableHead>
+                  <TableHead className="text-right">{t('common.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -408,7 +410,7 @@ export default function LeadsTable() {
           <div className="flex items-center gap-3 text-[var(--text-tertiary)]">
             <span>{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} de {total}</span>
             <div className="flex items-center gap-2">
-              <label htmlFor="page-size" className="text-xs">Filas por página:</label>
+              <label htmlFor="page-size" className="text-xs">{t('common.rows_per_page')}</label>
               <Select
                 value={String(pageSize)}
                 onValueChange={(v) => { setPageSize(Number(v)); setPage(1) }}
@@ -426,11 +428,11 @@ export default function LeadsTable() {
           {totalPages > 1 && (
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-                <ChevronLeft className="h-4 w-4" /> Anterior
+                <ChevronLeft className="h-4 w-4" /> {t('common.previous')}
               </Button>
               <span className="self-center text-xs text-[var(--text-tertiary)]">{page} / {totalPages}</span>
               <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-                Siguiente <ChevronRight className="h-4 w-4" />
+                {t('common.next')} <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           )}
