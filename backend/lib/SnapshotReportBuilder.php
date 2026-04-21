@@ -350,10 +350,263 @@ class SnapshotReportBuilder {
         if (!empty($vulns)) return $hasUpdate ? 'outdated_vulnerable' : 'vulnerable';
         return $hasUpdate ? 'outdated' : 'safe';
     }
-    private function buildThemes(): array      { return []; }
-    private function buildSecurity(): array    { return []; }
-    private function buildPerformance(): array { return []; }
-    private function buildDatabase(): array    { return []; }
+    // ——— Themes ——————————————————————————————————————————————————
+
+    private function buildThemes(): array {
+        $th = $this->section('themes');
+        $active = $th['active_theme'] ?? [];
+        $installed = $th['installed'] ?? [];
+
+        $items = array_map(fn($t) => [
+            'slug'          => $t['stylesheet'] ?? $t['template'] ?? '',
+            'name'          => $t['name'] ?? '?',
+            'version'       => $t['version'] ?? '',
+            'author'        => $t['author'] ?? '',
+            'uri'           => $t['uri'] ?? '',
+            'isActive'      => (bool) ($t['is_active'] ?? false),
+            'isChildTheme'  => (bool) ($t['is_child_theme'] ?? false),
+            'parent'        => $t['parent_theme'] ?? null,
+            'isBlockTheme'  => (bool) ($t['is_block_theme'] ?? false),
+            'hasUpdate'     => (bool) ($t['has_update'] ?? false),
+            'requiresWp'    => $t['requires_wp'] ?? '',
+            'requiresPhp'   => $t['requires_php'] ?? '',
+        ], $installed);
+
+        usort($items, fn($a, $b) => [$b['isActive'], strtolower($a['name'])] <=> [$a['isActive'], strtolower($b['name'])]);
+
+        $issues = [];
+        if (!empty($active) && !($active['is_child_theme'] ?? false)) {
+            $issues[] = [
+                'severity' => 'info',
+                'title'    => "Tema {$active['name']} sin child theme",
+                'action'   => 'Cualquier customización directa al tema se perderá al actualizar. Crear un child theme con Template: ' . strtolower($active['name'] ?? '') . '.',
+            ];
+        }
+        if (($active['has_update'] ?? false)) {
+            $issues[] = [
+                'severity' => 'warning',
+                'title'    => "Tema activo desactualizado: {$active['name']}",
+                'action'   => 'Actualizar desde Apariencia → Temas.',
+            ];
+        }
+        $inactiveCount = (int) ($th['total_themes'] ?? 0) - (empty($active) ? 0 : 1);
+        if ($inactiveCount >= 3) {
+            $issues[] = [
+                'severity' => 'info',
+                'title'    => "$inactiveCount temas inactivos en disco",
+                'action'   => 'Eliminar temas sin usar desde Apariencia → Temas (mantener solo el activo y un default como fallback).',
+            ];
+        }
+
+        return [
+            'summary' => [
+                'total'       => (int) ($th['total_themes'] ?? 0),
+                'activeName'  => $active['name'] ?? '',
+                'isChild'     => (bool) ($active['is_child_theme'] ?? false),
+                'updates'     => (int) ($th['update_available'] ?? 0),
+            ],
+            'items'  => $items,
+            'issues' => $issues,
+        ];
+    }
+
+    // ——— Security: 11 checks del plugin + hallazgos ——————————————
+
+    private function buildSecurity(): array {
+        $sec = $this->section('security');
+        $checks = $sec['checks'] ?? [];
+
+        $items = [];
+        $issues = [];
+        foreach ($checks as $key => $c) {
+            $status = $c['status'] ?? 'info';          // good|warning|critical|info
+            $items[] = [
+                'id'     => $key,
+                'label'  => $c['label'] ?? $key,
+                'value'  => $c['value'] ?? null,
+                'status' => $status,
+                'note'   => $c['note'] ?? '',
+            ];
+            if ($status === 'critical' || $status === 'warning') {
+                $issues[] = [
+                    'severity' => $status,
+                    'title'    => $c['label'] ?? $key,
+                    'action'   => $this->securityActionFor($key, $c),
+                ];
+            }
+        }
+
+        // Orden: critical → warning → info → good
+        $rank = ['critical' => 0, 'warning' => 1, 'info' => 2, 'good' => 3];
+        usort($items, fn($a, $b) => ($rank[$a['status']] ?? 9) <=> ($rank[$b['status']] ?? 9));
+
+        return [
+            'summary' => [
+                'critical' => (int) ($sec['critical_count'] ?? 0),
+                'warning'  => (int) ($sec['warning_count'] ?? 0),
+                'good'     => (int) ($sec['good_count'] ?? 0),
+            ],
+            'items'  => $items,
+            'issues' => $issues,
+        ];
+    }
+
+    private function securityActionFor(string $key, array $c): string {
+        $value = $c['value'] ?? null;
+        return match ($key) {
+            'wp_debug'         => 'En wp-config.php: define("WP_DEBUG", false); — o al menos desactivar WP_DEBUG_DISPLAY.',
+            'wp_debug_display' => 'define("WP_DEBUG_DISPLAY", false); en wp-config.php para no leakear errores a visitantes.',
+            'file_editing'     => $value ? '' : 'define("DISALLOW_FILE_EDIT", true); en wp-config.php.',
+            'file_mods'        => 'define("DISALLOW_FILE_MODS", true); impide instalar/actualizar plugins vía admin — solo recomendable con CI/CD.',
+            'db_prefix'        => $value ? '' : 'Cambiar prefijo de wp_ a uno custom vía script de migración (wp-config + renombrar tablas + options serializadas).',
+            'auto_updates_core' => 'Habilitar auto-updates menores: add_filter("auto_update_core", "__return_true"); o dejar defaults de WP.',
+            'app_passwords'    => 'Si no usas apps externas (Jetpack, mobile app) desactivar con add_filter("wp_is_application_passwords_available", "__return_false");',
+            'wp_config_writable' => 'Permisos de wp-config.php a 440 o 400 (read-only).',
+            'xmlrpc'           => $value ? 'Desactivar XML-RPC si no lo usas: add_filter("xmlrpc_enabled", "__return_false"); — reduce superficie de fuerza bruta.' : '',
+            'ssl'              => $value ? '' : 'Migrar a HTTPS: actualizar site_url/home_url, instalar SSL, forzar redirect 301 desde HTTP.',
+            default            => (string) ($c['note'] ?? ''),
+        };
+    }
+
+    // ——— Database: tamaño, tablas top, autoload, cleanup ——————————
+
+    private function buildDatabase(): array {
+        $db = $this->section('database');
+        $tables = $db['tables'] ?? [];
+
+        // Top 15 tablas por tamaño
+        usort($tables, fn($a, $b) => ((int) ($b['total_size'] ?? 0)) <=> ((int) ($a['total_size'] ?? 0)));
+        $top = array_slice($tables, 0, 15);
+        $topOut = array_map(fn($t) => [
+            'name'    => $t['name'] ?? '',
+            'engine'  => $t['engine'] ?? '',
+            'rows'    => (int) ($t['rows'] ?? 0),
+            'sizeBytes' => (int) ($t['total_size'] ?? 0),
+            'sizeMb'  => round(((int) ($t['total_size'] ?? 0)) / (1024 * 1024), 1),
+            'collation' => $t['collation'] ?? '',
+        ], $top);
+
+        $myisam = array_values(array_filter($tables, fn($t) => strtolower((string) ($t['engine'] ?? '')) === 'myisam'));
+        $myisamList = array_map(fn($t) => ['name' => $t['name'] ?? '', 'rows' => (int) ($t['rows'] ?? 0)], $myisam);
+
+        $autoloadBytes = (int) ($db['autoload_size'] ?? 0);
+        $autoloadMb = $autoloadBytes / (1024 * 1024);
+        $revisions = (int) ($db['revisions_count'] ?? 0);
+        $transients = (int) ($db['transients_count'] ?? 0);
+        $orphaned = (int) ($db['orphaned_postmeta'] ?? 0);
+
+        $issues = [];
+        if ($autoloadMb > 1) {
+            $issues[] = [
+                'severity' => $autoloadMb > 3 ? 'critical' : 'warning',
+                'title'    => 'Autoload pesado: ' . ($db['autoload_size_human'] ?? '?') . ' en ' . (int) ($db['autoloaded_options'] ?? 0) . ' opciones',
+                'action'   => 'Ralentiza TODO el sitio (cada request carga estas opciones). Usar WP-Optimize / Autoload Options Monitor para identificar las más pesadas y cambiar autoload=no.',
+            ];
+        }
+        if ($revisions >= 500) {
+            $issues[] = [
+                'severity' => $revisions >= 2000 ? 'warning' : 'info',
+                'title'    => "$revisions revisiones acumuladas",
+                'action'   => 'define("WP_POST_REVISIONS", 5); + limpiar históricas con WP-Optimize.',
+            ];
+        }
+        if (!empty($myisam)) {
+            $issues[] = [
+                'severity' => 'warning',
+                'title'    => count($myisam) . ' tablas con motor MyISAM',
+                'action'   => 'Convertir a InnoDB: ALTER TABLE nombre ENGINE=InnoDB; (una por una, backup antes).',
+            ];
+        }
+        if ($orphaned > 100) {
+            $issues[] = [
+                'severity' => 'warning',
+                'title'    => "$orphaned registros de postmeta huérfanos",
+                'action'   => 'Limpiar con WP-Optimize o SQL directo sobre wp_postmeta LEFT JOIN wp_posts.',
+            ];
+        }
+
+        return [
+            'summary' => [
+                'sizeBytes'    => (int) ($db['total_db_size'] ?? 0),
+                'sizeHuman'    => $db['total_db_size_human'] ?? '',
+                'tables'       => (int) ($db['total_tables'] ?? 0),
+                'rows'         => (int) ($db['total_rows'] ?? 0),
+                'prefix'       => $db['db_prefix'] ?? '',
+                'charset'      => $db['db_charset'] ?? '',
+                'collation'    => $db['db_collate'] ?? '',
+                'autoloadHuman' => $db['autoload_size_human'] ?? '',
+                'autoloadBytes' => $autoloadBytes,
+                'autoloadOptions' => (int) ($db['autoloaded_options'] ?? 0),
+                'totalOptions' => (int) ($db['total_options'] ?? 0),
+                'transients'   => $transients,
+                'revisions'    => $revisions,
+                'trashed'      => (int) ($db['trashed_count'] ?? 0),
+                'orphanedMeta' => $orphaned,
+                'myisamCount'  => count($myisam),
+            ],
+            'topTables'  => $topOut,
+            'myisamTables' => $myisamList,
+            'postCounts' => $db['post_counts'] ?? [],
+            'issues'     => $issues,
+        ];
+    }
+
+    // ——— Performance: cache stack + image editor + opcache ———————
+
+    private function buildPerformance(): array {
+        $perf = $this->section('performance');
+        $env  = $this->section('environment');
+
+        $pageCache = (bool) ($perf['page_cache_likely'] ?? false);
+        $objectCache = (bool) ($perf['object_cache_active'] ?? false);
+        $objectCacheType = $perf['object_cache_type'] ?? 'None';
+        $opcache = (bool) ($perf['opcache_enabled'] ?? $env['opcache_enabled'] ?? false);
+        $imageEditor = $perf['image_editor'] ?? '';
+
+        $issues = [];
+        if (!$opcache) {
+            $issues[] = [
+                'severity' => 'critical',
+                'title'    => 'OPcache desactivado',
+                'action'   => 'En php.ini: opcache.enable=1, opcache.memory_consumption=256. Ganancia típica 30-60% en rendimiento PHP.',
+            ];
+        }
+        if (!$objectCache) {
+            $issues[] = [
+                'severity' => 'warning',
+                'title'    => 'Sin object cache persistente',
+                'action'   => 'Instalar Redis o Memcached + plugin Redis Object Cache. Reduce queries repetidas a DB.',
+            ];
+        }
+        if (!$pageCache) {
+            $issues[] = [
+                'severity' => 'warning',
+                'title'    => 'No se detecta page cache',
+                'action'   => 'Instalar WP Rocket / LiteSpeed Cache / W3 Total Cache, o habilitar cache a nivel de servidor (Nginx FastCGI, Varnish).',
+            ];
+        }
+        if ($imageEditor && stripos($imageEditor, 'imagick') === false) {
+            $issues[] = [
+                'severity' => 'info',
+                'title'    => "WP usa $imageEditor (sin Imagick)",
+                'action'   => 'Instalar extensión PHP Imagick para mejor calidad, WebP y AVIF.',
+            ];
+        }
+
+        return [
+            'summary' => [
+                'pageCache'        => $pageCache,
+                'objectCache'      => $objectCache,
+                'objectCacheType'  => $objectCacheType,
+                'objectCacheDropin' => (bool) ($perf['object_cache_dropin'] ?? false),
+                'opcache'          => $opcache,
+                'imageEditor'      => $imageEditor,
+                'permalinks'       => $perf['permalink_structure'] ?? '',
+                'wpOrgReachable'   => (bool) ($perf['wp_org_reachable'] ?? true),
+            ],
+            'issues' => $issues,
+        ];
+    }
     private function buildCron(): array        { return []; }
     private function buildMedia(): array       { return []; }
     private function buildUsers(): array       { return []; }
