@@ -1,5 +1,6 @@
 import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { TrendingUp } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { DashboardData } from '@/types/dashboard'
 
@@ -12,9 +13,10 @@ import type { DashboardData } from '@/types/dashboard'
  * (¿los días con muchos audits tienen score diferente?).
  */
 export function TrendChart({ data }: { data: DashboardData['trend30d'] }) {
+  const { t, i18n } = useTranslation()
   const chartData = data.map(d => ({
     ...d,
-    day: formatDay(d.date),
+    day: formatDay(d.date, i18n.language),
   }))
 
   const hasAnyAudit = data.some(d => d.count > 0)
@@ -24,13 +26,13 @@ export function TrendChart({ data }: { data: DashboardData['trend30d'] }) {
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-[var(--accent-primary)]" strokeWidth={1.5} />
-          <CardTitle className="text-base">Actividad últimos 30 días</CardTitle>
+          <CardTitle className="text-base">{t('dashboard.section_trend')}</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
         {!hasAnyAudit ? (
           <div className="flex items-center justify-center py-12 text-sm text-[var(--text-tertiary)]">
-            Sin auditorías en los últimos 30 días
+            {t('dashboard.section_trend_empty')}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={220}>
@@ -74,8 +76,8 @@ export function TrendChart({ data }: { data: DashboardData['trend30d'] }) {
                 labelFormatter={(_, payload) => (payload?.[0]?.payload as { date: string })?.date}
                 formatter={((value: unknown, name: unknown) => {
                   const v = typeof value === 'number' ? value : 0
-                  if (name === 'count') return [v, 'Auditorías'] as [number, string]
-                  if (name === 'avgScore') return [v.toFixed(1), 'Score prom.'] as [string, string]
+                  if (name === 'count') return [v, t('dashboard.trend_audits_label')] as [number, string]
+                  if (name === 'avgScore') return [v.toFixed(1), t('dashboard.trend_avg_score_label')] as [string, string]
                   return [v, String(name ?? '')] as [number, string]
                 }) as never}
               />
@@ -97,9 +99,9 @@ export function TrendChart({ data }: { data: DashboardData['trend30d'] }) {
   )
 }
 
-function formatDay(iso: string): string {
+function formatDay(iso: string, lang: string): string {
   try {
-    return new Date(iso + 'T00:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
+    return new Date(iso + 'T00:00:00').toLocaleDateString(lang, { day: 'numeric', month: 'short' })
   } catch {
     return iso
   }
