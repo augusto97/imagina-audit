@@ -14,7 +14,7 @@ import { ReportHeader } from './report/ReportHeader'
 import { ExecutiveSummary } from './report/ExecutiveSummary'
 import { TechStackSummary } from './report/TechStackSummary'
 import { ActionPlan } from './report/ActionPlan'
-import { ModuleDetail } from './report/ModuleDetail'
+import { ModulesAccordion } from './report/ModulesAccordion'
 import { ModuleScoreGrid } from './report/ModuleScoreGrid'
 import { getAllMetricsByLevel, type ChecklistState } from './report/helpers'
 
@@ -173,9 +173,10 @@ function TechnicalReport() {
         </TabsContent>
 
         {/* ─── Tab 3: Detalles por módulo ────────────────────────── */}
-        <TabsContent value="modules" className="mt-4 space-y-5">
-          {result.modules.map(m => <ModuleDetail key={m.id} module={m} />)}
-          {snapshotModule && <ModuleDetail module={snapshotModule} />}
+        <TabsContent value="modules" className="mt-4">
+          <ModulesAccordion
+            modules={snapshotModule ? [...result.modules, snapshotModule] : result.modules}
+          />
         </TabsContent>
       </Tabs>
     </div>
