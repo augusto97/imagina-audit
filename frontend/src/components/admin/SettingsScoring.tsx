@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAdmin } from '@/hooks/useAdmin'
-import { MODULE_EMOJIS, MODULE_NAMES } from '@/lib/constants'
+import { MODULE_NAMES } from '@/lib/constants'
+import { ModuleIcon } from './ModuleIcon'
 
 export default function SettingsScoring() {
   const { fetchSettings, updateSettings } = useAdmin()
@@ -73,7 +74,10 @@ export default function SettingsScoring() {
         <CardContent className="space-y-3">
           {moduleIds.map((id) => (
             <div key={id} className="flex items-center gap-3">
-              <Label className="w-40">{MODULE_EMOJIS[id]} {MODULE_NAMES[id]}</Label>
+              <Label className="w-40 flex items-center gap-2">
+                <ModuleIcon id={id} className="h-4 w-4 text-[var(--text-secondary)]" />
+                {MODULE_NAMES[id]}
+              </Label>
               <input
                 type="range" min="0" max="0.5" step="0.01"
                 value={weights[id] ?? 0.1}

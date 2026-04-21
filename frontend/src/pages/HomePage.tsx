@@ -3,7 +3,9 @@ import Layout from '@/components/layout/Layout'
 import AuditForm from '@/components/audit/AuditForm'
 import ScanningAnimation from '@/components/audit/ScanningAnimation'
 import { useAuditStore } from '@/store/auditStore'
+import { useConfigStore } from '@/store/configStore'
 import { MODULE_EMOJIS, MODULE_NAMES } from '@/lib/constants'
+import { renderStyledText } from '@/lib/styled-text'
 
 const moduleIds = ['security', 'performance', 'seo', 'wordpress', 'mobile', 'infrastructure', 'conversion', 'page_health']
 
@@ -22,6 +24,7 @@ const itemVariants = {
 
 export default function HomePage() {
   const status = useAuditStore((s) => s.status)
+  const home = useConfigStore((s) => s.config.home)
 
   if (status === 'scanning' || status === 'error') {
     return <ScanningAnimation />
@@ -39,11 +42,10 @@ export default function HomePage() {
             className="text-center"
           >
             <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)] sm:text-4xl lg:text-5xl">
-              Auditoría <span className="highlight-yellow">Gratuita</span> de tu{' '}
-              <span className="text-[var(--accent-primary)]">WordPress</span>
+              {renderStyledText(home.heroHeadline)}
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-base text-[var(--text-secondary)] sm:text-lg">
-              Descubre en 30 segundos qué tan seguro, rápido y optimizado está tu sitio web
+              {renderStyledText(home.heroSubheadline)}
             </p>
           </motion.div>
 
@@ -68,7 +70,7 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="mb-8 text-center text-xl font-bold text-[var(--text-primary)] sm:text-2xl"
           >
-            Analizamos <span className="highlight-yellow">8 áreas clave</span> de tu sitio
+            {renderStyledText(home.featuresTitle)}
           </motion.h2>
 
           <motion.div
@@ -98,7 +100,7 @@ export default function HomePage() {
       <section className="border-t border-[var(--border-default)] bg-[var(--bg-secondary)] py-12">
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
           <p className="text-sm font-medium text-[var(--text-secondary)]">
-            Con la experiencia de <span className="highlight-yellow">15 años</span> de maestría exclusiva en WordPress
+            {renderStyledText(home.trustText)}
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-[var(--text-secondary)]">
             {['Elementor', 'WP Rocket', 'Rank Math', 'Gravity Forms', 'Cloudflare', 'WooCommerce'].map((tool) => (

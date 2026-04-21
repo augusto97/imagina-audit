@@ -10,7 +10,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useAdmin } from '@/hooks/useAdmin'
 import { Skeleton } from '@/components/ui/skeleton'
-import { MODULE_EMOJIS, MODULE_NAMES } from '@/lib/constants'
+import { MODULE_NAMES } from '@/lib/constants'
+import { ModuleIcon } from './ModuleIcon'
 
 const moduleIds = ['wordpress', 'security', 'performance', 'seo', 'mobile', 'infrastructure', 'conversion']
 
@@ -74,7 +75,10 @@ export default function SettingsMessages() {
               <CardContent className="space-y-5 pt-6">
                 {moduleIds.map((id) => (
                   <div key={id} className="space-y-1.5">
-                    <Label>{MODULE_EMOJIS[id]} {MODULE_NAMES[id]}</Label>
+                    <Label className="flex items-center gap-2">
+                      <ModuleIcon id={id} className="h-4 w-4 text-[var(--text-secondary)]" />
+                      {MODULE_NAMES[id]}
+                    </Label>
                     <Textarea {...register(`sales_${id}`)} rows={3} placeholder={`Mensaje de venta para ${MODULE_NAMES[id]}...`} />
                   </div>
                 ))}

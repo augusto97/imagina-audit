@@ -45,6 +45,11 @@ find "$DEPLOY_DIR/database" -name "*.db-shm" -delete 2>/dev/null || true
 cp -r "$PROJECT_DIR/backend/cron" "$DEPLOY_DIR/cron"
 mkdir -p "$DEPLOY_DIR/cache"
 mkdir -p "$DEPLOY_DIR/logs"
+mkdir -p "$DEPLOY_DIR/uploads"
+# El .htaccess del uploads bloquea ejecución de PHP (defense-in-depth)
+if [ -f "$PROJECT_DIR/backend/uploads/.htaccess" ]; then
+  cp "$PROJECT_DIR/backend/uploads/.htaccess" "$DEPLOY_DIR/uploads/.htaccess"
+fi
 
 # .htaccess files
 cp "$PROJECT_DIR/backend/.htaccess" "$DEPLOY_DIR/.htaccess.backend"

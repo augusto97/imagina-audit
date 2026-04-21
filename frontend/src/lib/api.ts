@@ -34,6 +34,52 @@ api.interceptors.request.use((config) => {
 })
 
 /**
+ * Recupera el token CSRF desde /admin/session.php. Se usa cuando el backend
+ * rechaza un request con 403 CSRF (sesión renovada en segundo plano, pestaña
+ * dejada abierta, etc.) — refrescamos y reintentamos una vez.
+ */
+async function refreshCsrfToken(): Promise<string | null> {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/admin/session.php`, {
+      withCredentials: true,
+      timeout: 10000,
+    })
+    const token = res.data?.data?.csrfToken ?? null
+    useAuthStore.getState().setCsrfToken(token)
+    return token
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Interceptor de respuesta: si el backend devuelve 403 "Token CSRF inválido o
+ * ausente" (típicamente por sesión renovada o pestaña vieja), refrescamos el
+ * token y reintentamos la petición una sola vez. Si falla de nuevo, el error
+ * fluye al caller para que decida (toast, re-login, etc.).
+ */
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const status = error?.response?.status
+    const errMsg = (error?.response?.data?.error ?? '').toString()
+    const isCsrfError = status === 403 && /CSRF/i.test(errMsg)
+    const config = error?.config ?? {}
+
+    if (isCsrfError && !config.__csrfRetried) {
+      config.__csrfRetried = true
+      const fresh = await refreshCsrfToken()
+      if (fresh) {
+        config.headers = config.headers ?? {}
+        config.headers['X-CSRF-Token'] = fresh
+        return api.request(config)
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
+/**
  * Resultado del POST /api/audit.
  *
  * - `cached=true`: hay resultado cacheado <24h, se devuelve completo.

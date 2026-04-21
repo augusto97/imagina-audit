@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAudit } from '@/hooks/useAudit'
+import { useConfigStore } from '@/store/configStore'
 
 const auditSchema = z.object({
   url: z.string().min(1, 'La URL es obligatoria').refine(
@@ -29,7 +30,10 @@ type AuditFormData = z.infer<typeof auditSchema>
 
 export default function AuditForm() {
   const { startAudit, status } = useAudit()
+  const { home, form: formCfg } = useConfigStore((s) => s.config)
   const isScanning = status === 'scanning'
+  const microItems = (home.formMicrocopy || 'Sin instalar nada · 100% externo · Resultados en 30 seg')
+    .split(/\s*[·•|]\s*/).filter(Boolean)
 
   const { register, handleSubmit, formState: { errors } } = useForm<AuditFormData>({
     resolver: zodResolver(auditSchema),
@@ -61,7 +65,7 @@ export default function AuditForm() {
               <Globe className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />
               <Input
                 {...register('url')}
-                placeholder="https://tusitio.com"
+                placeholder={formCfg?.placeholderUrl || 'https://tusitio.com'}
                 className="h-12 pl-10 text-base"
                 disabled={isScanning}
               />
@@ -77,7 +81,7 @@ export default function AuditForm() {
               <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />
               <Input
                 {...register('leadName')}
-                placeholder="Tu nombre"
+                placeholder={formCfg?.placeholderName || 'Tu nombre'}
                 className="pl-10"
                 disabled={isScanning}
               />
@@ -86,7 +90,7 @@ export default function AuditForm() {
               <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />
               <Input
                 {...register('leadEmail')}
-                placeholder="tu@email.com"
+                placeholder={formCfg?.placeholderEmail || 'tu@email.com'}
                 type="email"
                 className="pl-10"
                 disabled={isScanning}
@@ -96,7 +100,7 @@ export default function AuditForm() {
               <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />
               <Input
                 {...register('leadWhatsapp')}
-                placeholder="+57..."
+                placeholder={formCfg?.placeholderWhatsapp || '+57...'}
                 className="pl-10"
                 disabled={isScanning}
               />
@@ -111,14 +115,14 @@ export default function AuditForm() {
             disabled={isScanning}
           >
             <Search className="h-5 w-5" strokeWidth={1.5} />
-            {isScanning ? 'Analizando...' : 'Auditar Mi Sitio Gratis'}
+            {isScanning ? 'Analizando...' : home.formButtonText || 'Auditar Mi Sitio Gratis'}
           </Button>
 
           {/* Micro-copy */}
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-[var(--text-tertiary)]">
-            <span>Sin instalar nada</span>
-            <span>100% externo</span>
-            <span>Resultados en 30 seg</span>
+            {microItems.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
           </div>
         </form>
       </CardContent>
