@@ -1,13 +1,15 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { MessageCircle, ExternalLink } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAuditStore } from '@/store/auditStore'
 
 export default function CtaSection() {
+  const { t } = useTranslation()
   const config = useAuditStore((s) => s.config)
 
-  const whatsappUrl = `https://wa.me/${config.companyWhatsapp.replace(/[^0-9+]/g, '')}?text=${encodeURIComponent('Hola! Acabo de hacer una auditoría de mi sitio web y me gustaría saber más sobre los planes de soporte.')}`
+  const whatsappUrl = `https://wa.me/${config.companyWhatsapp.replace(/[^0-9+]/g, '')}?text=${encodeURIComponent(t('public.cta_whatsapp_message'))}`
 
   return (
     <motion.div
@@ -48,9 +50,9 @@ export default function CtaSection() {
               ))}
             </div>
 
-            <p className="mt-4 text-sm text-[var(--text-tertiary)]">
-              <span className="highlight-yellow">15 años</span> de experiencia exclusiva en WordPress
-            </p>
+            <p className="mt-4 text-sm text-[var(--text-tertiary)]"
+              dangerouslySetInnerHTML={{ __html: t('public.cta_experience').replace(/<yellow>/g, '<span class="highlight-yellow">').replace(/<\/yellow>/g, '</span>') }}
+            />
           </CardContent>
         </div>
       </Card>

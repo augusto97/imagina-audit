@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { TrendingUp, TrendingDown, Minus, History } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,6 +26,7 @@ interface HistorySectionProps {
 }
 
 export default function HistorySection({ domain }: HistorySectionProps) {
+  const { t, i18n } = useTranslation()
   const [data, setData] = useState<HistoryData | null>(null)
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export default function HistorySection({ domain }: HistorySectionProps) {
   if (!data || data.totalAudits <= 1) return null
 
   const chartData = [...data.history].reverse().map((h) => ({
-    date: new Date(h.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
+    date: new Date(h.createdAt).toLocaleDateString(i18n.language, { day: 'numeric', month: 'short' }),
     score: h.globalScore,
   }))
 
@@ -49,10 +51,10 @@ export default function HistorySection({ domain }: HistorySectionProps) {
   const diff = last.globalScore - first.globalScore
 
   const trendConfig = {
-    improving: { icon: TrendingUp, label: 'Mejorando', variant: 'success' as const, color: '#10B981' },
-    declining: { icon: TrendingDown, label: 'Deteriorándose', variant: 'destructive' as const, color: '#EF4444' },
-    stable: { icon: Minus, label: 'Estable', variant: 'secondary' as const, color: '#64748B' },
-    insufficient_data: { icon: Minus, label: 'Datos insuficientes', variant: 'secondary' as const, color: '#64748B' },
+    improving: { icon: TrendingUp, label: t('public.history_trend_improving'), variant: 'success' as const, color: '#10B981' },
+    declining: { icon: TrendingDown, label: t('public.history_trend_declining'), variant: 'destructive' as const, color: '#EF4444' },
+    stable: { icon: Minus, label: t('public.history_trend_stable'), variant: 'secondary' as const, color: '#64748B' },
+    insufficient_data: { icon: Minus, label: t('public.history_trend_insufficient'), variant: 'secondary' as const, color: '#64748B' },
   }
 
   const trend = trendConfig[data.trend]
@@ -65,10 +67,10 @@ export default function HistorySection({ domain }: HistorySectionProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <History className="h-4 w-4 text-[var(--accent-primary)]" strokeWidth={1.5} />
-              <CardTitle className="text-base">Historial — {domain}</CardTitle>
+              <CardTitle className="text-base">{t('public.history_title', { domain })}</CardTitle>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-[10px]">{data.totalAudits} auditorías</Badge>
+              <Badge variant="secondary" className="text-[10px]">{t('public.history_total_audits', { count: data.totalAudits })}</Badge>
               <Badge variant={trend.variant} className="text-[10px]">
                 <TrendIcon className="h-3 w-3 mr-0.5" /> {trend.label}
               </Badge>
@@ -94,10 +96,10 @@ export default function HistorySection({ domain }: HistorySectionProps) {
 
           {/* Resumen */}
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-secondary)]">
-            <span>Primera: {new Date(first.createdAt).toLocaleDateString('es-CO')} ({first.globalScore}/100)</span>
-            <span>Actual: {new Date(last.createdAt).toLocaleDateString('es-CO')} ({last.globalScore}/100)</span>
-            {diff > 0 && <span className="text-emerald-500 font-medium">+{diff} puntos</span>}
-            {diff < 0 && <span className="text-red-500 font-medium">{diff} puntos</span>}
+            <span>{t('public.history_first', { date: new Date(first.createdAt).toLocaleDateString(i18n.language), score: first.globalScore })}</span>
+            <span>{t('public.history_current', { date: new Date(last.createdAt).toLocaleDateString(i18n.language), score: last.globalScore })}</span>
+            {diff > 0 && <span className="text-emerald-500 font-medium">{t('public.history_diff_up', { diff })}</span>}
+            {diff < 0 && <span className="text-red-500 font-medium">{t('public.history_diff_down', { diff })}</span>}
           </div>
         </CardContent>
       </Card>

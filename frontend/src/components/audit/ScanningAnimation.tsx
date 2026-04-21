@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { CheckCircle, Loader2, Clock, AlertCircle, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuditStore } from '@/store/auditStore'
@@ -7,20 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 
-/** Orden de steps que muestra la UI (coincide con backend/lib/AuditProgress.php). */
-const DISPLAY_STEPS = [
-  { id: 'fetch', label: 'Descargando página' },
-  { id: 'wordpress', label: 'Detectando WordPress' },
-  { id: 'security', label: 'Analizando seguridad' },
-  { id: 'performance', label: 'Consultando Google PageSpeed' },
-  { id: 'seo', label: 'Verificando SEO' },
-  { id: 'mobile', label: 'Evaluando experiencia móvil' },
-  { id: 'infrastructure', label: 'Analizando infraestructura' },
-  { id: 'conversion', label: 'Detectando herramientas de marketing' },
-  { id: 'page_health', label: 'Verificando salud de página' },
-  { id: 'techstack', label: 'Detectando stack tecnológico' },
-  { id: 'compile', label: 'Compilando resultados' },
-]
+/** IDs de steps que muestra la UI (coincide con backend/lib/AuditProgress.php). */
+const DISPLAY_STEP_IDS = ['fetch', 'wordpress', 'security', 'performance', 'seo', 'mobile', 'infrastructure', 'conversion', 'page_health', 'techstack', 'compile'] as const
 
 type StepState = 'pending' | 'scanning' | 'done'
 
@@ -35,9 +24,12 @@ function stepStateFor(stepId: string, currentStep: string | undefined, allSteps:
 }
 
 export default function ScanningAnimation() {
+  const { t } = useTranslation()
   const { status, error, request, progress, reset } = useAuditStore()
   const navigate = useNavigate()
   const [elapsedSec, setElapsedSec] = useState(0)
+
+  const DISPLAY_STEPS = DISPLAY_STEP_IDS.map(id => ({ id, label: t(`public.scan_step_${id}`) }))
 
   useEffect(() => {
     if (status !== 'scanning') return
@@ -55,13 +47,12 @@ export default function ScanningAnimation() {
           <Card className="w-full max-w-md text-center">
             <CardContent className="pt-8 pb-8">
               <AlertCircle className="mx-auto h-12 w-12 text-[var(--color-critical)]" strokeWidth={1.5} />
-              <h2 className="mt-4 text-lg font-semibold text-[var(--text-primary)]">No pudimos analizar este sitio</h2>
+              <h2 className="mt-4 text-lg font-semibold text-[var(--text-primary)]">{t('public.scan_error_title')}</h2>
               <p className="mt-2 text-sm text-[var(--text-secondary)]">{error}</p>
-              <p className="mt-4 text-xs text-[var(--text-tertiary)]">
-                Si el problema persiste, verifica que el sitio esté online.<br />
-                Espera unos minutos antes de reintentar.
+              <p className="mt-4 text-xs text-[var(--text-tertiary)] whitespace-pre-line">
+                {t('public.scan_error_hint')}
               </p>
-              <Button onClick={() => { reset(); navigate('/') }} className="mt-6">Volver</Button>
+              <Button onClick={() => { reset(); navigate('/') }} className="mt-6">{t('public.scan_error_back')}</Button>
             </CardContent>
           </Card>
         </motion.div>
@@ -79,14 +70,14 @@ export default function ScanningAnimation() {
     // slots concurrentes (asumimos 3 como default del backend)
     const estimatedWaitSec = Math.max(0, Math.ceil((position - 1) * 45 / 3))
     const waitLabel = estimatedWaitSec < 60
-      ? `~${estimatedWaitSec} segundos`
-      : `~${Math.ceil(estimatedWaitSec / 60)} minuto${Math.ceil(estimatedWaitSec / 60) > 1 ? 's' : ''}`
+      ? t('public.scan_queue_wait_seconds', { count: estimatedWaitSec })
+      : t('public.scan_queue_wait_minutes', { count: Math.ceil(estimatedWaitSec / 60) })
 
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-secondary)] px-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 w-full max-w-md">
           <div className="mb-8 text-center">
-            <p className="text-sm text-[var(--text-tertiary)]">Esperando turno</p>
+            <p className="text-sm text-[var(--text-tertiary)]">{t('public.scan_queue_waiting')}</p>
             <h2 className="mt-1 text-2xl font-bold text-[var(--accent-primary)]">{domain}</h2>
           </div>
 
@@ -96,26 +87,21 @@ export default function ScanningAnimation() {
                 <Users className="h-8 w-8 text-[var(--accent-primary)]" strokeWidth={1.5} />
               </div>
               <h3 className="text-xl font-bold text-[var(--text-primary)]">
-                Tu análisis está en cola
+                {t('public.scan_queue_title')}
               </h3>
-              <p className="mt-3 text-sm text-[var(--text-secondary)]">
-                Hay <span className="font-bold text-[var(--text-primary)]">{total}</span> análisis en cola.
-                Tu posición: <span className="font-bold text-[var(--accent-primary)]">#{position}</span>
-              </p>
-              <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                Tiempo estimado de espera: <span className="font-medium text-[var(--text-primary)]">{waitLabel}</span>
-              </p>
+              <p className="mt-3 text-sm text-[var(--text-secondary)]" dangerouslySetInnerHTML={{ __html: t('public.scan_queue_position', { total, position }) }} />
+              <p className="mt-2 text-sm text-[var(--text-secondary)]" dangerouslySetInnerHTML={{ __html: t('public.scan_queue_wait', { label: waitLabel }) }} />
               <div className="mt-6">
                 <Loader2 className="mx-auto h-5 w-5 animate-spin text-[var(--text-tertiary)]" strokeWidth={1.5} />
                 <p className="mt-2 text-xs text-[var(--text-tertiary)]">
-                  Arrancará automáticamente cuando sea tu turno.
+                  {t('public.scan_queue_auto_start')}
                 </p>
               </div>
             </CardContent>
           </Card>
 
           <p className="mt-4 text-center text-xs text-[var(--text-tertiary)]">
-            Puedes dejar esta ventana abierta — te avisaremos en cuanto termine.
+            {t('public.scan_queue_keep_open')}
           </p>
         </motion.div>
       </div>
@@ -124,7 +110,7 @@ export default function ScanningAnimation() {
 
   // Pantalla de ejecución: audit corriendo con progreso real
   const displayProgress = progress?.progress ?? 5
-  const currentLabel = progress?.currentLabel ?? 'Iniciando análisis...'
+  const currentLabel = progress?.currentLabel ?? t('public.scan_starting')
   const allStepIds = DISPLAY_STEPS.map(s => s.id)
 
   return (
@@ -142,18 +128,18 @@ export default function ScanningAnimation() {
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 w-full max-w-md">
         <div className="mb-8 text-center">
-          <p className="text-sm text-[var(--text-tertiary)]">Escaneando</p>
+          <p className="text-sm text-[var(--text-tertiary)]">{t('public.scan_label')}</p>
           <h2 className="mt-1 text-2xl font-bold text-[var(--accent-primary)]">{domain}</h2>
           {elapsedSec > 0 && (
             <p className="mt-1 text-xs text-[var(--text-tertiary)] tabular-nums">
-              {elapsedSec}s transcurridos
+              {t('public.scan_elapsed', { sec: elapsedSec })}
             </p>
           )}
         </div>
 
         <div className="mb-8">
           <div className="mb-2 flex items-center justify-between text-xs text-[var(--text-tertiary)]">
-            <span>Progreso</span>
+            <span>{t('public.scan_progress')}</span>
             <span className="font-medium tabular-nums">{displayProgress}%</span>
           </div>
           <Progress value={displayProgress} className="h-2" />

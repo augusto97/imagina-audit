@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft, RotateCw, RefreshCw, Share2, LinkIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import Layout from '@/components/layout/Layout'
@@ -44,6 +45,7 @@ _Informe generado por Imagina Audit_`
 }
 
 export default function ResultsPage() {
+  const { t, i18n } = useTranslation()
   const { auditId } = useParams<{ auditId: string }>()
   const navigate = useNavigate()
   const storeResult = useAuditStore((s) => s.result)
@@ -65,7 +67,7 @@ export default function ResultsPage() {
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href)
-    toast.success('Link copiado al portapapeles')
+    toast.success(t('public.results_link_copied'))
   }
 
   const shareWhatsApp = () => {
@@ -90,8 +92,8 @@ export default function ResultsPage() {
     setLoading(true)
     getAuditResult(auditId)
       .then((data) => { setResult(data); setLoading(false) })
-      .catch(() => { setError('No se pudo cargar la auditoría.'); setLoading(false) })
-  }, [auditId, storeResult])
+      .catch(() => { setError(t('public.results_load_error')); setLoading(false) })
+  }, [auditId, storeResult, t])
 
   if (loading) {
     return (
@@ -110,10 +112,10 @@ export default function ResultsPage() {
     return (
       <Layout>
         <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
-          <h2 className="text-xl font-semibold text-[var(--text-primary)]">Error</h2>
-          <p className="mt-2 text-[var(--text-secondary)]">{error || 'Auditoría no encontrada.'}</p>
+          <h2 className="text-xl font-semibold text-[var(--text-primary)]">{t('public.results_error_title')}</h2>
+          <p className="mt-2 text-[var(--text-secondary)]">{error || t('public.results_error_body')}</p>
           <Link to="/" className="mt-6">
-            <Button><ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> Nueva auditoría</Button>
+            <Button><ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> {t('public.results_new_audit')}</Button>
           </Link>
         </div>
       </Layout>
@@ -128,22 +130,22 @@ export default function ResultsPage() {
           <div className="flex items-center gap-2 min-w-0 shrink">
             <span className="text-sm font-semibold text-[var(--text-primary)] truncate">{result.domain}</span>
             <span className="text-xs text-[var(--text-tertiary)] hidden sm:inline whitespace-nowrap">
-              {new Date(result.timestamp).toLocaleDateString('es-CO')}
+              {new Date(result.timestamp).toLocaleDateString(i18n.language)}
             </span>
           </div>
           <div className="flex items-center shrink-0">
             <PdfReport result={result} />
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={shareWhatsApp} title="WhatsApp">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={shareWhatsApp} title={t('public.results_share_whatsapp')}>
               <Share2 className="h-4 w-4" strokeWidth={1.5} />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyLink} title="Copiar link">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyLink} title={t('public.results_copy_link')}>
               <LinkIcon className="h-4 w-4" strokeWidth={1.5} />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={rescan} title="Re-escanear">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={rescan} title={t('public.results_rescan')}>
               <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
             </Button>
             <Link to="/">
-              <Button variant="ghost" size="icon" className="h-8 w-8" title="Nueva auditoría">
+              <Button variant="ghost" size="icon" className="h-8 w-8" title={t('public.results_new_audit_title')}>
                 <RotateCw className="h-4 w-4" strokeWidth={1.5} />
               </Button>
             </Link>
@@ -182,8 +184,8 @@ export default function ResultsPage() {
         <CtaSection />
 
         <div className="py-8 text-center text-xs text-[var(--text-tertiary)]">
-          <p>Informe generado por <span className="font-medium text-[var(--accent-primary)]">Imagina Audit</span> &mdash; imaginawp.com</p>
-          <p className="mt-1">Duración del escaneo: {(result.scanDurationMs / 1000).toFixed(1)}s</p>
+          <p>{t('public.results_footer_generated')} <span className="font-medium text-[var(--accent-primary)]">Imagina Audit</span> &mdash; imaginawp.com</p>
+          <p className="mt-1">{t('public.results_footer_duration', { sec: (result.scanDurationMs / 1000).toFixed(1) })}</p>
         </div>
       </div>
     </Layout>
