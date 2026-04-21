@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Save, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,6 +14,7 @@ import { useAdmin } from '@/hooks/useAdmin'
 interface Plan { name: string; price: string; currency: string }
 
 export default function SettingsPlans() {
+  const { t } = useTranslation()
   const { fetchSettings, updateSettings } = useAdmin()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -36,8 +38,8 @@ export default function SettingsPlans() {
     setSaving(true)
     try {
       await updateSettings({ plans })
-      toast.success('Planes guardados')
-    } catch { toast.error('Error al guardar') }
+      toast.success(t('settings.plans_saved'))
+    } catch { toast.error(t('settings.save_error')) }
     setSaving(false)
   }
 
@@ -46,19 +48,19 @@ export default function SettingsPlans() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Planes y Precios</h1>
-        <p className="text-sm text-[var(--text-secondary)]">Se muestran en la tabla de soluciones y el CTA del informe</p>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('settings.plans_title')}</h1>
+        <p className="text-sm text-[var(--text-secondary)]">{t('settings.plans_subtitle')}</p>
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Planes</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('settings.plans_card_title')}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {plans.map((plan, idx) => (
             <div key={idx} className="flex flex-wrap items-center gap-2">
-              <div className="space-y-1"><Label className="text-xs">Nombre</Label><Input value={plan.name} onChange={(e) => updatePlan(idx, 'name', e.target.value)} placeholder="Nombre" className="w-40" /></div>
-              <div className="space-y-1"><Label className="text-xs">Precio</Label><Input value={plan.price} onChange={(e) => updatePlan(idx, 'price', e.target.value)} placeholder="Precio" className="w-28" /></div>
+              <div className="space-y-1"><Label className="text-xs">{t('settings.plans_name')}</Label><Input value={plan.name} onChange={(e) => updatePlan(idx, 'name', e.target.value)} placeholder={t('settings.plans_name_placeholder')} className="w-40" /></div>
+              <div className="space-y-1"><Label className="text-xs">{t('settings.plans_price')}</Label><Input value={plan.price} onChange={(e) => updatePlan(idx, 'price', e.target.value)} placeholder={t('settings.plans_price_placeholder')} className="w-28" /></div>
               <div className="space-y-1">
-                <Label className="text-xs">Moneda</Label>
+                <Label className="text-xs">{t('settings.plans_currency')}</Label>
                 <Select value={plan.currency} onValueChange={(v) => updatePlan(idx, 'currency', v)}>
                   <SelectTrigger className="w-[90px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -73,14 +75,14 @@ export default function SettingsPlans() {
               )}
             </div>
           ))}
-          <Button variant="outline" size="sm" onClick={addPlan}><Plus className="h-4 w-4" strokeWidth={1.5} /> Agregar Plan</Button>
+          <Button variant="outline" size="sm" onClick={addPlan}><Plus className="h-4 w-4" strokeWidth={1.5} /> {t('settings.plans_add')}</Button>
         </CardContent>
       </Card>
 
       {/* Preview */}
       <Card>
         <CardContent className="p-5">
-          <p className="text-xs font-medium text-[var(--text-tertiary)] mb-3">Vista previa</p>
+          <p className="text-xs font-medium text-[var(--text-tertiary)] mb-3">{t('settings.preview')}</p>
           <div className="flex flex-wrap gap-2">
             {plans.filter((p) => p.name).map((p, i) => (
               <Badge key={i} variant="secondary" className="text-sm px-3 py-1">
@@ -93,7 +95,7 @@ export default function SettingsPlans() {
 
       <Button onClick={save} disabled={saving}>
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" strokeWidth={1.5} />}
-        Guardar Planes
+        {t('settings.plans_save')}
       </Button>
     </div>
   )

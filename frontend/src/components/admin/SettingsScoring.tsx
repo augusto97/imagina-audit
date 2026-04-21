@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,6 +13,7 @@ import { MODULE_NAMES } from '@/lib/constants'
 import { ModuleIcon } from './ModuleIcon'
 
 export default function SettingsScoring() {
+  const { t } = useTranslation()
   const { fetchSettings, updateSettings } = useAdmin()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -36,10 +38,10 @@ export default function SettingsScoring() {
   const isSumValid = Math.abs(totalWeight - 1.0) < 0.005
 
   const getTestLevel = () => {
-    if (testScore >= thresholds.excellent) return { label: 'Excelente', variant: 'success' as const }
-    if (testScore >= thresholds.good) return { label: 'Bueno', variant: 'success' as const }
-    if (testScore >= thresholds.warning) return { label: 'Advertencia', variant: 'warning' as const }
-    return { label: 'Crítico', variant: 'destructive' as const }
+    if (testScore >= thresholds.excellent) return { label: t('settings.scoring_level_excellent'), variant: 'success' as const }
+    if (testScore >= thresholds.good) return { label: t('settings.scoring_level_good'), variant: 'success' as const }
+    if (testScore >= thresholds.warning) return { label: t('settings.scoring_level_warning'), variant: 'warning' as const }
+    return { label: t('settings.scoring_level_critical'), variant: 'destructive' as const }
   }
 
   const save = async () => {
@@ -55,22 +57,29 @@ export default function SettingsScoring() {
       payload.threshold_warning = thresholds.warning
       payload.threshold_critical = thresholds.critical
       await updateSettings(payload)
-      toast.success('Scoring guardado')
-    } catch { toast.error('Error al guardar') }
+      toast.success(t('settings.scoring_saved'))
+    } catch { toast.error(t('settings.save_error')) }
     setSaving(false)
   }
 
   if (loading) return <Skeleton className="h-64 rounded-2xl" />
 
+  const thresholdRows = [
+    { key: 'excellent' as const, label: t('settings.scoring_level_excellent'), variant: 'success' as const },
+    { key: 'good' as const,      label: t('settings.scoring_level_good'),      variant: 'success' as const },
+    { key: 'warning' as const,   label: t('settings.scoring_level_warning'),   variant: 'warning' as const },
+    { key: 'critical' as const,  label: t('settings.scoring_level_critical'),  variant: 'destructive' as const },
+  ]
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Scoring y Umbrales</h1>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('settings.scoring_title')}</h1>
       </div>
 
       {/* Pesos */}
       <Card>
-        <CardHeader><CardTitle>Pesos de Módulos</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('settings.scoring_weights_card')}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {moduleIds.map((id) => (
             <div key={id} className="flex items-center gap-3">
@@ -92,7 +101,9 @@ export default function SettingsScoring() {
 
           <div className="mt-4 pt-3 border-t border-[var(--border-default)]">
             <Badge variant={isSumValid ? 'success' : 'destructive'}>
-              {isSumValid ? `Los pesos suman ${totalWeight.toFixed(2)}` : `Los pesos suman ${totalWeight.toFixed(2)} — deben sumar 1.00`}
+              {isSumValid
+                ? t('settings.scoring_sum_ok', { total: totalWeight.toFixed(2) })
+                : t('settings.scoring_sum_bad', { total: totalWeight.toFixed(2) })}
             </Badge>
           </div>
         </CardContent>
@@ -100,30 +111,25 @@ export default function SettingsScoring() {
 
       {/* Umbrales */}
       <Card>
-        <CardHeader><CardTitle>Umbrales de Clasificación</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('settings.scoring_thresholds_card')}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          {[
-            { key: 'excellent' as const, label: 'Excelente', variant: 'success' as const },
-            { key: 'good' as const, label: 'Bueno', variant: 'success' as const },
-            { key: 'warning' as const, label: 'Advertencia', variant: 'warning' as const },
-            { key: 'critical' as const, label: 'Crítico', variant: 'destructive' as const },
-          ].map((t) => (
-            <div key={t.key} className="flex items-center gap-3">
-              <Badge variant={t.variant} className="w-28 justify-center">{t.label}</Badge>
-              <span className="text-sm text-[var(--text-secondary)]">Score &ge;</span>
+          {thresholdRows.map((row) => (
+            <div key={row.key} className="flex items-center gap-3">
+              <Badge variant={row.variant} className="w-28 justify-center">{row.label}</Badge>
+              <span className="text-sm text-[var(--text-secondary)]">{t('settings.scoring_score_gte')}</span>
               <Input
                 type="number" min={0} max={100}
-                value={thresholds[t.key]}
-                onChange={(e) => setThresholds({ ...thresholds, [t.key]: parseInt(e.target.value) || 0 })}
+                value={thresholds[row.key]}
+                onChange={(e) => setThresholds({ ...thresholds, [row.key]: parseInt(e.target.value) || 0 })}
                 className="w-20"
               />
             </div>
           ))}
 
           <div className="mt-4 pt-3 border-t border-[var(--border-default)] flex items-center gap-3">
-            <span className="text-sm text-[var(--text-secondary)]">Prueba: un score de</span>
+            <span className="text-sm text-[var(--text-secondary)]">{t('settings.scoring_test_prefix')}</span>
             <Input type="number" value={testScore} onChange={(e) => setTestScore(parseInt(e.target.value) || 0)} className="w-20" />
-            <span className="text-sm text-[var(--text-secondary)]">se clasifica como:</span>
+            <span className="text-sm text-[var(--text-secondary)]">{t('settings.scoring_test_suffix')}</span>
             <Badge variant={getTestLevel().variant}>{getTestLevel().label}</Badge>
           </div>
         </CardContent>
@@ -131,7 +137,7 @@ export default function SettingsScoring() {
 
       <Button onClick={save} disabled={saving || !isSumValid}>
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" strokeWidth={1.5} />}
-        Guardar Scoring
+        {t('settings.scoring_save')}
       </Button>
     </div>
   )

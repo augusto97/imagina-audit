@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useForm } from 'react-hook-form'
 import { Loader2, Save } from 'lucide-react'
 import { toast } from 'sonner'
@@ -16,6 +17,7 @@ import { ModuleIcon } from './ModuleIcon'
 const moduleIds = ['wordpress', 'security', 'performance', 'seo', 'mobile', 'infrastructure', 'conversion']
 
 export default function SettingsMessages() {
+  const { t } = useTranslation()
   const { fetchSettings, updateSettings } = useAdmin()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -49,8 +51,8 @@ export default function SettingsMessages() {
         ctaButtonWhatsappText: data.ctaButtonWhatsappText,
         ctaButtonPlansText: data.ctaButtonPlansText,
       })
-      toast.success('Mensajes guardados correctamente')
-    } catch { toast.error('Error al guardar') }
+      toast.success(t('settings.messages_saved'))
+    } catch { toast.error(t('settings.save_error')) }
     setSaving(false)
   }
 
@@ -59,15 +61,15 @@ export default function SettingsMessages() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Textos y Mensajes</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">Mensajes de venta que aparecen en cada módulo del informe</p>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('settings.messages_title')}</h1>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">{t('settings.messages_subtitle')}</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Tabs defaultValue="modules">
           <TabsList>
-            <TabsTrigger value="modules">Mensajes por Módulo</TabsTrigger>
-            <TabsTrigger value="cta">CTA Final</TabsTrigger>
+            <TabsTrigger value="modules">{t('settings.messages_tab_modules')}</TabsTrigger>
+            <TabsTrigger value="cta">{t('settings.messages_tab_cta')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="modules">
@@ -79,7 +81,7 @@ export default function SettingsMessages() {
                       <ModuleIcon id={id} className="h-4 w-4 text-[var(--text-secondary)]" />
                       {MODULE_NAMES[id]}
                     </Label>
-                    <Textarea {...register(`sales_${id}`)} rows={3} placeholder={`Mensaje de venta para ${MODULE_NAMES[id]}...`} />
+                    <Textarea {...register(`sales_${id}`)} rows={3} placeholder={t('settings.messages_module_placeholder', { name: MODULE_NAMES[id] })} />
                   </div>
                 ))}
               </CardContent>
@@ -88,23 +90,23 @@ export default function SettingsMessages() {
 
           <TabsContent value="cta">
             <Card>
-              <CardHeader><CardTitle>Textos del CTA Final</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t('settings.messages_cta_card_title')}</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label>Título del CTA</Label>
+                  <Label>{t('settings.messages_cta_title_label')}</Label>
                   <Input {...register('ctaTitle')} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Descripción del CTA</Label>
+                  <Label>{t('settings.messages_cta_description_label')}</Label>
                   <Textarea {...register('ctaDescription')} rows={3} />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label>Texto botón WhatsApp</Label>
+                    <Label>{t('settings.messages_cta_btn_whatsapp')}</Label>
                     <Input {...register('ctaButtonWhatsappText')} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Texto botón Planes</Label>
+                    <Label>{t('settings.messages_cta_btn_plans')}</Label>
                     <Input {...register('ctaButtonPlansText')} />
                   </div>
                 </div>
@@ -114,12 +116,12 @@ export default function SettingsMessages() {
             {/* Preview */}
             <Card className="mt-4 border-[var(--accent-primary)]/20 bg-gradient-to-br from-[#F0FDFE] to-white">
               <CardContent className="text-center pt-6">
-                <p className="text-xs font-medium text-[var(--text-tertiary)] mb-3">Vista previa</p>
-                <h3 className="text-lg font-bold text-[var(--text-primary)]">{watch('ctaTitle') as string || 'Título'}</h3>
-                <p className="mt-2 text-sm text-[var(--text-secondary)]">{watch('ctaDescription') as string || 'Descripción'}</p>
+                <p className="text-xs font-medium text-[var(--text-tertiary)] mb-3">{t('settings.preview')}</p>
+                <h3 className="text-lg font-bold text-[var(--text-primary)]">{watch('ctaTitle') as string || t('settings.messages_preview_title')}</h3>
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">{watch('ctaDescription') as string || t('settings.messages_preview_description')}</p>
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  <Button size="sm" variant="success">{watch('ctaButtonWhatsappText') as string || 'WhatsApp'}</Button>
-                  <Button size="sm" variant="outline">{watch('ctaButtonPlansText') as string || 'Planes'}</Button>
+                  <Button size="sm" variant="success">{watch('ctaButtonWhatsappText') as string || t('settings.messages_preview_whatsapp')}</Button>
+                  <Button size="sm" variant="outline">{watch('ctaButtonPlansText') as string || t('settings.messages_preview_plans')}</Button>
                 </div>
               </CardContent>
             </Card>
@@ -128,7 +130,7 @@ export default function SettingsMessages() {
 
         <Button type="submit" disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" strokeWidth={1.5} />}
-          Guardar Mensajes
+          {t('settings.messages_save')}
         </Button>
       </form>
     </div>
