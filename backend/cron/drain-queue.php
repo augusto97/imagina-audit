@@ -78,6 +78,7 @@ try {
             ],
         ]);
     }
+    CronHealth::markRun('drain-queue', null, "processed=$processed");
 } catch (Throwable $e) {
     Logger::error('drain-queue cron falló: ' . $e->getMessage());
     if (php_sapi_name() === 'cli') {

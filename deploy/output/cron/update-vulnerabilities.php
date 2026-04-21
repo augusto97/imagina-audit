@@ -28,6 +28,7 @@ try {
     Database::getInstance()->initSchema();
     $stats = VulnerabilityUpdater::run();
     $msg = "[" . date('Y-m-d H:i:s') . "] {$stats['new']} nuevas, {$stats['updated']} actualizadas, {$stats['checked']} plugins, {$stats['errors']} errores";
+    CronHealth::markRun('update-vulnerabilities', null, "new={$stats['new']} updated={$stats['updated']} checked={$stats['checked']}");
     if (php_sapi_name() === 'cli') { echo $msg . PHP_EOL; }
     else { header('Content-Type: application/json'); echo json_encode(['success' => true, 'stats' => $stats]); }
 } catch (Throwable $e) {

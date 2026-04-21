@@ -59,6 +59,8 @@ try {
         $before / 1048576, $after / 1048576, $savedKB, $elapsedMs
     );
 
+    CronHealth::markRun('vacuum', (int) round($elapsedMs / 1000), "saved=${savedKB}KB");
+
     if (php_sapi_name() === 'cli') {
         echo $msg . PHP_EOL;
     } else {

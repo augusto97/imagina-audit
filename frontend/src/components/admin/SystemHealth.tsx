@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { CheckCircle2, AlertTriangle, XCircle, Activity, RefreshCw } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, XCircle, Activity, RefreshCw, Clock, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,10 +14,29 @@ interface Check {
   details?: Record<string, unknown>
 }
 
+interface CronItem {
+  name: string
+  label: string
+  description: string
+  intervalHuman: string
+  lastRunAt: string | null
+  lastDurationSec: number | null
+  ageHuman: string | null
+  status: 'ok' | 'warning' | 'critical' | 'never'
+  message: string
+}
+
+interface CronHealth {
+  overallOk: boolean
+  counts: { ok: number; warning: number; critical: number; never: number }
+  items: CronItem[]
+}
+
 interface Diag {
   overall: 'ok' | 'warn' | 'fail'
   summary: { ok: number; warn: number; fail: number }
   checks: Check[]
+  cronHealth: CronHealth | null
   generatedAt: string
 }
 
@@ -97,6 +116,66 @@ export default function SystemHealth() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Cron health */}
+      {diag.cronHealth && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-[var(--accent-primary)]" strokeWidth={1.5} />
+              Tareas automáticas (cron)
+              <span className="ml-2 text-xs font-normal text-[var(--text-tertiary)]">
+                {diag.cronHealth.counts.ok} ok
+                {diag.cronHealth.counts.warning > 0 && <> · {diag.cronHealth.counts.warning} atrasados</>}
+                {diag.cronHealth.counts.critical > 0 && <> · {diag.cronHealth.counts.critical} críticos</>}
+                {diag.cronHealth.counts.never > 0 && <> · {diag.cronHealth.counts.never} nunca</>}
+              </span>
+            </CardTitle>
+            <p className="mt-1 text-xs text-[var(--text-tertiary)]">
+              Si alguna tarea aparece "nunca ejecutada" o "atrasada", el cron del sistema no está configurado.
+              Revisa el panel de ServerAvatar → Cron Jobs y verifica que cada línea apunta al script correcto.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {diag.cronHealth.items.map((cron) => {
+                const bg =
+                  cron.status === 'ok'       ? 'border-emerald-200 bg-emerald-50 text-emerald-900' :
+                  cron.status === 'warning'  ? 'border-amber-200   bg-amber-50   text-amber-900' :
+                  cron.status === 'critical' ? 'border-red-200     bg-red-50     text-red-900'   :
+                                               'border-gray-200    bg-gray-50    text-gray-700'
+                const icon =
+                  cron.status === 'ok'       ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> :
+                  cron.status === 'warning'  ? <AlertTriangle className="h-4 w-4 text-amber-600" /> :
+                  cron.status === 'critical' ? <XCircle className="h-4 w-4 text-red-600" />        :
+                                               <Info className="h-4 w-4 text-gray-500" />
+                return (
+                  <div key={cron.name} className={`rounded-lg border p-3 ${bg}`}>
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 shrink-0">{icon}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-[var(--text-primary)]">{cron.label}</p>
+                          <code className="rounded bg-white/70 px-1.5 py-0.5 text-[10px] font-mono text-[var(--text-tertiary)]">
+                            cada {cron.intervalHuman}
+                          </code>
+                        </div>
+                        <p className="mt-0.5 text-xs opacity-85">{cron.description}</p>
+                        <p className="mt-1 text-[11px] opacity-85">
+                          <b>{cron.message}</b>
+                          {cron.lastRunAt && (
+                            <> · última vez hace <b>{cron.ageHuman}</b> ({new Date(cron.lastRunAt).toLocaleString('es-CO')})</>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Lista de checks */}
       <Card>

@@ -135,6 +135,8 @@ $msg = sprintf(
     count($stats['errors'])
 );
 
+CronHealth::markRun('cleanup', null, $msg);
+
 if (php_sapi_name() === 'cli') {
     echo $msg . PHP_EOL;
     foreach ($stats['errors'] as $err) echo "  err: $err" . PHP_EOL;

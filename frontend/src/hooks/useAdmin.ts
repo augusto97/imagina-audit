@@ -109,6 +109,35 @@ export function useAdmin() {
     } catch (err) { handleError(err) }
   }, [handleError])
 
+  const fetch2faStatus = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/2fa.php')
+      return res.data.data as { enabled: boolean; recoveryCodesLeft: number }
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const setup2fa = useCallback(async () => {
+    try {
+      const res = await api.post('/admin/2fa.php?action=setup', {})
+      return res.data.data as { secret: string; otpauthUri: string; issuer: string; label: string }
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const enable2fa = useCallback(async (secret: string, code: string) => {
+    const res = await api.post('/admin/2fa.php?action=enable', { secret, code })
+    return res.data.data as { enabled: boolean; recoveryCodes: string[] }
+  }, [])
+
+  const disable2fa = useCallback(async (password: string, code: string) => {
+    const res = await api.post('/admin/2fa.php?action=disable', { password, code })
+    return res.data.data as { enabled: boolean }
+  }, [])
+
+  const regenerateRecoveryCodes = useCallback(async (code: string) => {
+    const res = await api.post('/admin/2fa.php?action=regenerate-recovery', { code })
+    return res.data.data as { recoveryCodes: string[] }
+  }, [])
+
   const fetchPluginVault = useCallback(async () => {
     try {
       const res = await api.get('/admin/plugin-vault.php')
@@ -158,5 +187,6 @@ export function useAdmin() {
     uploadBrandAsset,
     fetchSnapshotReport,
     fetchPluginVault, refreshPluginVault,
+    fetch2faStatus, setup2fa, enable2fa, disable2fa, regenerateRecoveryCodes,
   }
 }

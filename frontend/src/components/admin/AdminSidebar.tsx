@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Settings, MessageSquare,
-  CreditCard, SlidersHorizontal, ShieldAlert, Shield, Server, Archive, Activity, Palette, Home, Package,
+  CreditCard, SlidersHorizontal, ShieldAlert, Shield, ShieldCheck, Server, Archive, Activity, Palette, Home, Package,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
@@ -32,6 +32,7 @@ const navSections = [
   {
     title: 'Seguridad',
     items: [
+      { to: '/admin/security',        icon: ShieldCheck, label: '2FA del login' },
       { to: '/admin/vulnerabilities', icon: ShieldAlert, label: 'Vulnerabilidades' },
       { to: '/admin/plugin-vault',    icon: Package,     label: 'Plugin Vault' },
     ],
