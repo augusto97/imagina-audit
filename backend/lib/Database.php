@@ -165,6 +165,8 @@ class Database {
         $migrations = [
             // Columna `is_pinned` añadida para proteger informes del borrado por retención
             "ALTER TABLE audits ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0",
+            // Columna `lang` añadida para cachear audits por idioma (P2 i18n)
+            "ALTER TABLE audits ADD COLUMN lang TEXT NOT NULL DEFAULT 'en'",
         ];
         foreach ($migrations as $sql) {
             try { $this->pdo->exec($sql); } catch (Throwable $e) { /* columna ya existe */ }

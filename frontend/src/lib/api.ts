@@ -96,9 +96,11 @@ export interface StartAuditResponse {
 
 /** Arranca una auditoría. No bloquea HTTP durante el scan. */
 export async function startAudit(request: AuditRequest): Promise<StartAuditResponse> {
+  const { default: i18n } = await import('@/i18n')
+  const lang = (i18n.language || 'en').split('-')[0]
   const response = await api.post<{ success: boolean; data: StartAuditResponse }>(
     '/audit.php',
-    request,
+    { ...request, lang },
     { timeout: 15000 }, // la respuesta es inmediata; 15s es margen generoso
   )
   return response.data.data
@@ -121,10 +123,15 @@ export async function getAuditResult(id: string): Promise<AuditResult> {
   return response.data.data
 }
 
-/** Obtiene la configuración pública */
+/** Obtiene la configuración pública. Se pasa el idioma activo para que los
+ *  fallbacks no editados desde admin vengan en el idioma correcto. */
 export async function getConfig(): Promise<typeof DEFAULT_CONFIG> {
   try {
-    const response = await api.get<{ success: boolean; data: typeof DEFAULT_CONFIG }>('/config.php')
+    const { default: i18n } = await import('@/i18n')
+    const lang = (i18n.language || 'en').split('-')[0]
+    const response = await api.get<{ success: boolean; data: typeof DEFAULT_CONFIG }>('/config.php', {
+      params: { lang },
+    })
     return response.data.data
   } catch {
     return DEFAULT_CONFIG

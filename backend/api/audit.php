@@ -42,6 +42,15 @@ try {
     Response::error($e->getMessage());
 }
 
+// Idioma activo — determina las traducciones del resultado. Se guarda en
+// `audits.lang` para que el cache respete el idioma (pedir la misma URL en
+// otro idioma dispara un audit nuevo).
+$lang = strtolower(substr(trim($body['lang'] ?? ''), 0, 2));
+if (!in_array($lang, Translator::SUPPORTED, true)) {
+    $lang = Translator::DEFAULT_LANG;
+}
+Translator::setLang($lang);
+
 $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
 // Rate limiting
@@ -82,9 +91,10 @@ try {
 try {
     if (!$forceRefresh) {
         $db = Database::getInstance();
+        // Filtramos por lang: un resultado cacheado en otro idioma NO sirve.
         $cached = $db->queryOne(
-            "SELECT * FROM audits WHERE url = ? AND created_at > datetime('now', '-' || ? || ' seconds') ORDER BY created_at DESC LIMIT 1",
-            [$url, $cacheTtl]
+            "SELECT * FROM audits WHERE url = ? AND lang = ? AND created_at > datetime('now', '-' || ? || ' seconds') ORDER BY created_at DESC LIMIT 1",
+            [$url, $lang, $cacheTtl]
         );
 
         if ($cached) {
@@ -212,14 +222,14 @@ try {
     $waterfallJson = JsonStore::encode($perfData);
 
     $db->execute(
-        "INSERT INTO audits (id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_wordpress, scan_duration_ms, result_json, waterfall_json, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO audits (id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_wordpress, scan_duration_ms, result_json, waterfall_json, lang, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             $result['id'], $result['url'], $result['domain'],
             $leadData['leadName'] ?: null, $leadData['leadEmail'] ?: null,
             $leadData['leadWhatsapp'] ?: null, $leadData['leadCompany'] ?: null,
             $result['globalScore'], $result['globalLevel'],
             $result['isWordPress'] ? 1 : 0, $result['scanDurationMs'],
-            $resultJson, $waterfallJson, $ip,
+            $resultJson, $waterfallJson, $lang, $ip,
         ]
     );
 } catch (Throwable $e) {

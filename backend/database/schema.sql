@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS audits (
     result_json TEXT NOT NULL,
     waterfall_json TEXT,
     is_pinned INTEGER NOT NULL DEFAULT 0,
+    lang TEXT NOT NULL DEFAULT 'en',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     ip_address TEXT
 );
