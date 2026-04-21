@@ -42,15 +42,21 @@ function LoginForm({
   loading: boolean
   setLoading: (v: boolean) => void
 }) {
-  const { register, handleSubmit } = useForm<{ password: string }>()
+  const { register, handleSubmit } = useForm<{ password: string; website?: string }>()
   const { logoUrl, companyName } = useConfigStore((s) => s.config)
 
-  const onSubmit = async (data: { password: string }) => {
+  const onSubmit = async (data: { password: string; website?: string }) => {
+    // Honeypot: si 'website' viene con valor, un bot rellenó el form.
+    // No bloqueamos explícitamente (para no leakear la señal) — el backend
+    // también rechaza el intento, así que solo hacemos bail out silencioso.
+    if (data.website) return
     setLoading(true)
     try {
       await login(data.password)
-    } catch {
-      toast.error('Contraseña incorrecta')
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string }; status?: number } }
+      const msg = axiosErr.response?.data?.error || 'Contraseña incorrecta'
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -84,7 +90,21 @@ function LoginForm({
             </div>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" autoComplete="off">
+            {/* Honeypot — invisible para humanos (posicionado fuera de pantalla,
+                sin display:none porque muchos bots ignoran esos inputs). Los bots
+                que auto-rellenan campos lo verán como un input legítimo. */}
+            <div style={{ position: 'absolute', left: '-9999px', top: 0 }} aria-hidden="true">
+              <label>
+                Website (dejar vacío)
+                <input
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  {...register('website')}
+                />
+              </label>
+            </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-[var(--text-secondary)]">Contraseña</label>
               <div className="relative">
