@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, memo } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { Database, ArrowRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAdmin } from '@/hooks/useAdmin'
 import api from '@/lib/api'
+import LeadReportNav from './LeadReportNav'
 import type { AuditResult, ModuleResult } from '@/types/audit'
 
 import { ReportHeader } from './report/ReportHeader'
@@ -26,7 +27,6 @@ import { getAllMetricsByLevel, type ChecklistState } from './report/helpers'
  */
 function TechnicalReport() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const { fetchLeadDetail, pinAudit } = useAdmin()
   const [result, setResult] = useState<AuditResult | null>(null)
   const [checklist, setChecklist] = useState<ChecklistState>({})
@@ -73,7 +73,6 @@ function TechnicalReport() {
     })
   }, [id])
 
-  const handleBack = useCallback(() => navigate('/admin/leads'), [navigate])
 
   const handleTogglePin = useCallback(async () => {
     if (!id) return
@@ -97,8 +96,9 @@ function TechnicalReport() {
   const warningMetrics = getAllMetricsByLevel(result, 'warning')
 
   return (
-    <div className="space-y-8">
-      <ReportHeader result={result} isPinned={isPinned} onBack={handleBack} onTogglePin={handleTogglePin} />
+    <div className="space-y-6">
+      {id && <LeadReportNav auditId={id} domain={result.domain} />}
+      <ReportHeader result={result} isPinned={isPinned} onTogglePin={handleTogglePin} />
       <ExecutiveSummary result={result} criticalCount={criticalMetrics.length} warningCount={warningMetrics.length} snapshotModule={snapshotModule} />
       {result.techStack && <TechStackSummary techStack={result.techStack} scanDuration={result.scanDurationMs} />}
       {result.isWordPress && id && (

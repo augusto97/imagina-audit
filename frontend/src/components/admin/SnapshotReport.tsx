@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Loader2, Database, FileDown, RefreshCw } from 'lucide-react'
+import { useParams } from 'react-router-dom'
+import { Loader2, Database, RefreshCw } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAdmin } from '@/hooks/useAdmin'
+import LeadReportNav from './LeadReportNav'
 import SnapshotUploader from './SnapshotUploader'
 import OverviewSection from './snapshot/OverviewSection'
 import PluginsSection from './snapshot/PluginsSection'
@@ -55,9 +56,9 @@ export default function SnapshotReport() {
   if (!data && id) {
     return (
       <div className="space-y-4">
-        <BackNav auditId={id} />
+        <LeadReportNav auditId={id} />
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Análisis interno</h1>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Análisis interno</h2>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
             Datos internos del sitio que no se pueden obtener desde fuera (plugins con versiones reales, base
             de datos, cron, seguridad interna). Requiere subir el JSON del plugin{' '}
@@ -88,15 +89,15 @@ export default function SnapshotReport() {
 
   return (
     <div className="space-y-5">
-      <BackNav auditId={id} />
+      <LeadReportNav auditId={id} domain={meta.siteName || meta.siteUrl} />
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <Database className="h-6 w-6 text-[var(--accent-primary)]" strokeWidth={1.5} />
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
+            <Database className="h-5 w-5 text-[var(--accent-primary)]" strokeWidth={1.5} />
             Análisis interno
-          </h1>
+          </h2>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
             {meta.siteName ? <><b>{meta.siteName}</b> · </> : null}
             {meta.siteUrl && <span className="font-mono">{meta.siteUrl}</span>}
@@ -105,14 +106,9 @@ export default function SnapshotReport() {
             Snapshot generado: {meta.generatedAt} · Subido: {new Date(meta.uploadedAt).toLocaleString('es-CO')} · Plugin v{meta.generatorVersion}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={load}>
-            <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} /> Refrescar
-          </Button>
-          <Button size="sm" variant="outline" disabled title="Próximamente">
-            <FileDown className="h-3.5 w-3.5" strokeWidth={1.5} /> Exportar
-          </Button>
-        </div>
+        <Button size="sm" variant="outline" onClick={load}>
+          <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} /> Refrescar
+        </Button>
       </div>
 
       <OverviewSection report={report} />
@@ -130,15 +126,4 @@ export default function SnapshotReport() {
   )
 }
 
-function BackNav({ auditId }: { auditId: string }) {
-  return (
-    <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-      <Link to={`/admin/leads/${auditId}`} className="flex items-center gap-1 hover:text-[var(--text-secondary)]">
-        <ArrowLeft className="h-3 w-3" /> Volver al lead
-      </Link>
-      <span>·</span>
-      <Link to={`/admin/leads/${auditId}/report`} className="hover:text-[var(--text-secondary)]">Informe técnico</Link>
-    </div>
-  )
-}
 
