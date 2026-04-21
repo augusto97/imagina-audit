@@ -1,10 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Upload, Link as LinkIcon, Trash2, CheckCircle, Loader2, Database, AlertCircle, FileCheck2 } from 'lucide-react'
+import { Upload, Trash2, CheckCircle, Loader2, Database, FileCheck2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import api from '@/lib/api'
 
 interface SnapshotMetadata {
@@ -31,11 +29,9 @@ type ProgressStep = 'uploading' | 'analyzing' | 'reauditing' | null
 export default function SnapshotUploader({ auditId, onChange }: Props) {
   const [existing, setExisting] = useState<SnapshotMetadata | null>(null)
   const [loading, setLoading] = useState(true)
-  const [shareUrl, setShareUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [progressStep, setProgressStep] = useState<ProgressStep>(null)
   const [selectedFile, setSelectedFile] = useState<{ name: string; size: number } | null>(null)
-  const [tab, setTab] = useState<'url' | 'upload'>('url')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
@@ -65,38 +61,13 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
     return `${(bytes / 1048576).toFixed(1)} MB`
   }
 
-  const submitUrl = async () => {
-    if (!shareUrl.trim()) { toast.error('Pega la URL del share'); return }
-    setSubmitting(true)
-    try {
-      const res = await api.post('/admin/snapshot.php', { auditId, source: 'url', shareUrl: shareUrl.trim() })
-      const data = res.data?.data
-      if (data?.reaudit) {
-        toast.success(`Snapshot conectado y auditoría re-ejecutada (Score: ${data.newScore}/100)`)
-      } else {
-        toast.success('Snapshot cargado y analizado')
-      }
-      setShareUrl('')
-      await load()
-      onChange?.()
-      // Scroll al informe para que el usuario vea el resultado
-      setTimeout(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' })
-      }, 300)
-    } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al cargar el snapshot'
-      toast.error(msg, { duration: 10000 })
-    }
-    setSubmitting(false)
-  }
-
   const submitFile = async (file: File) => {
     setSelectedFile({ name: file.name, size: file.size })
     setSubmitting(true)
     try {
       const text = await file.text()
       const parsed = JSON.parse(text)
-      const res = await api.post('/admin/snapshot.php', { auditId, source: 'upload', jsonData: parsed })
+      const res = await api.post('/admin/snapshot.php', { auditId, jsonData: parsed })
       const data = res.data?.data
       if (data?.reaudit) {
         toast.success(`Snapshot conectado y auditoría re-ejecutada (Score: ${data.newScore}/100)`)
@@ -178,59 +149,36 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
           <div className="flex-1">
             <h3 className="font-semibold text-sm text-gray-900">Conectar snapshot interno</h3>
             <p className="text-xs text-gray-500 mt-1">
-              Conecta la auditoría al plugin <a href="https://github.com/mrabro/wp-snapshot" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">wp-snapshot</a> para obtener datos internos (plugins inactivos, tamaño DB, cron, etc.). Pide al cliente que instale el plugin y te envíe la URL compartida, o sube el JSON exportado.
+              Conecta la auditoría al plugin <a href="https://github.com/mrabro/wp-snapshot" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">wp-snapshot</a> para obtener datos internos (plugins con versiones, base de datos, cron, seguridad). El cliente descarga el JSON desde WP Admin → Herramientas → Site Audit Snapshot → Download JSON y lo subes aquí.
             </p>
           </div>
         </div>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as 'url' | 'upload')}>
-          <TabsList>
-            <TabsTrigger value="url"><LinkIcon className="h-3.5 w-3.5 mr-1" /> URL Compartida</TabsTrigger>
-            <TabsTrigger value="upload"><Upload className="h-3.5 w-3.5 mr-1" /> Subir JSON</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="url" className="mt-3">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Input
-                value={shareUrl}
-                onChange={(e) => setShareUrl(e.target.value)}
-                placeholder="https://ejemplo.com/site-audit-snapshot/share/abc123..."
-                disabled={submitting}
-                className="flex-1"
-              />
-              <Button onClick={submitUrl} disabled={submitting || !shareUrl.trim()}>
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Conectar'}
-              </Button>
+        <div>
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed border-[var(--border-default)] bg-white px-4 py-6 transition-colors hover:border-[var(--accent-primary)]">
+            <Upload className="h-5 w-5 text-[var(--text-tertiary)]" strokeWidth={1.5} />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-[var(--text-primary)]">Seleccionar archivo JSON</p>
+              <p className="text-[11px] text-[var(--text-tertiary)]">Máximo 10 MB. Solo .json exportado por wp-snapshot.</p>
             </div>
-            <p className="text-[11px] text-gray-400 mt-2 flex items-center gap-1">
-              <AlertCircle className="h-3 w-3" /> El enlace se genera desde WP Admin → Tools → Site Audit Snapshot → Share
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) submitFile(f)
+              }}
+              className="hidden"
+              disabled={submitting}
+            />
+          </label>
+          {selectedFile && !submitting && (
+            <p className="mt-2 flex items-center gap-1 text-[11px] text-emerald-600">
+              <FileCheck2 className="h-3 w-3" /> {selectedFile.name} ({formatSize(selectedFile.size)})
             </p>
-          </TabsContent>
-
-          <TabsContent value="upload" className="mt-3">
-            <label className="block">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/json,.json"
-                onChange={(e) => {
-                  const f = e.target.files?.[0]
-                  if (f) submitFile(f)
-                }}
-                className="block w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                disabled={submitting}
-              />
-            </label>
-            <p className="text-[11px] text-gray-400 mt-2">
-              Descargar desde WP Admin → Tools → Site Audit Snapshot → Download JSON
-            </p>
-            {selectedFile && !submitting && (
-              <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1">
-                <FileCheck2 className="h-3 w-3" /> {selectedFile.name} ({formatSize(selectedFile.size)})
-              </p>
-            )}
-          </TabsContent>
-        </Tabs>
+          )}
+        </div>
 
         {/* Progress indicator visible mientras se procesa */}
         {submitting && (
