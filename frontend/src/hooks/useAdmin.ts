@@ -109,6 +109,13 @@ export function useAdmin() {
     } catch (err) { handleError(err) }
   }, [handleError])
 
+  const fetchSnapshotReport = useCallback(async (auditId: string) => {
+    try {
+      const res = await api.get('/admin/snapshot-report.php', { params: { audit_id: auditId } })
+      return res.data.data
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
   /**
    * Sube un asset de branding (logo, logo_collapsed, favicon).
    * Retorna la URL pública relativa donde quedó guardado.
@@ -135,5 +142,6 @@ export function useAdmin() {
     pinAudit, fetchRetentionPreview,
     fetchVulnerabilities, createVulnerability, updateVulnerability, deleteVulnerability,
     uploadBrandAsset,
+    fetchSnapshotReport,
   }
 }

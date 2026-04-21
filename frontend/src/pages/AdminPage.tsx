@@ -18,6 +18,7 @@ import SettingsRetention from '@/components/admin/SettingsRetention'
 import SystemHealth from '@/components/admin/SystemHealth'
 import VulnerabilityManager from '@/components/admin/VulnerabilityManager'
 import TechnicalReport from '@/components/admin/TechnicalReport'
+import SnapshotReport from '@/components/admin/SnapshotReport'
 import WaterfallPage from '@/components/admin/WaterfallPage'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
@@ -58,6 +59,7 @@ export default function AdminPage() {
         <Route path="leads" element={<LeadsTable />} />
         <Route path="leads/:id" element={<LeadDetail />} />
         <Route path="leads/:id/report" element={<TechnicalReport />} />
+        <Route path="leads/:id/internal" element={<SnapshotReport />} />
         <Route path="leads/:id/waterfall" element={<WaterfallPage />} />
         <Route path="settings" element={<SettingsGeneral />} />
         <Route path="branding" element={<SettingsBranding />} />
