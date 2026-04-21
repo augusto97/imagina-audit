@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { Blocks, Shield, Gauge, Search, Smartphone, Server, BarChart3, Activity, Database, HelpCircle, AlertCircle, AlertTriangle, CheckCircle2, Info, type LucideIcon } from 'lucide-react'
 import { Accordion, AccordionRadixItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
@@ -34,7 +34,14 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   wp_internal: Database,
 }
 
-export function ModulesAccordion({ modules }: { modules: ModuleResult[] }) {
+export function ModulesAccordion({
+  modules,
+  focusedModuleId,
+}: {
+  modules: ModuleResult[]
+  /** Si se pasa, se asegura que ese módulo esté expandido y se scrollea a él. */
+  focusedModuleId?: string | null
+}) {
   // Default open: los módulos con problemas críticos. Evita que al abrir
   // el tab todo esté cerrado (no ves nada) pero tampoco todo expandido.
   const defaultValue = useMemo(
@@ -44,16 +51,39 @@ export function ModulesAccordion({ modules }: { modules: ModuleResult[] }) {
 
   const [value, setValue] = useState<string[]>(defaultValue)
 
+  // Cada vez que cambia focusedModuleId (ej. click en un mini-gauge del
+  // Resumen), lo añadimos al set de abiertos y scrolleamos a él.
+  const refs = useRef<Record<string, HTMLDivElement | null>>({})
+  useEffect(() => {
+    if (!focusedModuleId) return
+    setValue((prev) => (prev.includes(focusedModuleId) ? prev : [...prev, focusedModuleId]))
+    // Scroll después del próximo frame para que Radix haya renderizado
+    requestAnimationFrame(() => {
+      const el = refs.current[focusedModuleId]
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [focusedModuleId])
+
   return (
     <Accordion type="multiple" value={value} onValueChange={setValue} className="space-y-3">
       {modules.map(m => (
-        <ModuleAccordionItem key={m.id} module={m} />
+        <ModuleAccordionItem
+          key={m.id}
+          module={m}
+          itemRef={(el) => { refs.current[m.id] = el }}
+        />
       ))}
     </Accordion>
   )
 }
 
-function ModuleAccordionItem({ module: m }: { module: ModuleResult }) {
+function ModuleAccordionItem({
+  module: m,
+  itemRef,
+}: {
+  module: ModuleResult
+  itemRef?: (el: HTMLDivElement | null) => void
+}) {
   const issues    = m.metrics.filter(mt => mt.level === 'critical' || mt.level === 'warning')
   const criticals = issues.filter(mt => mt.level === 'critical')
   const warnings  = issues.filter(mt => mt.level === 'warning')
@@ -65,8 +95,9 @@ function ModuleAccordionItem({ module: m }: { module: ModuleResult }) {
 
   return (
     <AccordionRadixItem
+      ref={itemRef}
       value={m.id}
-      className="rounded-2xl border border-[var(--border-default)] bg-white data-[state=open]:shadow-sm"
+      className="scroll-mt-6 rounded-2xl border border-[var(--border-default)] bg-white data-[state=open]:shadow-sm"
     >
       <AccordionTrigger className="px-5 py-4 hover:no-underline">
         <div className="flex flex-1 items-center gap-3 text-left">

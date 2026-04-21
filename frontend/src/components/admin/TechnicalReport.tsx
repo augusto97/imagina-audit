@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, memo } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { Database, ArrowRight, LayoutDashboard, ListChecks, Boxes } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -36,13 +36,30 @@ function TechnicalReport() {
   const [loading, setLoading] = useState(true)
   const [snapshotModule, setSnapshotModule] = useState<ModuleResult | null>(null)
   const [isPinned, setIsPinned] = useState(false)
-  const [activeTab, setActiveTab] = useState<'summary' | 'plan' | 'modules'>('summary')
+  const [focusedModuleId, setFocusedModuleId] = useState<string | null>(null)
 
-  // Click en un mini-gauge: saltar al tab Detalles. En fase D el módulo
-  // clickeado se expandirá en el acordeón automáticamente.
-  const handleModuleClick = useCallback((_moduleId: string) => {
+  // Tab activo sincronizado con ?tab= en la URL. Permite compartir links
+  // al tab específico y usar back/forward del navegador.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rawTab = searchParams.get('tab')
+  const activeTab: 'summary' | 'plan' | 'modules' =
+    rawTab === 'plan' || rawTab === 'modules' ? rawTab : 'summary'
+
+  const setActiveTab = useCallback((tab: 'summary' | 'plan' | 'modules') => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (tab === 'summary') next.delete('tab')
+      else next.set('tab', tab)
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
+
+  // Click en un mini-gauge del Resumen: saltar al tab Detalles y marcar
+  // el módulo como focused para que el acordeón lo expanda.
+  const handleModuleClick = useCallback((moduleId: string) => {
+    setFocusedModuleId(moduleId)
     setActiveTab('modules')
-  }, [])
+  }, [setActiveTab])
 
   useEffect(() => {
     if (!id) return
@@ -176,6 +193,7 @@ function TechnicalReport() {
         <TabsContent value="modules" className="mt-4">
           <ModulesAccordion
             modules={snapshotModule ? [...result.modules, snapshotModule] : result.modules}
+            focusedModuleId={focusedModuleId}
           />
         </TabsContent>
       </Tabs>
