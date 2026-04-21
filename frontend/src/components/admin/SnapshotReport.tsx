@@ -10,6 +10,12 @@ import PluginsSection from './snapshot/PluginsSection'
 import SecuritySection from './snapshot/SecuritySection'
 import EnvironmentSection from './snapshot/EnvironmentSection'
 import PerformanceSection from './snapshot/PerformanceSection'
+import DatabaseSection from './snapshot/DatabaseSection'
+import ThemesSection from './snapshot/ThemesSection'
+import CronSection from './snapshot/CronSection'
+import MediaSection from './snapshot/MediaSection'
+import UsersSection from './snapshot/UsersSection'
+import ContentSection from './snapshot/ContentSection'
 import type { SnapshotReportResponse } from '@/types/snapshotReport'
 
 /**
@@ -114,12 +120,12 @@ export default function SnapshotReport() {
       <SecuritySection report={report} />
       <EnvironmentSection report={report} />
       <PerformanceSection report={report} />
-      <SectionStub title="Base de datos" subtitle={String(report.database.summary.sizeHuman || '')} />
-      <SectionStub title="Temas" subtitle={`${report.themes.summary.total ?? 0} instalados`} />
-      <SectionStub title="Cron" subtitle={`${report.cron.summary.total ?? 0} tareas`} />
-      <SectionStub title="Medios" subtitle={String(report.media.summary.sizeHuman || '')} />
-      <SectionStub title="Usuarios" subtitle={`${report.users.summary.totalUsers} usuarios · ${report.users.summary.administrators} admins`} />
-      <SectionStub title="Contenido y REST" subtitle={`${report.content.summary.totalPostTypes} post types · ${report.content.summary.totalRestRoutes} rutas REST`} />
+      <DatabaseSection report={report} />
+      <ThemesSection report={report} />
+      <CronSection report={report} />
+      <MediaSection report={report} />
+      <UsersSection report={report} />
+      <ContentSection report={report} />
     </div>
   )
 }
@@ -136,18 +142,3 @@ function BackNav({ auditId }: { auditId: string }) {
   )
 }
 
-function SectionStub({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <Card>
-      <CardContent className="py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-sm text-[var(--text-primary)]">{title}</h3>
-            <p className="text-xs text-[var(--text-tertiary)]">{subtitle}</p>
-          </div>
-          <span className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase">wip · fase 3-4</span>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
