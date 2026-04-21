@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Blocks, Shield, Gauge, Search, Smartphone, Server, BarChart3, Activity, Database, HelpCircle, AlertCircle, AlertTriangle, CheckCircle2, Info, type LucideIcon } from 'lucide-react'
 import { Accordion, AccordionRadixItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
@@ -84,6 +85,7 @@ function ModuleAccordionItem({
   module: ModuleResult
   itemRef?: (el: HTMLDivElement | null) => void
 }) {
+  const { t } = useTranslation()
   const issues    = m.metrics.filter(mt => mt.level === 'critical' || mt.level === 'warning')
   const criticals = issues.filter(mt => mt.level === 'critical')
   const warnings  = issues.filter(mt => mt.level === 'warning')
@@ -116,16 +118,16 @@ function ModuleAccordionItem({
             </div>
             <div className="mt-0.5 flex flex-wrap gap-2.5 text-[11px]">
               {criticals.length > 0 && (
-                <span className="inline-flex items-center gap-1 text-red-600"><AlertCircle className="h-3 w-3" />{criticals.length} crítico{criticals.length === 1 ? '' : 's'}</span>
+                <span className="inline-flex items-center gap-1 text-red-600"><AlertCircle className="h-3 w-3" />{t('report.accordion_critical', { count: criticals.length })}</span>
               )}
               {warnings.length > 0 && (
-                <span className="inline-flex items-center gap-1 text-amber-600"><AlertTriangle className="h-3 w-3" />{warnings.length} importante{warnings.length === 1 ? '' : 's'}</span>
+                <span className="inline-flex items-center gap-1 text-amber-600"><AlertTriangle className="h-3 w-3" />{t('report.accordion_warning', { count: warnings.length })}</span>
               )}
               {passed.length > 0 && (
-                <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3 w-3" />{passed.length} OK</span>
+                <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3 w-3" />{t('report.accordion_passed_count', { count: passed.length })}</span>
               )}
               {info.length > 0 && (
-                <span className="inline-flex items-center gap-1 text-[var(--text-tertiary)]"><Info className="h-3 w-3" />{info.length} info</span>
+                <span className="inline-flex items-center gap-1 text-[var(--text-tertiary)]"><Info className="h-3 w-3" />{t('report.accordion_info_count', { count: info.length })}</span>
               )}
             </div>
           </div>
@@ -135,7 +137,7 @@ function ModuleAccordionItem({
       <AccordionContent className="px-5 pb-5">
         {issues.length > 0 && (
           <div className="mb-4">
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-red-500">Problemas a corregir</h3>
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-red-500">{t('report.modules_header_problems')}</h3>
             <div className="space-y-3">
               {issues.map(mt => <MetricDetail key={mt.id} metric={mt} />)}
             </div>
@@ -148,7 +150,7 @@ function ModuleAccordionItem({
             {passed.length > 0 && (
               <AccordionRadixItem value="passed" className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)]">
                 <AccordionTrigger className="px-3 py-2 text-xs uppercase tracking-wider text-emerald-600 hover:no-underline">
-                  Aprobados · {passed.length}
+                  {t('report.accordion_passed_summary', { count: passed.length })}
                 </AccordionTrigger>
                 <AccordionContent className="px-3 pb-3">
                   <div className="space-y-1">
@@ -167,7 +169,7 @@ function ModuleAccordionItem({
             {info.length > 0 && (
               <AccordionRadixItem value="info" className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)]">
                 <AccordionTrigger className="px-3 py-2 text-xs uppercase tracking-wider text-[var(--text-tertiary)] hover:no-underline">
-                  Informativos · {info.length}
+                  {t('report.accordion_info_summary', { count: info.length })}
                 </AccordionTrigger>
                 <AccordionContent className="px-3 pb-3">
                   <div className="space-y-1">
@@ -190,6 +192,7 @@ function ModuleAccordionItem({
 }
 
 function MetricDetail({ metric }: { metric: MetricResult }) {
+  const { t } = useTranslation()
   const details = metric.details || {}
   return (
     <div className={`rounded-xl border p-4 ${levelBg(metric.level)}`}>
@@ -205,7 +208,7 @@ function MetricDetail({ metric }: { metric: MetricResult }) {
 
           {metric.recommendation && (
             <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-white/80 p-3">
-              <p className="mb-1 text-xs font-bold text-[var(--text-tertiary)]">CÓMO CORREGIR</p>
+              <p className="mb-1 text-xs font-bold text-[var(--text-tertiary)]">{t('report.how_to_fix_label')}</p>
               <p className="text-sm text-[var(--text-primary)]">{metric.recommendation}</p>
             </div>
           )}

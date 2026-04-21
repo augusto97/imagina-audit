@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Blocks, Shield, Gauge, Search, Smartphone, Server, BarChart3, Activity, Database, HelpCircle, ChevronRight, type LucideIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getLevelColor, getLevelLabel } from '@/lib/utils'
@@ -18,13 +19,14 @@ export const ModuleScoreGrid = memo(function ModuleScoreGrid({
   modules: ModuleResult[]
   onModuleClick?: (moduleId: string) => void
 }) {
+  const { t } = useTranslation()
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base">Score por módulo</CardTitle>
+          <CardTitle className="text-base">{t('report.modules_grid_title')}</CardTitle>
           <span className="text-xs text-[var(--text-tertiary)]">
-            Click para ver el detalle
+            {t('report.modules_grid_click_hint')}
           </span>
         </div>
       </CardHeader>

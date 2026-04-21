@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, memo } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Database, ArrowRight, LayoutDashboard, ListChecks, Boxes } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -29,6 +30,7 @@ import { getAllMetricsByLevel, type ChecklistState } from './report/helpers'
  * fase E; por ahora se mantiene solo en state local).
  */
 function TechnicalReport() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const { fetchLeadDetail, pinAudit } = useAdmin()
   const [result, setResult] = useState<AuditResult | null>(null)
@@ -110,7 +112,7 @@ function TechnicalReport() {
     return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-48 rounded-2xl" /></div>
   }
   if (!result) {
-    return <div className="text-center py-12 text-[var(--text-secondary)]">Auditoría no encontrada</div>
+    return <div className="text-center py-12 text-[var(--text-secondary)]">{t('report.not_found')}</div>
   }
 
   const criticalMetrics = getAllMetricsByLevel(result, 'critical')
@@ -126,10 +128,10 @@ function TechnicalReport() {
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
         <TabsList>
           <TabsTrigger value="summary">
-            <LayoutDashboard className="h-4 w-4 mr-1" strokeWidth={1.5} /> Resumen
+            <LayoutDashboard className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('report.tab_summary')}
           </TabsTrigger>
           <TabsTrigger value="plan">
-            <ListChecks className="h-4 w-4 mr-1" strokeWidth={1.5} /> Plan de acción
+            <ListChecks className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('report.tab_plan')}
             {totalPlanItems > 0 && (
               <Badge variant="secondary" className="ml-1.5 text-[10px]">
                 {donePlanItems}/{totalPlanItems}
@@ -137,7 +139,7 @@ function TechnicalReport() {
             )}
           </TabsTrigger>
           <TabsTrigger value="modules">
-            <Boxes className="h-4 w-4 mr-1" strokeWidth={1.5} /> Detalles por módulo
+            <Boxes className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('report.tab_modules')}
             <Badge variant="secondary" className="ml-1.5 text-[10px]">
               {result.modules.length + (snapshotModule ? 1 : 0)}
             </Badge>
@@ -167,10 +169,10 @@ function TechnicalReport() {
               <CardContent className="flex items-center justify-between gap-3 py-4">
                 <div>
                   <p className="font-semibold text-[var(--text-primary)]">
-                    {totalPlanItems} acciones detectadas ({criticalMetrics.length} críticas + {warningMetrics.length} importantes)
+                    {t('report.plan_cta_title', { total: totalPlanItems, critical: criticalMetrics.length, warning: warningMetrics.length })}
                   </p>
                   <p className="text-xs text-[var(--text-secondary)]">
-                    Ver el plan de acción paso a paso con checklist →
+                    {t('report.plan_cta_subtitle')}
                   </p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-[var(--accent-primary)]" />
@@ -205,25 +207,24 @@ function TechnicalReport() {
  * Banner que invita a ir a la pestaña de análisis interno.
  */
 function SnapshotAvailabilityBanner({ auditId, hasSnapshot }: { auditId: string; hasSnapshot: boolean }) {
+  const { t } = useTranslation()
   return (
     <Card className={hasSnapshot ? 'border-emerald-200 bg-emerald-50/50' : 'border-blue-200 bg-blue-50/50'}>
       <CardContent className="flex flex-wrap items-center gap-3 py-3">
         <Database className={`h-5 w-5 shrink-0 ${hasSnapshot ? 'text-emerald-600' : 'text-blue-600'}`} strokeWidth={1.5} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-[var(--text-primary)]">
-            {hasSnapshot ? 'Análisis interno conectado' : '¿Necesitas datos internos?'}
+            {hasSnapshot ? t('report.snapshot_connected_title') : t('report.snapshot_missing_title')}
           </p>
           <p className="text-xs text-[var(--text-secondary)]">
-            {hasSnapshot
-              ? 'Plugins con versiones reales, BD, cron, seguridad interna y más — en la pestaña Análisis interno.'
-              : 'Sube el JSON del plugin wp-snapshot para ver plugins, vulnerabilidades, BD, cron y configuración interna.'}
+            {hasSnapshot ? t('report.snapshot_connected_body') : t('report.snapshot_missing_body')}
           </p>
         </div>
         <Link
           to={`/admin/leads/${auditId}/internal`}
           className="inline-flex items-center gap-1 rounded-md bg-white px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:bg-[var(--bg-secondary)]"
         >
-          {hasSnapshot ? 'Ver análisis' : 'Conectar snapshot'} <ArrowRight className="h-3 w-3" />
+          {hasSnapshot ? t('report.snapshot_view_analysis') : t('report.snapshot_connect')} <ArrowRight className="h-3 w-3" />
         </Link>
       </CardContent>
     </Card>

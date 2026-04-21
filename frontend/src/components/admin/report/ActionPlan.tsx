@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check, Filter, CheckCircle2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { levelBg, type ChecklistState, type MetricWithModule } from './helpers'
@@ -25,6 +26,7 @@ export function ActionPlan({
   checklist: ChecklistState
   onToggle: (metricId: string) => void
 }) {
+  const { t } = useTranslation()
   const [filter, setFilter] = useState<FilterKey>('all')
 
   const allItems = [...critical, ...warning]
@@ -38,9 +40,9 @@ export function ActionPlan({
         <div className="flex items-start gap-3">
           <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" strokeWidth={1.75} />
           <div>
-            <h2 className="text-lg font-bold text-emerald-700">Sin problemas detectados</h2>
+            <h2 className="text-lg font-bold text-emerald-700">{t('report.plan_no_issues_title')}</h2>
             <p className="mt-1 text-sm text-emerald-600">
-              El sitio está en buen estado. No se requieren acciones correctivas urgentes.
+              {t('report.plan_no_issues_body')}
             </p>
           </div>
         </div>
@@ -81,7 +83,7 @@ export function ActionPlan({
       {/* Header sticky con progreso + filtros */}
       <div className="sticky top-0 z-10 rounded-t-2xl border-b border-[var(--border-default)] bg-white/95 px-6 py-4 backdrop-blur">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-[var(--text-primary)]">Plan de acción</h2>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">{t('report.plan_title')}</h2>
           <div className="flex items-center gap-2 text-sm">
             <span className="font-semibold text-[var(--text-primary)] tabular-nums">
               {doneCount}<span className="text-[var(--text-tertiary)]">/{total}</span>
@@ -89,7 +91,7 @@ export function ActionPlan({
             <span className="text-xs text-[var(--text-tertiary)]">
               ({Math.round((doneCount / total) * 100)}%)
             </span>
-            {doneCount === total && <Badge variant="success" className="text-[10px]">Completo</Badge>}
+            {doneCount === total && <Badge variant="success" className="text-[10px]">{t('report.plan_complete')}</Badge>}
           </div>
         </div>
 
@@ -102,12 +104,12 @@ export function ActionPlan({
 
         <div className="flex flex-wrap items-center gap-1.5">
           <Filter className="h-3.5 w-3.5 text-[var(--text-tertiary)]" strokeWidth={1.5} />
-          <FilterChip active={filter === 'all'}      onClick={() => setFilter('all')}      label="Todos"        count={total} />
-          <FilterChip active={filter === 'pending'}  onClick={() => setFilter('pending')}  label="Pendientes"   count={pendingCount} tone="accent" />
-          <FilterChip active={filter === 'done'}     onClick={() => setFilter('done')}     label="Completados"  count={doneCount}    tone="emerald" />
+          <FilterChip active={filter === 'all'}      onClick={() => setFilter('all')}      label={t('report.plan_filter_all')}      count={total} />
+          <FilterChip active={filter === 'pending'}  onClick={() => setFilter('pending')}  label={t('report.plan_filter_pending')}  count={pendingCount} tone="accent" />
+          <FilterChip active={filter === 'done'}     onClick={() => setFilter('done')}     label={t('report.plan_filter_done')}     count={doneCount}    tone="emerald" />
           <span className="mx-1 text-[var(--text-tertiary)]">·</span>
-          <FilterChip active={filter === 'critical'} onClick={() => setFilter('critical')} label="Críticos"     count={filter === 'done' ? critDone : filter === 'pending' ? critPending : critical.length} tone="red" />
-          <FilterChip active={filter === 'warning'}  onClick={() => setFilter('warning')}  label="Importantes"  count={filter === 'done' ? warnDone : filter === 'pending' ? warnPending : warning.length} tone="amber" />
+          <FilterChip active={filter === 'critical'} onClick={() => setFilter('critical')} label={t('report.plan_filter_critical')} count={filter === 'done' ? critDone : filter === 'pending' ? critPending : critical.length} tone="red" />
+          <FilterChip active={filter === 'warning'}  onClick={() => setFilter('warning')}  label={t('report.plan_filter_warning')}  count={filter === 'done' ? warnDone : filter === 'pending' ? warnPending : warning.length} tone="amber" />
         </div>
       </div>
 
@@ -115,7 +117,7 @@ export function ActionPlan({
       <div className="space-y-4 p-6">
         {nothingToShow && (
           <p className="py-10 text-center text-sm text-[var(--text-tertiary)]">
-            No hay items que coincidan con el filtro.
+            {t('report.plan_nothing_matches')}
           </p>
         )}
 
@@ -123,7 +125,7 @@ export function ActionPlan({
           <div>
             <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-red-600">
               <span className="h-2 w-2 rounded-full bg-red-500" />
-              Prioridad Alta — {filteredCritical.length} {filteredCritical.length === 1 ? 'problema crítico' : 'problemas críticos'}
+              {t('report.plan_high_priority', { count: filteredCritical.length })}
             </h3>
             <div className="space-y-2">
               {filteredCritical.map((m, i) => (
@@ -137,7 +139,7 @@ export function ActionPlan({
           <div>
             <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-amber-600">
               <span className="h-2 w-2 rounded-full bg-amber-500" />
-              Prioridad Media — {filteredWarning.length} {filteredWarning.length === 1 ? 'mejora' : 'mejoras'}
+              {t('report.plan_medium_priority', { count: filteredWarning.length })}
             </h3>
             <div className="space-y-2">
               {filteredWarning.map((m, i) => (

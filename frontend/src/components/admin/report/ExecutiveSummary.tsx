@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getLevelColor } from '@/lib/utils'
 import type { AuditResult, ModuleResult } from '@/types/audit'
 
@@ -18,28 +19,29 @@ export const ExecutiveSummary = memo(function ExecutiveSummary({
   /** Mantenido por compatibilidad hacia atrás; ya no se renderiza. */
   snapshotModule?: ModuleResult | null
 }) {
+  const { t } = useTranslation()
   return (
     <div className="rounded-2xl border border-[var(--border-default)] bg-white p-6">
-      <h2 className="text-lg font-bold text-[var(--text-primary)] mb-4">Resumen Ejecutivo</h2>
+      <h2 className="text-lg font-bold text-[var(--text-primary)] mb-4">{t('report.executive_summary')}</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <SummaryCard
-          label="Score Global"
+          label={t('report.executive_global_score')}
           value={`${result.globalScore}/100`}
           color={getLevelColor(result.globalLevel)}
         />
         <SummaryCard
-          label="Críticos"
+          label={t('report.executive_critical')}
           value={String(criticalCount)}
           color={criticalCount > 0 ? 'var(--color-critical)' : 'var(--text-tertiary)'}
         />
         <SummaryCard
-          label="Importantes"
+          label={t('report.executive_important')}
           value={String(warningCount)}
           color={warningCount > 0 ? 'var(--color-warning)' : 'var(--text-tertiary)'}
         />
         <SummaryCard
-          label="Tipo de sitio"
-          value={result.isWordPress ? 'WordPress' : 'Externo'}
+          label={t('report.executive_site_type')}
+          value={result.isWordPress ? t('report.executive_site_wordpress') : t('report.executive_site_external')}
           color="var(--accent-primary)"
         />
       </div>
