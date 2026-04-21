@@ -109,6 +109,20 @@ export function useAdmin() {
     } catch (err) { handleError(err) }
   }, [handleError])
 
+  const fetchPluginVault = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/plugin-vault.php')
+      return res.data.data
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const refreshPluginVault = useCallback(async (slug: string, force = false) => {
+    try {
+      const res = await api.post('/admin/plugin-vault.php', { slug, force })
+      return res.data.data
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
   const fetchSnapshotReport = useCallback(async (auditId: string) => {
     try {
       const res = await api.get('/admin/snapshot-report.php', { params: { audit_id: auditId } })
@@ -143,5 +157,6 @@ export function useAdmin() {
     fetchVulnerabilities, createVulnerability, updateVulnerability, deleteVulnerability,
     uploadBrandAsset,
     fetchSnapshotReport,
+    fetchPluginVault, refreshPluginVault,
   }
 }
