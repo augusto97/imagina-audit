@@ -58,10 +58,14 @@ export function ScoreDistribution({ data }: { data: DashboardData['scoreDistribu
                   fontSize: '12px',
                   padding: '8px 12px',
                 }}
-                formatter={(v: number, _: string, p: { payload?: { range: string; name: string } }) => [
-                  `${v} (${total > 0 ? Math.round((v / total) * 100) : 0}%)`,
-                  `${p.payload?.name} ${p.payload?.range ? `(${p.payload.range})` : ''}`,
-                ]}
+                formatter={((v: unknown, _: unknown, p: unknown) => {
+                  const val = typeof v === 'number' ? v : 0
+                  const payload = (p as { payload?: { range?: string; name?: string } } | undefined)?.payload
+                  return [
+                    `${val} (${total > 0 ? Math.round((val / total) * 100) : 0}%)`,
+                    `${payload?.name ?? ''} ${payload?.range ? `(${payload.range})` : ''}`,
+                  ] as [string, string]
+                }) as never}
               />
               <Bar dataKey="value" radius={[6, 6, 2, 2]}>
                 {chartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}

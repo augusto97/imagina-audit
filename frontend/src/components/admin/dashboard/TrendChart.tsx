@@ -72,11 +72,12 @@ export function TrendChart({ data }: { data: DashboardData['trend30d'] }) {
                   padding: '8px 12px',
                 }}
                 labelFormatter={(_, payload) => (payload?.[0]?.payload as { date: string })?.date}
-                formatter={(value: number, name: string) => {
-                  if (name === 'count') return [value, 'Auditorías']
-                  if (name === 'avgScore') return [value?.toFixed(1), 'Score prom.']
-                  return [value, name]
-                }}
+                formatter={((value: unknown, name: unknown) => {
+                  const v = typeof value === 'number' ? value : 0
+                  if (name === 'count') return [v, 'Auditorías'] as [number, string]
+                  if (name === 'avgScore') return [v.toFixed(1), 'Score prom.'] as [string, string]
+                  return [v, String(name ?? '')] as [number, string]
+                }) as never}
               />
               <Bar yAxisId="count" dataKey="count" fill="var(--accent-primary)" radius={[4, 4, 0, 0]} />
               <Line
