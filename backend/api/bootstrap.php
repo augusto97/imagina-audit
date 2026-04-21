@@ -17,6 +17,7 @@ if (!class_exists('Database')) {
     spl_autoload_register(function (string $class) {
         $paths = [
             dirname(__DIR__) . '/lib/' . $class . '.php',
+            dirname(__DIR__) . '/lib/providers/' . $class . '.php',
             dirname(__DIR__) . '/analyzers/' . $class . '.php',
         ];
         foreach ($paths as $path) {
