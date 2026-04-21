@@ -7,6 +7,9 @@ import { useAdmin } from '@/hooks/useAdmin'
 import SnapshotUploader from './SnapshotUploader'
 import OverviewSection from './snapshot/OverviewSection'
 import PluginsSection from './snapshot/PluginsSection'
+import SecuritySection from './snapshot/SecuritySection'
+import EnvironmentSection from './snapshot/EnvironmentSection'
+import PerformanceSection from './snapshot/PerformanceSection'
 import type { SnapshotReportResponse } from '@/types/snapshotReport'
 
 /**
@@ -108,9 +111,9 @@ export default function SnapshotReport() {
 
       <OverviewSection report={report} />
       <PluginsSection report={report} />
-      <SectionStub title="Seguridad" subtitle={`${report.security.summary.critical} críticos · ${report.security.summary.warning} warnings`} />
-      <SectionStub title="Entorno y servidor" subtitle="Stack WordPress/PHP/DB/server" />
-      <SectionStub title="Rendimiento" subtitle="Cache stack, OPcache, image editor" />
+      <SecuritySection report={report} />
+      <EnvironmentSection report={report} />
+      <PerformanceSection report={report} />
       <SectionStub title="Base de datos" subtitle={String(report.database.summary.sizeHuman || '')} />
       <SectionStub title="Temas" subtitle={`${report.themes.summary.total ?? 0} instalados`} />
       <SectionStub title="Cron" subtitle={`${report.cron.summary.total ?? 0} tareas`} />
