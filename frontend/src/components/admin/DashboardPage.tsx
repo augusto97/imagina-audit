@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FileSearch, UserCheck, Gauge, Blocks, RefreshCw, Loader2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,7 @@ import type { DashboardData } from '@/types/dashboard'
  *   - Row 5: Recent audits (full width)
  */
 export default function DashboardPage() {
+  const { t } = useTranslation()
   const { fetchDashboard } = useAdmin()
   const [data, setData] = useState<DashboardData | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -48,16 +50,14 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Dashboard</h1>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Estado del sistema, actividad reciente e integraciones.
-          </p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('dashboard.title')}</h1>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">{t('dashboard.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-          {lastUpdated && <span>Actualizado {lastUpdated.toLocaleTimeString('es-CO')}</span>}
+          {lastUpdated && <span>{t('dashboard.updated_at', { time: lastUpdated.toLocaleTimeString() })}</span>}
           <Button variant="outline" size="sm" onClick={() => load(true)} disabled={refreshing}>
             {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />}
-            Refrescar
+            {t('common.refresh')}
           </Button>
         </div>
       </div>
@@ -65,7 +65,7 @@ export default function DashboardPage() {
       {/* Row 1: KPIs primarios */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard
-          label="Auditorías totales"
+          label={t('dashboard.kpi_total_audits')}
           value={data.audits.total}
           icon={<FileSearch className="h-5 w-5 text-white" strokeWidth={1.5} />}
           gradient="from-[#0CC0DF] to-[#0A9DB8]"
@@ -73,24 +73,24 @@ export default function DashboardPage() {
           delay={0}
           subtext={
             <div className="flex gap-3">
-              <span><b className="text-[var(--text-primary)]">{data.audits.today}</b> hoy</span>
-              <span><b className="text-[var(--text-primary)]">{data.audits.thisWeek}</b> 7d</span>
-              <span><b className="text-[var(--text-primary)]">{data.audits.thisMonth}</b> 30d</span>
+              <span><b className="text-[var(--text-primary)]">{data.audits.today}</b> {t('dashboard.kpi_today')}</span>
+              <span><b className="text-[var(--text-primary)]">{data.audits.thisWeek}</b> {t('dashboard.kpi_7d')}</span>
+              <span><b className="text-[var(--text-primary)]">{data.audits.thisMonth}</b> {t('dashboard.kpi_30d')}</span>
             </div>
           }
         />
         <KPICard
-          label="Score promedio"
+          label={t('dashboard.kpi_avg_score')}
           value={data.audits.averageScore}
           suffix="/100"
           icon={<Gauge className="h-5 w-5 text-white" strokeWidth={1.5} />}
           gradient="from-violet-400 to-violet-600"
           bgGlow="bg-violet-500/8"
           delay={0.08}
-          subtext={<TrendDelta current={data.audits.averageScore7d} overall={data.audits.averageScore} label="últimos 7d" />}
+          subtext={<TrendDelta current={data.audits.averageScore7d} overall={data.audits.averageScore} label={t('dashboard.kpi_avg_last_7d')} noDataLabel={t('dashboard.kpi_avg_no_data_7d')} />}
         />
         <KPICard
-          label="Tasa de conversión"
+          label={t('dashboard.kpi_conversion')}
           value={data.leads.conversionRate}
           suffix="%"
           icon={<UserCheck className="h-5 w-5 text-white" strokeWidth={1.5} />}
@@ -99,13 +99,13 @@ export default function DashboardPage() {
           delay={0.16}
           subtext={
             <>
-              <b className="text-[var(--text-primary)]">{data.leads.total}</b> con contacto
-              <span className="text-[var(--text-tertiary)]"> · de {data.audits.total}</span>
+              <b className="text-[var(--text-primary)]">{data.leads.total}</b> {t('dashboard.kpi_with_contact')}
+              <span className="text-[var(--text-tertiary)]"> · {t('dashboard.kpi_of')} {data.audits.total}</span>
             </>
           }
         />
         <KPICard
-          label="% WordPress"
+          label={t('dashboard.kpi_wordpress_rate')}
           value={data.audits.wpRate}
           suffix="%"
           icon={<Blocks className="h-5 w-5 text-white" strokeWidth={1.5} />}
@@ -114,8 +114,8 @@ export default function DashboardPage() {
           delay={0.24}
           subtext={
             <>
-              <b className="text-[var(--text-primary)]">{data.audits.wpCount}</b> WordPress
-              <span className="text-[var(--text-tertiary)]"> · {data.audits.nonWpCount} externos</span>
+              <b className="text-[var(--text-primary)]">{data.audits.wpCount}</b> {t('dashboard.kpi_wordpress_count')}
+              <span className="text-[var(--text-tertiary)]"> · {data.audits.nonWpCount} {t('dashboard.kpi_external_count')}</span>
             </>
           }
         />
@@ -154,11 +154,11 @@ export default function DashboardPage() {
  * Delta textual: muestra el score 7d comparado con el histórico.
  * Si son (casi) iguales, muestra neutro; si difiere >0.5 muestra flecha.
  */
-function TrendDelta({ current, overall, label }: { current: number; overall: number; label: string }) {
+function TrendDelta({ current, overall, label, noDataLabel }: { current: number; overall: number; label: string; noDataLabel: string }) {
   const diff = current - overall
   const abs = Math.abs(diff)
   if (current === 0) {
-    return <span className="text-[var(--text-tertiary)]">Sin datos en 7d</span>
+    return <span className="text-[var(--text-tertiary)]">{noDataLabel}</span>
   }
   if (abs < 0.5) {
     return <span><b className="text-[var(--text-primary)]">{current}</b> {label}</span>
