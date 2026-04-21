@@ -51,6 +51,13 @@ if [ -f "$PROJECT_DIR/backend/uploads/.htaccess" ]; then
   cp "$PROJECT_DIR/backend/uploads/.htaccess" "$DEPLOY_DIR/uploads/.htaccess"
 fi
 
+# Storage de plugins (vault) — los ZIPs se descargan en runtime, solo
+# copiamos el .htaccess que bloquea acceso directo.
+mkdir -p "$DEPLOY_DIR/storage/plugins"
+if [ -f "$PROJECT_DIR/backend/storage/.htaccess" ]; then
+  cp "$PROJECT_DIR/backend/storage/.htaccess" "$DEPLOY_DIR/storage/.htaccess"
+fi
+
 # .htaccess files
 cp "$PROJECT_DIR/backend/.htaccess" "$DEPLOY_DIR/.htaccess.backend"
 cp "$PROJECT_DIR/backend/cache/.htaccess" "$DEPLOY_DIR/cache/.htaccess"

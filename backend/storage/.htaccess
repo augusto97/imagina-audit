@@ -1,0 +1,3 @@
+# Bloquear acceso HTTP directo. Los archivos se sirven via PHP
+# (plugin-download.php) que controla nombres y headers.
+Require all denied
