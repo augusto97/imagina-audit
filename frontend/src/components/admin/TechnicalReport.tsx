@@ -15,6 +15,7 @@ import { ExecutiveSummary } from './report/ExecutiveSummary'
 import { TechStackSummary } from './report/TechStackSummary'
 import { ActionPlan } from './report/ActionPlan'
 import { ModuleDetail } from './report/ModuleDetail'
+import { ModuleScoreGrid } from './report/ModuleScoreGrid'
 import { getAllMetricsByLevel, type ChecklistState } from './report/helpers'
 
 /**
@@ -36,6 +37,12 @@ function TechnicalReport() {
   const [snapshotModule, setSnapshotModule] = useState<ModuleResult | null>(null)
   const [isPinned, setIsPinned] = useState(false)
   const [activeTab, setActiveTab] = useState<'summary' | 'plan' | 'modules'>('summary')
+
+  // Click en un mini-gauge: saltar al tab Detalles. En fase D el módulo
+  // clickeado se expandirá en el acordeón automáticamente.
+  const handleModuleClick = useCallback((_moduleId: string) => {
+    setActiveTab('modules')
+  }, [])
 
   useEffect(() => {
     if (!id) return
@@ -127,6 +134,10 @@ function TechnicalReport() {
             criticalCount={criticalMetrics.length}
             warningCount={warningMetrics.length}
             snapshotModule={snapshotModule}
+          />
+          <ModuleScoreGrid
+            modules={snapshotModule ? [...result.modules, snapshotModule] : result.modules}
+            onModuleClick={handleModuleClick}
           />
           {result.techStack && (
             <TechStackSummary techStack={result.techStack} scanDuration={result.scanDurationMs} />

@@ -3,37 +3,45 @@ import { getLevelColor } from '@/lib/utils'
 import type { AuditResult, ModuleResult } from '@/types/audit'
 
 /**
- * Resumen ejecutivo con scores globales y grid de módulos.
+ * Resumen ejecutivo con 4 KPIs: score global, críticos, importantes,
+ * tipo de sitio. La lista de módulos ya NO vive aquí — ahora hay un
+ * `ModuleScoreGrid` con mini-gauges en el tab Resumen.
  */
 export const ExecutiveSummary = memo(function ExecutiveSummary({
   result,
   criticalCount,
   warningCount,
-  snapshotModule,
 }: {
   result: AuditResult
   criticalCount: number
   warningCount: number
-  snapshotModule: ModuleResult | null
+  /** Mantenido por compatibilidad hacia atrás; ya no se renderiza. */
+  snapshotModule?: ModuleResult | null
 }) {
-  const modules = snapshotModule ? [...result.modules, snapshotModule] : result.modules
   return (
     <div className="rounded-2xl border border-[var(--border-default)] bg-white p-6">
       <h2 className="text-lg font-bold text-[var(--text-primary)] mb-4">Resumen Ejecutivo</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-        <SummaryCard label="Score Global" value={`${result.globalScore}/100`} color={getLevelColor(result.globalLevel)} />
-        <SummaryCard label="Críticos" value={String(criticalCount)} color="var(--color-critical)" />
-        <SummaryCard label="Importantes" value={String(warningCount)} color="var(--color-warning)" />
-        <SummaryCard label="WordPress" value={result.isWordPress ? 'Sí' : 'No'} color="var(--accent-primary)" />
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {modules.map(m => (
-          <div key={m.id} className="flex items-center gap-2 text-sm">
-            <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: getLevelColor(m.level) }} />
-            <span className="text-[var(--text-secondary)] truncate">{m.name}</span>
-            <span className="font-semibold text-[var(--text-primary)] ml-auto">{m.score ?? '—'}</span>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <SummaryCard
+          label="Score Global"
+          value={`${result.globalScore}/100`}
+          color={getLevelColor(result.globalLevel)}
+        />
+        <SummaryCard
+          label="Críticos"
+          value={String(criticalCount)}
+          color={criticalCount > 0 ? 'var(--color-critical)' : 'var(--text-tertiary)'}
+        />
+        <SummaryCard
+          label="Importantes"
+          value={String(warningCount)}
+          color={warningCount > 0 ? 'var(--color-warning)' : 'var(--text-tertiary)'}
+        />
+        <SummaryCard
+          label="Tipo de sitio"
+          value={result.isWordPress ? 'WordPress' : 'Externo'}
+          color="var(--accent-primary)"
+        />
       </div>
     </div>
   )
