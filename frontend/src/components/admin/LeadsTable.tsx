@@ -11,6 +11,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { useAdmin } from '@/hooks/useAdmin'
 import api from '@/lib/api'
 import { LeadsSummaryTiles } from './leads/LeadsSummaryTiles'
+import { LeadsBulkBar } from './leads/LeadsBulkBar'
 import { DomainCell } from './leads/DomainCell'
 import { LeadActionsCell } from './leads/LeadActionsCell'
 import { ScorePill } from './leads/ScorePill'
@@ -33,7 +34,9 @@ type Dimensional = 'any' | 'yes' | 'no'
  */
 export default function LeadsTable() {
   const navigate = useNavigate()
-  const { fetchLeads, deleteLead, pinAudit } = useAdmin()
+  const { fetchLeads, deleteLead, pinAudit, bulkLeads } = useAdmin()
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
   const [leads, setLeads] = useState<Lead[]>([])
   const [summary, setSummary] = useState<LeadsSummary | null>(null)
   const [total, setTotal] = useState(0)
@@ -99,6 +102,57 @@ export default function LeadsTable() {
     e.stopPropagation()
     navigator.clipboard.writeText(email)
     toast.success('Email copiado')
+  }
+
+  // ─── Selección múltiple (C.1) ──────────────────────────────────
+  const allOnPageIds = leads.map(l => l.id)
+  const allOnPageSelected = allOnPageIds.length > 0 && allOnPageIds.every(id => selected.has(id))
+  const someOnPageSelected = allOnPageIds.some(id => selected.has(id))
+
+  const toggleRow = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const toggleAllOnPage = () => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (allOnPageSelected) {
+        allOnPageIds.forEach(id => next.delete(id))
+      } else {
+        allOnPageIds.forEach(id => next.add(id))
+      }
+      return next
+    })
+  }
+
+  const clearSelection = () => setSelected(new Set())
+
+  const runBulk = async (action: 'delete' | 'pin' | 'unpin') => {
+    const ids = Array.from(selected)
+    if (ids.length === 0) return
+    if (action === 'delete' && !window.confirm(`¿Eliminar ${ids.length} auditoría${ids.length > 1 ? 's' : ''}? (los protegidos se saltarán)`)) return
+
+    setBulkBusy(true)
+    try {
+      const res = await bulkLeads(ids, action)
+      if (res) {
+        if (action === 'delete') {
+          const msg = res.skipped > 0
+            ? `${res.processed} eliminadas, ${res.skipped} saltadas (protegidas)`
+            : `${res.processed} eliminadas`
+          toast.success(msg)
+        } else {
+          toast.success(`${res.processed} ${action === 'pin' ? 'protegidas' : 'desprotegidas'}`)
+        }
+      }
+      clearSelection()
+      loadLeads()
+    } catch { toast.error('Error al ejecutar la acción en lote') }
+    setBulkBusy(false)
   }
 
   // ─── Filter derivado (qué tile está activo) ─────────────────────
@@ -182,6 +236,16 @@ export default function LeadsTable() {
         </Button>
       </div>
 
+      {/* Bulk bar (sticky, solo visible con selección) */}
+      <LeadsBulkBar
+        count={selected.size}
+        busy={bulkBusy}
+        onClear={clearSelection}
+        onPin={() => runBulk('pin')}
+        onUnpin={() => runBulk('unpin')}
+        onDelete={() => runBulk('delete')}
+      />
+
       {/* Table */}
       <Card className="overflow-hidden py-0">
         <CardContent className="p-0">
@@ -206,6 +270,16 @@ export default function LeadsTable() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[40px]">
+                    <input
+                      type="checkbox"
+                      checked={allOnPageSelected}
+                      ref={(el) => { if (el) el.indeterminate = !allOnPageSelected && someOnPageSelected }}
+                      onChange={toggleAllOnPage}
+                      aria-label="Seleccionar todos en la página"
+                      className="h-4 w-4 cursor-pointer accent-[var(--accent-primary)]"
+                    />
+                  </TableHead>
                   <TableHead className="w-[110px]">Fecha</TableHead>
                   <TableHead>Dominio</TableHead>
                   <TableHead className="hidden lg:table-cell">Email</TableHead>
@@ -219,8 +293,17 @@ export default function LeadsTable() {
                   <TableRow
                     key={lead.id}
                     onClick={() => handleOpen(lead)}
-                    className="cursor-pointer hover:bg-[var(--bg-tertiary)]/40"
+                    className={`cursor-pointer hover:bg-[var(--bg-tertiary)]/40 ${selected.has(lead.id) ? 'bg-[var(--accent-primary)]/5' : ''}`}
                   >
+                    <TableCell className="w-[40px]" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(lead.id)}
+                        onChange={() => toggleRow(lead.id)}
+                        aria-label={`Seleccionar ${lead.domain}`}
+                        className="h-4 w-4 cursor-pointer accent-[var(--accent-primary)]"
+                      />
+                    </TableCell>
                     <TableCell className="whitespace-nowrap text-xs text-[var(--text-tertiary)]">
                       <div>
                         <span>{new Date(lead.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
