@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { X, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -21,12 +22,13 @@ export function ActiveFiltersBar({
   chips: FilterChip[]
   onClearAll: () => void
 }) {
+  const { t } = useTranslation()
   if (chips.length === 0) return null
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2">
       <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-        <Filter className="h-3 w-3" strokeWidth={1.5} /> Filtros activos
+        <Filter className="h-3 w-3" strokeWidth={1.5} /> {t('leads.filters_active')}
       </span>
       {chips.map((chip) => (
         <button
@@ -41,7 +43,7 @@ export function ActiveFiltersBar({
       ))}
       {chips.length >= 2 && (
         <Button variant="ghost" size="sm" onClick={onClearAll} className="ml-auto h-6 text-[11px]">
-          Limpiar todo
+          {t('leads.clear_all')}
         </Button>
       )}
     </div>

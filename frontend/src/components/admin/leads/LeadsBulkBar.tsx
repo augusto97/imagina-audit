@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Pin, PinOff, Trash2, X, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -20,6 +21,7 @@ export function LeadsBulkBar({
   onUnpin: () => void
   onDelete: () => void
 }) {
+  const { t } = useTranslation()
   if (count === 0) return null
 
   return (
@@ -28,21 +30,21 @@ export function LeadsBulkBar({
         <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-white px-1.5 text-[11px] font-bold text-[var(--accent-primary)]">
           {count}
         </span>
-        seleccionad{count === 1 ? 'o' : 'os'}
+        {t('leads.bulk_selected', { count })}
       </span>
 
       <div className="ml-auto flex flex-wrap gap-1">
         <Button variant="secondary" size="sm" onClick={onPin} disabled={busy} className="bg-white/95 hover:bg-white">
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pin className="h-3.5 w-3.5" strokeWidth={1.5} />}
-          Proteger
+          {t('leads.bulk_protect')}
         </Button>
         <Button variant="secondary" size="sm" onClick={onUnpin} disabled={busy} className="bg-white/95 hover:bg-white">
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PinOff className="h-3.5 w-3.5" strokeWidth={1.5} />}
-          Desproteger
+          {t('leads.bulk_unprotect')}
         </Button>
         <Button variant="destructive" size="sm" onClick={onDelete} disabled={busy}>
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />}
-          Eliminar
+          {t('leads.bulk_delete')}
         </Button>
         <Button variant="ghost" size="icon" onClick={onClear} disabled={busy} className="text-white hover:bg-white/20 hover:text-white">
           <X className="h-4 w-4" strokeWidth={1.5} />

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { SlidersHorizontal, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -30,6 +31,7 @@ export function MoreFiltersPopover({
   filterPinned: Dimensional
   onFilterPinnedChange: (v: Dimensional) => void
 }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -46,36 +48,36 @@ export function MoreFiltersPopover({
     <div ref={ref} className="relative">
       <Button variant="outline" size="sm" onClick={() => setOpen(o => !o)}>
         <SlidersHorizontal className="h-4 w-4" strokeWidth={1.5} />
-        <span className="hidden sm:inline">Más filtros</span>
+        <span className="hidden sm:inline">{t('leads.more_filters')}</span>
         <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
       </Button>
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-64 rounded-lg border border-[var(--border-default)] bg-white p-3 shadow-lg">
           <TriToggle
-            label="WordPress"
+            label={t('leads.more_filters_section_wordpress')}
             value={filterWp}
             onChange={onFilterWpChange}
           />
           <TriToggle
-            label="Análisis interno (snapshot)"
+            label={t('leads.more_filters_section_snapshot')}
             value={filterSnap}
             onChange={onFilterSnapChange}
           />
           <TriToggle
-            label="Informes protegidos (pinned)"
+            label={t('leads.more_filters_section_pinned')}
             value={filterPinned}
             onChange={onFilterPinnedChange}
           />
 
           <div className="mt-2 border-t border-[var(--border-default)] pt-2">
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-              Rango temporal
+              {t('leads.more_filters_section_temporal')}
             </p>
             <div className="flex flex-wrap gap-1">
               {[
-                { v: 'all', l: 'Todos' },
-                { v: 'this_week', l: '7 días' },
-                { v: 'this_month', l: '30 días' },
+                { v: 'all', l: t('leads.more_filters_all') },
+                { v: 'this_week', l: t('leads.more_filters_last_7d') },
+                { v: 'this_month', l: t('leads.more_filters_last_30d') },
               ].map((o) => (
                 <button
                   key={o.v}
@@ -93,13 +95,13 @@ export function MoreFiltersPopover({
             </div>
 
             <p className="mt-2 mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-              Rango de score
+              {t('leads.more_filters_section_score')}
             </p>
             <div className="flex flex-wrap gap-1">
               {[
-                { v: 'all', l: 'Cualquiera' },
-                { v: 'critical', l: 'Crítico (<30)' },
-                { v: 'warning', l: 'Bajo (30-49)' },
+                { v: 'all', l: t('leads.more_filters_score_any') },
+                { v: 'critical', l: t('leads.more_filters_score_critical') },
+                { v: 'warning', l: t('leads.more_filters_score_warning') },
               ].map((o) => (
                 <button
                   key={o.v}
@@ -129,14 +131,15 @@ function TriToggle({
   value: Dimensional
   onChange: (v: Dimensional) => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="mb-2">
       <p className="mb-1 text-xs font-medium text-[var(--text-primary)]">{label}</p>
       <div className="flex gap-1">
         {[
-          { v: 'any' as const, l: 'Cualquiera' },
-          { v: 'yes' as const, l: 'Sólo con' },
-          { v: 'no' as const,  l: 'Sólo sin' },
+          { v: 'any' as const, l: t('leads.more_filters_any') },
+          { v: 'yes' as const, l: t('leads.more_filters_only_with') },
+          { v: 'no' as const,  l: t('leads.more_filters_only_without') },
         ].map((o) => (
           <button
             key={o.v}

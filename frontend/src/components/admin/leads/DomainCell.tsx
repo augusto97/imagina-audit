@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Blocks, Database, Pin, ExternalLink } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import type { Lead } from '@/types/lead'
@@ -12,6 +13,7 @@ import type { Lead } from '@/types/lead'
  * Debajo del dominio, nombre + empresa del lead cuando existen.
  */
 export function DomainCell({ lead }: { lead: Lead }) {
+  const { t } = useTranslation()
   const subline = [lead.leadName, lead.leadCompany].filter(Boolean).join(' · ')
 
   return (
@@ -42,7 +44,7 @@ export function DomainCell({ lead }: { lead: Lead }) {
                   <Blocks className="h-2.5 w-2.5" strokeWidth={2} />
                 </span>
               </TooltipTrigger>
-              <TooltipContent>Sitio WordPress</TooltipContent>
+              <TooltipContent>{t('leads.tooltip_wordpress')}</TooltipContent>
             </Tooltip>
           )}
           {lead.hasSnapshot && (
@@ -52,7 +54,7 @@ export function DomainCell({ lead }: { lead: Lead }) {
                   <Database className="h-2.5 w-2.5" strokeWidth={2} />
                 </span>
               </TooltipTrigger>
-              <TooltipContent>Análisis interno conectado (wp-snapshot)</TooltipContent>
+              <TooltipContent>{t('leads.tooltip_snapshot')}</TooltipContent>
             </Tooltip>
           )}
           {lead.isPinned && (
@@ -62,7 +64,7 @@ export function DomainCell({ lead }: { lead: Lead }) {
                   <Pin className="h-2.5 w-2.5 fill-amber-500 text-amber-500" strokeWidth={2} />
                 </span>
               </TooltipTrigger>
-              <TooltipContent>Protegido del borrado automático</TooltipContent>
+              <TooltipContent>{t('leads.tooltip_pinned')}</TooltipContent>
             </Tooltip>
           )}
         </div>

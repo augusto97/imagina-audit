@@ -1,4 +1,5 @@
 import { useState, type MouseEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FileText, MessageCircle, Pin, PinOff, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
@@ -28,6 +29,7 @@ export function LeadActionsCell({
   onTogglePin: (lead: Lead) => Promise<void> | void
   onDelete: (lead: Lead) => Promise<void> | void
 }) {
+  const { t } = useTranslation()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [pinBusy, setPinBusy] = useState(false)
 
@@ -42,10 +44,10 @@ export function LeadActionsCell({
     return (
       <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
         <Button variant="destructive" size="sm" className="h-8 text-xs" onClick={() => { onDelete(lead); setConfirmingDelete(false) }}>
-          Confirmar
+          {t('common.confirm')}
         </Button>
         <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setConfirmingDelete(false)}>
-          Cancelar
+          {t('common.cancel')}
         </Button>
       </div>
     )
@@ -59,7 +61,7 @@ export function LeadActionsCell({
             <FileText className="h-4 w-4" strokeWidth={1.5} />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Abrir lead</TooltipContent>
+        <TooltipContent>{t('leads.action_open')}</TooltipContent>
       </Tooltip>
 
       {lead.leadWhatsapp && (
@@ -76,7 +78,7 @@ export function LeadActionsCell({
               </Button>
             </a>
           </TooltipTrigger>
-          <TooltipContent>WhatsApp</TooltipContent>
+          <TooltipContent>{t('leads.action_whatsapp')}</TooltipContent>
         </Tooltip>
       )}
 
@@ -97,7 +99,7 @@ export function LeadActionsCell({
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          {lead.isPinned ? 'Quitar protección' : 'Proteger del borrado automático'}
+          {lead.isPinned ? t('leads.action_unpin') : t('leads.action_pin')}
         </TooltipContent>
       </Tooltip>
 
@@ -114,7 +116,7 @@ export function LeadActionsCell({
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          {lead.isPinned ? 'Desprotege primero' : 'Eliminar'}
+          {lead.isPinned ? t('leads.action_unprotect_first') : t('leads.action_delete')}
         </TooltipContent>
       </Tooltip>
     </div>
