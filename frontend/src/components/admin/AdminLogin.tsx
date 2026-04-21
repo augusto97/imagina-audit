@@ -10,9 +10,10 @@ import { useConfigStore } from '@/store/configStore'
 import api from '@/lib/api'
 
 export default function AdminLogin() {
-  const { login } = useAuth()
+  const { login, verify2fa } = useAuth()
   const [loading, setLoading] = useState(false)
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
+  const [needs2fa, setNeeds2fa] = useState(false)
 
   // Check si es la primera instalación (no hay password configurada)
   useEffect(() => {
@@ -29,7 +30,11 @@ export default function AdminLogin() {
     )
   }
 
-  return needsSetup ? <SetupWizard onDone={() => setNeedsSetup(false)} /> : <LoginForm login={login} loading={loading} setLoading={setLoading} />
+  if (needsSetup) return <SetupWizard onDone={() => setNeedsSetup(false)} />
+
+  if (needs2fa) return <TwoFaStep verify={verify2fa} loading={loading} setLoading={setLoading} onCancel={() => setNeeds2fa(false)} />
+
+  return <LoginForm login={login} loading={loading} setLoading={setLoading} onNeeds2fa={() => setNeeds2fa(true)} />
 }
 
 // ─── Login normal ──────────────────────────────────────────────────
@@ -37,22 +42,22 @@ function LoginForm({
   login,
   loading,
   setLoading,
+  onNeeds2fa,
 }: {
-  login: (pass: string) => Promise<void>
+  login: (pass: string) => Promise<{ needs2fa: boolean }>
   loading: boolean
   setLoading: (v: boolean) => void
+  onNeeds2fa: () => void
 }) {
   const { register, handleSubmit } = useForm<{ password: string; website?: string }>()
   const { logoUrl, companyName } = useConfigStore((s) => s.config)
 
   const onSubmit = async (data: { password: string; website?: string }) => {
-    // Honeypot: si 'website' viene con valor, un bot rellenó el form.
-    // No bloqueamos explícitamente (para no leakear la señal) — el backend
-    // también rechaza el intento, así que solo hacemos bail out silencioso.
-    if (data.website) return
+    if (data.website) return   // honeypot
     setLoading(true)
     try {
-      await login(data.password)
+      const res = await login(data.password)
+      if (res.needs2fa) onNeeds2fa()
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string }; status?: number } }
       const msg = axiosErr.response?.data?.error || 'Contraseña incorrecta'
@@ -226,6 +231,92 @@ function SetupWizard({ onDone }: { onDone: () => void }) {
             Si la pierdes, necesitarás acceso al servidor para resetearla
             (borrando la fila <code>admin_password_hash</code> de la tabla <code>settings</code>).
           </div>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+// ─── 2FA step (segundo factor tras password correcta) ──────────────
+
+function TwoFaStep({
+  verify, loading, setLoading, onCancel,
+}: {
+  verify: (code: string) => Promise<{ usedRecovery: boolean }>
+  loading: boolean
+  setLoading: (v: boolean) => void
+  onCancel: () => void
+}) {
+  const { register, handleSubmit, setValue, watch } = useForm<{ code: string }>()
+  const { logoUrl, companyName } = useConfigStore((s) => s.config)
+  const code = watch('code', '')
+
+  const onSubmit = async (data: { code: string }) => {
+    setLoading(true)
+    try {
+      const res = await verify(data.code.trim())
+      if (res.usedRecovery) {
+        toast.warning('Usaste un recovery code. Regenera los códigos desde Admin → 2FA.', { duration: 8000 })
+      }
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } }
+      toast.error(axiosErr.response?.data?.error || 'Código inválido')
+      setValue('code', '')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#F4F6F8] px-4">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-[var(--accent-primary)]/5 blur-3xl" />
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 30, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+        className="relative w-full max-w-sm"
+      >
+        <div className="rounded-2xl border border-[var(--border-default)] bg-white p-8 shadow-xl shadow-black/[0.03]">
+          <div className="mb-6 flex flex-col items-center gap-3">
+            {logoUrl ? (
+              <img src={logoUrl} alt={companyName || 'Logo'} className="h-12 max-w-[200px] object-contain opacity-80" />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/25">
+                <Key className="h-6 w-6 text-white" strokeWidth={2} />
+              </div>
+            )}
+            <div className="text-center">
+              <h1 className="text-xl font-bold text-[var(--text-primary)]">Código de verificación</h1>
+              <p className="text-sm text-[var(--text-tertiary)] mt-0.5">
+                Ingresa el código de 6 dígitos de tu app autenticadora
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" autoComplete="off">
+            <Input
+              {...register('code', { required: true })}
+              placeholder="000000"
+              maxLength={10}
+              inputMode="numeric"
+              autoFocus
+              disabled={loading}
+              className="h-12 text-center font-mono text-xl tracking-[0.4em]"
+            />
+            <Button type="submit" className="w-full h-11" disabled={loading || code.trim().length < 6}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (<>Verificar <ArrowRight className="h-4 w-4 ml-1" strokeWidth={1.5} /></>)}
+            </Button>
+            <Button type="button" variant="ghost" className="w-full h-9 text-xs" onClick={onCancel} disabled={loading}>
+              Volver al paso anterior
+            </Button>
+          </form>
+
+          <p className="mt-5 text-center text-[11px] text-[var(--text-tertiary)]">
+            Si perdiste acceso a tu app, también puedes ingresar un recovery code de 10 caracteres.
+          </p>
         </div>
       </motion.div>
     </div>

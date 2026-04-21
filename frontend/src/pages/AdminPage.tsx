@@ -10,6 +10,7 @@ import LeadDetail from '@/components/admin/LeadDetail'
 import SettingsGeneral from '@/components/admin/SettingsGeneral'
 import SettingsBranding from '@/components/admin/SettingsBranding'
 import SettingsPluginVault from '@/components/admin/SettingsPluginVault'
+import Settings2FA from '@/components/admin/Settings2FA'
 import SettingsHomeCMS from '@/components/admin/SettingsHomeCMS'
 import SettingsMessages from '@/components/admin/SettingsMessages'
 import SettingsPlans from '@/components/admin/SettingsPlans'
@@ -65,6 +66,7 @@ export default function AdminPage() {
         <Route path="settings" element={<SettingsGeneral />} />
         <Route path="branding" element={<SettingsBranding />} />
         <Route path="plugin-vault" element={<SettingsPluginVault />} />
+        <Route path="security" element={<Settings2FA />} />
         <Route path="home" element={<SettingsHomeCMS />} />
         <Route path="messages" element={<SettingsMessages />} />
         <Route path="plans" element={<SettingsPlans />} />
