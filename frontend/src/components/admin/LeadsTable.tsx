@@ -12,6 +12,8 @@ import { useAdmin } from '@/hooks/useAdmin'
 import api from '@/lib/api'
 import { LeadsSummaryTiles } from './leads/LeadsSummaryTiles'
 import { LeadsBulkBar } from './leads/LeadsBulkBar'
+import { ActiveFiltersBar, type FilterChip } from './leads/ActiveFiltersBar'
+import { MoreFiltersPopover } from './leads/MoreFiltersPopover'
 import { DomainCell } from './leads/DomainCell'
 import { LeadActionsCell } from './leads/LeadActionsCell'
 import { ScorePill } from './leads/ScorePill'
@@ -42,6 +44,7 @@ export default function LeadsTable() {
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
 
   const [mainFilter, setMainFilter] = useState<MainFilter>('all')
@@ -61,7 +64,7 @@ export default function LeadsTable() {
     setLoading(true)
     try {
       const data = await fetchLeads({
-        page, limit: 20,
+        page, limit: pageSize,
         filter: mainFilter,
         sort, search,
         wp: filterWp, snapshot: filterSnap, pinned: filterPinned,
@@ -72,7 +75,7 @@ export default function LeadsTable() {
       setSummary(data.summary || null)
     } catch { /* handled */ }
     setLoading(false)
-  }, [fetchLeads, page, mainFilter, sort, search, filterWp, filterSnap, filterPinned])
+  }, [fetchLeads, page, pageSize, mainFilter, sort, search, filterWp, filterSnap, filterPinned])
 
   useEffect(() => { loadLeads() }, [loadLeads])
 
@@ -161,6 +164,38 @@ export default function LeadsTable() {
     : filterPinned === 'yes' ? 'pin_yes'
     : mainFilter
 
+  // ─── Chips de filtros activos (labels amigables) ────────────────
+  const resetAll = () => {
+    setMainFilter('all'); setFilterWp('any'); setFilterSnap('any'); setFilterPinned('any')
+    setSearchInput(''); setSearch(''); setPage(1)
+  }
+
+  const mainFilterLabels: Record<MainFilter, string> = {
+    all:          'Todos',
+    with_contact: 'Con contacto',
+    critical:     'Score crítico',
+    warning:      'Score bajo',
+    this_week:    'Últimos 7 días',
+    this_month:   'Últimos 30 días',
+  }
+
+  const chips: FilterChip[] = []
+  if (mainFilter !== 'all') {
+    chips.push({ key: 'main', label: mainFilterLabels[mainFilter], onRemove: () => { setMainFilter('all'); setPage(1) } })
+  }
+  if (filterWp !== 'any') {
+    chips.push({ key: 'wp', label: filterWp === 'yes' ? 'WordPress' : 'Sin WordPress', onRemove: () => { setFilterWp('any'); setPage(1) } })
+  }
+  if (filterSnap !== 'any') {
+    chips.push({ key: 'snap', label: filterSnap === 'yes' ? 'Con snapshot' : 'Sin snapshot', onRemove: () => { setFilterSnap('any'); setPage(1) } })
+  }
+  if (filterPinned !== 'any') {
+    chips.push({ key: 'pin', label: filterPinned === 'yes' ? 'Protegidos' : 'Sin proteger', onRemove: () => { setFilterPinned('any'); setPage(1) } })
+  }
+  if (search) {
+    chips.push({ key: 'search', label: `"${search}"`, onRemove: () => { setSearchInput(''); setSearch(''); setPage(1) } })
+  }
+
   const applyTileFilter = (key: string) => {
     // Reset todos los filtros al cambiar — un solo tile activo a la vez
     setFilterWp('any'); setFilterSnap('any'); setFilterPinned('any')
@@ -230,11 +265,24 @@ export default function LeadsTable() {
             <SelectItem value="domain_asc">Dominio A-Z</SelectItem>
           </SelectContent>
         </Select>
+        <MoreFiltersPopover
+          mainFilter={mainFilter}
+          onMainFilterChange={(v) => { setMainFilter(v as MainFilter); setPage(1) }}
+          filterWp={filterWp}
+          onFilterWpChange={(v) => { setFilterWp(v); setPage(1) }}
+          filterSnap={filterSnap}
+          onFilterSnapChange={(v) => { setFilterSnap(v); setPage(1) }}
+          filterPinned={filterPinned}
+          onFilterPinnedChange={(v) => { setFilterPinned(v); setPage(1) }}
+        />
         <Button variant="outline" size="sm" onClick={exportCsv} disabled={exporting}>
           <Download className="h-4 w-4" strokeWidth={1.5} />
           <span className="hidden sm:inline">{exporting ? 'Exportando...' : 'CSV'}</span>
         </Button>
       </div>
+
+      {/* Chips de filtros activos */}
+      <ActiveFiltersBar chips={chips} onClearAll={resetAll} />
 
       {/* Bulk bar (sticky, solo visible con selección) */}
       <LeadsBulkBar
@@ -257,13 +305,8 @@ export default function LeadsTable() {
             <div className="flex flex-col items-center gap-3 py-16 text-[var(--text-tertiary)]">
               <SearchX className="h-10 w-10" strokeWidth={1} />
               <p className="text-sm">No se encontraron resultados</p>
-              {(mainFilter !== 'all' || filterWp !== 'any' || filterSnap !== 'any' || filterPinned !== 'any' || search) && (
-                <Button variant="outline" size="sm" onClick={() => {
-                  setMainFilter('all'); setFilterWp('any'); setFilterSnap('any'); setFilterPinned('any')
-                  setSearchInput(''); setSearch(''); setPage(1)
-                }}>
-                  Limpiar filtros
-                </Button>
+              {chips.length > 0 && (
+                <Button variant="outline" size="sm" onClick={resetAll}>Limpiar filtros</Button>
               )}
             </div>
           ) : (
@@ -359,20 +402,38 @@ export default function LeadsTable() {
         </CardContent>
       </Card>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-[var(--text-tertiary)]">
-            {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} de {total}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-              <ChevronLeft className="h-4 w-4" /> Anterior
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-              Siguiente <ChevronRight className="h-4 w-4" />
-            </Button>
+      {/* Paginación + page size */}
+      {total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <div className="flex items-center gap-3 text-[var(--text-tertiary)]">
+            <span>{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} de {total}</span>
+            <div className="flex items-center gap-2">
+              <label htmlFor="page-size" className="text-xs">Filas por página:</label>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => { setPageSize(Number(v)); setPage(1) }}
+              >
+                <SelectTrigger id="page-size" className="h-8 w-[70px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          {totalPages > 1 && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                <ChevronLeft className="h-4 w-4" /> Anterior
+              </Button>
+              <span className="self-center text-xs text-[var(--text-tertiary)]">{page} / {totalPages}</span>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+                Siguiente <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
