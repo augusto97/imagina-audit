@@ -4,6 +4,19 @@ Auth::requireAuth();
 
 $db = Database::getInstance();
 
+/**
+ * Convierte un string de la DB a bool. SQLite guarda todo como string:
+ * el toggle de retención viene como "1"/"0"/"true"/"false" según cómo
+ * lo serialicen los distintos callers.
+ */
+function settingsParseBool(mixed $value, bool $default = false): bool {
+    if ($value === null) return $default;
+    $v = strtolower(trim((string) $value));
+    if (in_array($v, ['1', 'true', 'yes', 'on'], true)) return true;
+    if (in_array($v, ['0', 'false', 'no', 'off', ''], true)) return false;
+    return $default;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
         $defaults = require dirname(__DIR__, 2) . '/config/defaults.php';
@@ -60,6 +73,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'homeFormMicrocopy' => $dbSettings['home_form_microcopy'] ?? $defaults['home_form_microcopy'] ?? '',
             'homeFeaturesTitle' => $dbSettings['home_features_title'] ?? $defaults['home_features_title'] ?? '',
             'homeTrustText' => $dbSettings['home_trust_text'] ?? $defaults['home_trust_text'] ?? '',
+
+            // Placeholders del form público
+            'formPlaceholderUrl'      => $dbSettings['form_placeholder_url']      ?? $defaults['form_placeholder_url'] ?? '',
+            'formPlaceholderName'     => $dbSettings['form_placeholder_name']     ?? $defaults['form_placeholder_name'] ?? '',
+            'formPlaceholderEmail'    => $dbSettings['form_placeholder_email']    ?? $defaults['form_placeholder_email'] ?? '',
+            'formPlaceholderWhatsapp' => $dbSettings['form_placeholder_whatsapp'] ?? $defaults['form_placeholder_whatsapp'] ?? '',
+
+            // Header y footer del sitio público
+            'headerCompareText'    => $dbSettings['header_compare_text']    ?? $defaults['header_compare_text'] ?? '',
+            'headerExternalText'   => $dbSettings['header_external_text']   ?? $defaults['header_external_text'] ?? '',
+            'headerExternalUrl'    => $dbSettings['header_external_url']    ?? $defaults['header_external_url'] ?? '',
+            'footerTagline'        => $dbSettings['footer_tagline']         ?? $defaults['footer_tagline'] ?? '',
+            'footerExperienceText' => $dbSettings['footer_experience_text'] ?? $defaults['footer_experience_text'] ?? '',
+            'footerPrivacyUrl'     => $dbSettings['footer_privacy_url']     ?? $defaults['footer_privacy_url'] ?? '',
+            'footerPrivacyText'    => $dbSettings['footer_privacy_text']    ?? $defaults['footer_privacy_text'] ?? '',
+
+            // Retención + cola (faltaban y por eso el toggle no persistía en la UI)
+            'auditsRetentionEnabled'   => settingsParseBool($dbSettings['audits_retention_enabled'] ?? null, $defaults['audits_retention_enabled'] ?? false),
+            'auditsRetentionMonths'    => (int) ($dbSettings['audits_retention_months'] ?? $defaults['audits_retention_months'] ?? 6),
+            'auditMaxConcurrent'       => (int) ($dbSettings['audit_max_concurrent'] ?? $defaults['audit_max_concurrent'] ?? 3),
+            'auditStaleSeconds'        => (int) ($dbSettings['audit_stale_seconds'] ?? $defaults['audit_stale_seconds'] ?? 300),
+            'auditFailureCacheMinutes' => (int) ($dbSettings['audit_failure_cache_minutes'] ?? $defaults['audit_failure_cache_minutes'] ?? 10),
+            'auditMaxAttempts'         => (int) ($dbSettings['audit_max_attempts'] ?? $defaults['audit_max_attempts'] ?? 3),
+
             'systemTotalRamMb' => (int) ($dbSettings['system_total_ram_mb'] ?? 0),
             'googlePagespeedApiKey' => $dbSettings['google_pagespeed_api_key'] ?? '',
             'leadNotificationEmail' => $dbSettings['lead_notification_email'] ?? '',
@@ -132,6 +169,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             // Si es array/objeto, codificar como JSON
             if (is_array($value)) {
                 $value = json_encode($value, JSON_UNESCAPED_UNICODE);
+            }
+            // Booleans → "1"/"0" para que el GET los lea correctamente
+            if (is_bool($value)) {
+                $value = $value ? '1' : '0';
             }
 
             $db->execute(

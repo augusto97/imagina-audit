@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Save, Search, FileText, Eye } from 'lucide-react'
+import { Loader2, Save, Search, FileText, Eye, Globe, Layout as LayoutIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAdmin } from '@/hooks/useAdmin'
 import { useConfigStore } from '@/store/configStore'
+import { renderStyledText } from '@/lib/styled-text'
 
 interface HomeForm {
   seoTitle: string
@@ -21,6 +22,17 @@ interface HomeForm {
   formMicrocopy: string
   featuresTitle: string
   trustText: string
+  formPlaceholderUrl: string
+  formPlaceholderName: string
+  formPlaceholderEmail: string
+  formPlaceholderWhatsapp: string
+  headerCompareText: string
+  headerExternalText: string
+  headerExternalUrl: string
+  footerTagline: string
+  footerExperienceText: string
+  footerPrivacyUrl: string
+  footerPrivacyText: string
 }
 
 const FIELD_LIMITS = {
@@ -38,6 +50,17 @@ const SETTING_KEYS: Record<keyof HomeForm, string> = {
   formMicrocopy: 'homeFormMicrocopy',
   featuresTitle: 'homeFeaturesTitle',
   trustText: 'homeTrustText',
+  formPlaceholderUrl: 'formPlaceholderUrl',
+  formPlaceholderName: 'formPlaceholderName',
+  formPlaceholderEmail: 'formPlaceholderEmail',
+  formPlaceholderWhatsapp: 'formPlaceholderWhatsapp',
+  headerCompareText: 'headerCompareText',
+  headerExternalText: 'headerExternalText',
+  headerExternalUrl: 'headerExternalUrl',
+  footerTagline: 'footerTagline',
+  footerExperienceText: 'footerExperienceText',
+  footerPrivacyUrl: 'footerPrivacyUrl',
+  footerPrivacyText: 'footerPrivacyText',
 }
 
 export default function SettingsHomeCMS() {
@@ -50,6 +73,11 @@ export default function SettingsHomeCMS() {
     heroHeadline: '', heroSubheadline: '',
     formButtonText: '', formMicrocopy: '',
     featuresTitle: '', trustText: '',
+    formPlaceholderUrl: '', formPlaceholderName: '',
+    formPlaceholderEmail: '', formPlaceholderWhatsapp: '',
+    headerCompareText: '', headerExternalText: '', headerExternalUrl: '',
+    footerTagline: '', footerExperienceText: '',
+    footerPrivacyUrl: '', footerPrivacyText: '',
   })
 
   useEffect(() => {
@@ -64,6 +92,17 @@ export default function SettingsHomeCMS() {
         formMicrocopy:   data.homeFormMicrocopy   ?? data.home_form_microcopy   ?? '',
         featuresTitle:   data.homeFeaturesTitle   ?? data.home_features_title   ?? '',
         trustText:       data.homeTrustText       ?? data.home_trust_text       ?? '',
+        formPlaceholderUrl:      data.formPlaceholderUrl      ?? data.form_placeholder_url      ?? '',
+        formPlaceholderName:     data.formPlaceholderName     ?? data.form_placeholder_name     ?? '',
+        formPlaceholderEmail:    data.formPlaceholderEmail    ?? data.form_placeholder_email    ?? '',
+        formPlaceholderWhatsapp: data.formPlaceholderWhatsapp ?? data.form_placeholder_whatsapp ?? '',
+        headerCompareText:    data.headerCompareText     ?? data.header_compare_text     ?? '',
+        headerExternalText:   data.headerExternalText    ?? data.header_external_text    ?? '',
+        headerExternalUrl:    data.headerExternalUrl     ?? data.header_external_url     ?? '',
+        footerTagline:        data.footerTagline         ?? data.footer_tagline          ?? '',
+        footerExperienceText: data.footerExperienceText  ?? data.footer_experience_text  ?? '',
+        footerPrivacyUrl:     data.footerPrivacyUrl      ?? data.footer_privacy_url      ?? '',
+        footerPrivacyText:    data.footerPrivacyText     ?? data.footer_privacy_text     ?? '',
       })
       setLoading(false)
     })
@@ -101,7 +140,9 @@ export default function SettingsHomeCMS() {
       <Tabs defaultValue="seo">
         <TabsList>
           <TabsTrigger value="seo"><Search className="h-4 w-4 mr-1" strokeWidth={1.5} /> SEO</TabsTrigger>
-          <TabsTrigger value="texts"><FileText className="h-4 w-4 mr-1" strokeWidth={1.5} /> Textos</TabsTrigger>
+          <TabsTrigger value="texts"><FileText className="h-4 w-4 mr-1" strokeWidth={1.5} /> Hero y textos</TabsTrigger>
+          <TabsTrigger value="form"><Globe className="h-4 w-4 mr-1" strokeWidth={1.5} /> Formulario</TabsTrigger>
+          <TabsTrigger value="nav"><LayoutIcon className="h-4 w-4 mr-1" strokeWidth={1.5} /> Header y Footer</TabsTrigger>
           <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-1" strokeWidth={1.5} /> Preview</TabsTrigger>
         </TabsList>
 
@@ -167,7 +208,16 @@ export default function SettingsHomeCMS() {
         {/* Textos */}
         <TabsContent value="texts">
           <Card>
-            <CardHeader><CardTitle>Textos del home</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Textos del home</CardTitle>
+              <div className="mt-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] p-3 text-xs text-[var(--text-secondary)]">
+                <p className="font-medium text-[var(--text-primary)] mb-1">Resaltado de palabras</p>
+                <p>
+                  Encierra una palabra entre <code className="px-1 py-0.5 bg-white rounded font-mono">**dobles asteriscos**</code> para pintarla del <span className="text-[var(--accent-primary)] font-semibold">color principal</span>,
+                  o entre <code className="px-1 py-0.5 bg-white rounded font-mono">==iguales==</code> para darle un <span className="highlight-yellow">highlight amarillo</span>.
+                </p>
+              </div>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
                 <Label>Titular principal (hero)</Label>
@@ -202,6 +252,89 @@ export default function SettingsHomeCMS() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Formulario */}
+        <TabsContent value="form">
+          <Card>
+            <CardHeader>
+              <CardTitle>Placeholders del formulario</CardTitle>
+              <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                Texto gris que aparece dentro de cada campo antes de escribir.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Campo URL</Label>
+                <Input value={form.formPlaceholderUrl} onChange={(e) => update('formPlaceholderUrl', e.target.value)} />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>Campo Nombre</Label>
+                  <Input value={form.formPlaceholderName} onChange={(e) => update('formPlaceholderName', e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Campo Email</Label>
+                  <Input value={form.formPlaceholderEmail} onChange={(e) => update('formPlaceholderEmail', e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Campo WhatsApp</Label>
+                  <Input value={form.formPlaceholderWhatsapp} onChange={(e) => update('formPlaceholderWhatsapp', e.target.value)} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Header + Footer */}
+        <TabsContent value="nav">
+          <div className="space-y-4">
+            <Card>
+              <CardHeader><CardTitle>Header</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label>Texto botón "Comparar"</Label>
+                  <Input value={form.headerCompareText} onChange={(e) => update('headerCompareText', e.target.value)} />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Texto link externo</Label>
+                    <Input value={form.headerExternalText} onChange={(e) => update('headerExternalText', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>URL del link externo</Label>
+                    <Input value={form.headerExternalUrl} onChange={(e) => update('headerExternalUrl', e.target.value)} placeholder="https://..." />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>Footer</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label>Tagline del footer</Label>
+                  <Input value={form.footerTagline} onChange={(e) => update('footerTagline', e.target.value)} />
+                  <p className="text-xs text-[var(--text-tertiary)]">Aparece junto al nombre de la empresa en el copyright.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Texto de experiencia</Label>
+                  <Input value={form.footerExperienceText} onChange={(e) => update('footerExperienceText', e.target.value)} />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Texto del link de privacidad</Label>
+                    <Input value={form.footerPrivacyText} onChange={(e) => update('footerPrivacyText', e.target.value)} />
+                    <p className="text-xs text-[var(--text-tertiary)]">Dejá vacío si no quieres mostrar este link.</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>URL política de privacidad</Label>
+                    <Input value={form.footerPrivacyUrl} onChange={(e) => update('footerPrivacyUrl', e.target.value)} placeholder="https://..." />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Preview — una maqueta visual del home real con los textos editados */}
@@ -261,16 +394,16 @@ function HomePreview({ form }: { form: HomeForm }) {
       {/* Hero */}
       <div className="bg-gradient-to-b from-white to-[var(--bg-secondary)] px-8 py-12 text-center">
         <h1 className="text-2xl sm:text-4xl font-bold text-[var(--text-primary)]">
-          {form.heroHeadline || <span className="italic text-[var(--text-tertiary)]">Titular principal (vacío)</span>}
+          {form.heroHeadline ? renderStyledText(form.heroHeadline) : <span className="italic text-[var(--text-tertiary)]">Titular principal (vacío)</span>}
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-sm sm:text-base text-[var(--text-secondary)]">
-          {form.heroSubheadline || <span className="italic">Subtítulo (vacío)</span>}
+          {form.heroSubheadline ? renderStyledText(form.heroSubheadline) : <span className="italic">Subtítulo (vacío)</span>}
         </p>
 
         {/* Form fake */}
         <div className="mx-auto mt-8 max-w-md rounded-xl border border-[var(--border-default)] bg-white p-4 shadow-sm">
           <div className="rounded border border-[var(--border-default)] px-3 py-2 text-left text-xs text-[var(--text-tertiary)]">
-            https://tusitio.com
+            {form.formPlaceholderUrl || 'https://tusitio.com'}
           </div>
           <button className="mt-3 w-full rounded px-5 py-2.5 text-sm font-medium text-white" style={{ backgroundColor: 'var(--accent-primary)' }}>
             {form.formButtonText || 'Botón del formulario'}
@@ -284,7 +417,7 @@ function HomePreview({ form }: { form: HomeForm }) {
       {/* Features */}
       <div className="bg-white px-8 py-10">
         <h2 className="mb-6 text-center text-lg sm:text-xl font-bold text-[var(--text-primary)]">
-          {form.featuresTitle || <span className="italic text-[var(--text-tertiary)]">Título de features (vacío)</span>}
+          {form.featuresTitle ? renderStyledText(form.featuresTitle) : <span className="italic text-[var(--text-tertiary)]">Título de features (vacío)</span>}
         </h2>
         <div className="mx-auto grid max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
           {moduleIds.map((id) => (
@@ -299,7 +432,7 @@ function HomePreview({ form }: { form: HomeForm }) {
       {/* Trust bar */}
       <div className="border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-8 py-8 text-center">
         <p className="text-xs sm:text-sm font-medium text-[var(--text-secondary)]">
-          {form.trustText || <span className="italic text-[var(--text-tertiary)]">Trust bar (vacío)</span>}
+          {form.trustText ? renderStyledText(form.trustText) : <span className="italic text-[var(--text-tertiary)]">Trust bar (vacío)</span>}
         </p>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           {tools.map((t) => (

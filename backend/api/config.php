@@ -60,6 +60,23 @@ $config = [
         'featuresTitle'   => $settings['home_features_title']   ?? $defaults['home_features_title'],
         'trustText'       => $settings['home_trust_text']       ?? $defaults['home_trust_text'],
     ],
+    'form' => [
+        'placeholderUrl'      => $settings['form_placeholder_url']      ?? $defaults['form_placeholder_url'],
+        'placeholderName'     => $settings['form_placeholder_name']     ?? $defaults['form_placeholder_name'],
+        'placeholderEmail'    => $settings['form_placeholder_email']    ?? $defaults['form_placeholder_email'],
+        'placeholderWhatsapp' => $settings['form_placeholder_whatsapp'] ?? $defaults['form_placeholder_whatsapp'],
+    ],
+    'header' => [
+        'compareText'  => $settings['header_compare_text']  ?? $defaults['header_compare_text'],
+        'externalText' => $settings['header_external_text'] ?? $defaults['header_external_text'],
+        'externalUrl'  => $settings['header_external_url']  ?? $defaults['header_external_url'],
+    ],
+    'footer' => [
+        'tagline'         => $settings['footer_tagline']          ?? $defaults['footer_tagline'],
+        'experienceText'  => $settings['footer_experience_text']  ?? $defaults['footer_experience_text'],
+        'privacyUrl'      => $settings['footer_privacy_url']      ?? $defaults['footer_privacy_url'],
+        'privacyText'     => $settings['footer_privacy_text']     ?? $defaults['footer_privacy_text'],
+    ],
 ];
 
 Response::success($config);

@@ -80,11 +80,31 @@ return [
     'home_seo_description' => 'Analiza tu sitio WordPress en 30 segundos. Seguridad, rendimiento, SEO y más. Recibe un informe gratuito con recomendaciones.',
     'home_seo_og_image' => '',
 
-    // Textos editables del home público
-    'home_hero_headline' => 'Auditoría Gratuita de tu WordPress',
+    // Textos editables del home público.
+    // Sintaxis de resaltado (opcional):
+    //   **palabra**  → color primario de la marca
+    //   ==palabra==  → highlight amarillo
+    'home_hero_headline' => 'Auditoría ==Gratuita== de tu **WordPress**',
     'home_hero_subheadline' => 'Descubre en 30 segundos qué tan seguro, rápido y optimizado está tu sitio web',
     'home_form_button_text' => 'Auditar Mi Sitio Gratis',
     'home_form_microcopy' => 'Sin instalar nada · 100% externo · Resultados en 30 seg',
-    'home_features_title' => 'Analizamos 8 áreas clave de tu sitio',
-    'home_trust_text' => 'Con la experiencia de 15 años de maestría exclusiva en WordPress',
+    'home_features_title' => 'Analizamos ==8 áreas clave== de tu sitio',
+    'home_trust_text' => 'Con la experiencia de ==15 años== de maestría exclusiva en WordPress',
+
+    // Placeholders del formulario público
+    'form_placeholder_url' => 'https://tusitio.com',
+    'form_placeholder_name' => 'Tu nombre',
+    'form_placeholder_email' => 'tu@email.com',
+    'form_placeholder_whatsapp' => '+57...',
+
+    // Header público
+    'header_compare_text' => 'Comparar',
+    'header_external_text' => 'imaginawp.com',
+    'header_external_url' => 'https://imaginawp.com',
+
+    // Footer público
+    'footer_tagline' => 'Especialistas exclusivos en WordPress',
+    'footer_experience_text' => '15 años de experiencia',
+    'footer_privacy_url' => '',
+    'footer_privacy_text' => 'Política de privacidad',
 ];

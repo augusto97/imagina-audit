@@ -64,7 +64,7 @@ export default function SettingsRetention() {
     setSaving(true)
     try {
       await updateSettings({
-        auditsRetentionEnabled: enabled ? 'true' : 'false',
+        auditsRetentionEnabled: enabled,
         auditsRetentionMonths: months,
       })
       toast.success('Configuración de retención guardada')

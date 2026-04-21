@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { useConfigStore } from '@/store/configStore'
 
 export default function Header() {
-  const { logoUrl, companyName } = useConfigStore((s) => s.config)
+  const { logoUrl, companyName, header } = useConfigStore((s) => s.config)
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-[var(--border-default)] bg-white/90 backdrop-blur-lg">
@@ -29,15 +29,17 @@ export default function Header() {
           <Link to="/compare">
             <Button variant="ghost" size="sm" className="text-[var(--text-secondary)]">
               <GitCompareArrows className="h-4 w-4" strokeWidth={1.5} />
-              <span className="hidden sm:inline">Comparar</span>
+              <span className="hidden sm:inline">{header?.compareText || 'Comparar'}</span>
             </Button>
           </Link>
-          <a href="https://imaginawp.com" target="_blank" rel="noopener noreferrer">
-            <Button variant="ghost" size="sm" className="text-[var(--text-secondary)]">
-              <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
-              <span className="hidden sm:inline">imaginawp.com</span>
-            </Button>
-          </a>
+          {header?.externalUrl && (
+            <a href={header.externalUrl} target="_blank" rel="noopener noreferrer">
+              <Button variant="ghost" size="sm" className="text-[var(--text-secondary)]">
+                <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
+                <span className="hidden sm:inline">{header.externalText || header.externalUrl}</span>
+              </Button>
+            </a>
+          )}
         </nav>
       </div>
     </header>

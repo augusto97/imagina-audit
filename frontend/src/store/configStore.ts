@@ -14,6 +14,26 @@ export interface HomeCms {
   trustText: string
 }
 
+export interface FormCms {
+  placeholderUrl: string
+  placeholderName: string
+  placeholderEmail: string
+  placeholderWhatsapp: string
+}
+
+export interface HeaderCms {
+  compareText: string
+  externalText: string
+  externalUrl: string
+}
+
+export interface FooterCms {
+  tagline: string
+  experienceText: string
+  privacyUrl: string
+  privacyText: string
+}
+
 export interface PublicConfig {
   companyName: string
   companyUrl: string
@@ -31,6 +51,9 @@ export interface PublicConfig {
   plans: Array<{ name: string; price: string; currency: string }>
   salesMessages: Record<string, string>
   home: HomeCms
+  form: FormCms
+  header: HeaderCms
+  footer: FooterCms
 }
 
 const DEFAULT_HOME: HomeCms = {
@@ -45,6 +68,26 @@ const DEFAULT_HOME: HomeCms = {
   trustText: 'Con la experiencia de 15 años de maestría exclusiva en WordPress',
 }
 
+const DEFAULT_FORM: FormCms = {
+  placeholderUrl: 'https://tusitio.com',
+  placeholderName: 'Tu nombre',
+  placeholderEmail: 'tu@email.com',
+  placeholderWhatsapp: '+57...',
+}
+
+const DEFAULT_HEADER: HeaderCms = {
+  compareText: 'Comparar',
+  externalText: 'imaginawp.com',
+  externalUrl: 'https://imaginawp.com',
+}
+
+const DEFAULT_FOOTER: FooterCms = {
+  tagline: 'Especialistas exclusivos en WordPress',
+  experienceText: '15 años de experiencia',
+  privacyUrl: '',
+  privacyText: 'Política de privacidad',
+}
+
 const INITIAL: PublicConfig = {
   ...DEFAULT_CONFIG,
   logoUrl: '',
@@ -52,6 +95,9 @@ const INITIAL: PublicConfig = {
   faviconUrl: '',
   brandPrimaryColor: '#3B82F6',
   home: DEFAULT_HOME,
+  form: DEFAULT_FORM,
+  header: DEFAULT_HEADER,
+  footer: DEFAULT_FOOTER,
 }
 
 interface ConfigStore {
@@ -111,11 +157,14 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   loaded: false,
   reload: async () => {
     try {
-      const data = await getConfig()
+      const data = await getConfig() as unknown as Partial<PublicConfig>
       const merged: PublicConfig = {
         ...INITIAL,
         ...data,
-        home: { ...DEFAULT_HOME, ...((data as unknown as { home?: Partial<HomeCms> }).home ?? {}) },
+        home:   { ...DEFAULT_HOME,   ...(data.home   ?? {}) },
+        form:   { ...DEFAULT_FORM,   ...(data.form   ?? {}) },
+        header: { ...DEFAULT_HEADER, ...(data.header ?? {}) },
+        footer: { ...DEFAULT_FOOTER, ...(data.footer ?? {}) },
       }
       applyBrandingToDocument(merged)
       set({ config: merged, loaded: true })

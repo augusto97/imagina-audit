@@ -5,6 +5,7 @@ import ScanningAnimation from '@/components/audit/ScanningAnimation'
 import { useAuditStore } from '@/store/auditStore'
 import { useConfigStore } from '@/store/configStore'
 import { MODULE_EMOJIS, MODULE_NAMES } from '@/lib/constants'
+import { renderStyledText } from '@/lib/styled-text'
 
 const moduleIds = ['security', 'performance', 'seo', 'wordpress', 'mobile', 'infrastructure', 'conversion', 'page_health']
 
@@ -41,10 +42,10 @@ export default function HomePage() {
             className="text-center"
           >
             <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)] sm:text-4xl lg:text-5xl">
-              {home.heroHeadline}
+              {renderStyledText(home.heroHeadline)}
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-base text-[var(--text-secondary)] sm:text-lg">
-              {home.heroSubheadline}
+              {renderStyledText(home.heroSubheadline)}
             </p>
           </motion.div>
 
@@ -69,7 +70,7 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="mb-8 text-center text-xl font-bold text-[var(--text-primary)] sm:text-2xl"
           >
-            {home.featuresTitle}
+            {renderStyledText(home.featuresTitle)}
           </motion.h2>
 
           <motion.div
@@ -99,7 +100,7 @@ export default function HomePage() {
       <section className="border-t border-[var(--border-default)] bg-[var(--bg-secondary)] py-12">
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
           <p className="text-sm font-medium text-[var(--text-secondary)]">
-            {home.trustText}
+            {renderStyledText(home.trustText)}
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-[var(--text-secondary)]">
             {['Elementor', 'WP Rocket', 'Rank Math', 'Gravity Forms', 'Cloudflare', 'WooCommerce'].map((tool) => (
