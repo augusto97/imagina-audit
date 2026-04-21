@@ -1,11 +1,11 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ExternalLink, Filter } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useParams } from 'react-router-dom'
+import { ExternalLink, Filter } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAdmin } from '@/hooks/useAdmin'
 import api from '@/lib/api'
+import LeadReportNav from './LeadReportNav'
 import type { AuditResult } from '@/types/audit'
 
 import {
@@ -34,7 +34,6 @@ import { PerformanceDetails } from './waterfall/PerformanceDetails'
  */
 export default function WaterfallPage() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const { fetchLeadDetail } = useAdmin()
   const [result, setResult] = useState<AuditResult | null>(null)
   const [loading, setLoading] = useState(true)
@@ -179,9 +178,7 @@ export default function WaterfallPage() {
   if (!result || requests.length === 0) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-4 w-4" /> Volver
-        </Button>
+        {id && <LeadReportNav auditId={id} domain={result?.domain} />}
         <div className="text-center py-16 text-gray-500">
           <p className="text-lg font-medium">No hay datos de waterfall disponibles</p>
           <p className="text-sm mt-1">Los datos se generan con la API de Google PageSpeed al ejecutar la auditoría.</p>
@@ -192,26 +189,19 @@ export default function WaterfallPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Waterfall Chart</h1>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <a href={result.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
-                {result.domain} <ExternalLink className="h-3 w-3" />
-              </a>
-              <span>&middot;</span>
-              <span>{requests.length} requests</span>
-              <span>&middot;</span>
-              <span>{formatSize(totalSize)}</span>
-              <span>&middot;</span>
-              <span>{(totalDuration / 1000).toFixed(2)}s</span>
-            </div>
-          </div>
+      {id && <LeadReportNav auditId={id} domain={result.domain} />}
+      <div>
+        <h2 className="text-lg font-semibold text-[var(--text-primary)]">Waterfall Chart</h2>
+        <div className="flex items-center gap-2 text-sm text-[var(--text-tertiary)] mt-0.5">
+          <a href={result.url} target="_blank" rel="noreferrer" className="text-[var(--accent-primary)] hover:underline flex items-center gap-1">
+            {result.domain} <ExternalLink className="h-3 w-3" />
+          </a>
+          <span>&middot;</span>
+          <span>{requests.length} requests</span>
+          <span>&middot;</span>
+          <span>{formatSize(totalSize)}</span>
+          <span>&middot;</span>
+          <span>{(totalDuration / 1000).toFixed(2)}s</span>
         </div>
       </div>
 

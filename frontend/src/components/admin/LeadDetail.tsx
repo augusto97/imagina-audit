@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, MessageCircle, ExternalLink, FileText, BarChart3 } from 'lucide-react'
+import { useParams } from 'react-router-dom'
+import { Mail, MessageCircle, ExternalLink } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import LeadReportNav from './LeadReportNav'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import ScoreOverview from '@/components/audit/ScoreOverview'
@@ -14,7 +14,6 @@ import type { AuditResult } from '@/types/audit'
 
 export default function LeadDetail() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const { fetchLeadDetail } = useAdmin()
   const [result, setResult] = useState<(AuditResult & { leadName?: string; leadEmail?: string; leadWhatsapp?: string; leadCompany?: string }) | null>(null)
   const [loading, setLoading] = useState(true)
@@ -37,21 +36,8 @@ export default function LeadDetail() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/admin/leads')}>
-          <ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> Volver
-        </Button>
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">{result.domain}</h1>
-        <div className="flex gap-2 ml-auto">
-          <Button variant="outline" size="sm" onClick={() => navigate(`/admin/leads/${id}/waterfall`)}>
-            <BarChart3 className="h-4 w-4 mr-1" strokeWidth={1.5} /> Waterfall
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate(`/admin/leads/${id}/report`)}>
-            <FileText className="h-4 w-4 mr-1" strokeWidth={1.5} /> Reporte Técnico
-          </Button>
-        </div>
-      </div>
+      {/* Header con navegación entre vistas del lead */}
+      {id && <LeadReportNav auditId={id} domain={result.domain} />}
 
       {/* Datos del lead */}
       <Card>

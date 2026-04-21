@@ -9,6 +9,7 @@ import LeadsTable from '@/components/admin/LeadsTable'
 import LeadDetail from '@/components/admin/LeadDetail'
 import SettingsGeneral from '@/components/admin/SettingsGeneral'
 import SettingsBranding from '@/components/admin/SettingsBranding'
+import SettingsPluginVault from '@/components/admin/SettingsPluginVault'
 import SettingsHomeCMS from '@/components/admin/SettingsHomeCMS'
 import SettingsMessages from '@/components/admin/SettingsMessages'
 import SettingsPlans from '@/components/admin/SettingsPlans'
@@ -18,6 +19,7 @@ import SettingsRetention from '@/components/admin/SettingsRetention'
 import SystemHealth from '@/components/admin/SystemHealth'
 import VulnerabilityManager from '@/components/admin/VulnerabilityManager'
 import TechnicalReport from '@/components/admin/TechnicalReport'
+import SnapshotReport from '@/components/admin/SnapshotReport'
 import WaterfallPage from '@/components/admin/WaterfallPage'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
@@ -58,9 +60,11 @@ export default function AdminPage() {
         <Route path="leads" element={<LeadsTable />} />
         <Route path="leads/:id" element={<LeadDetail />} />
         <Route path="leads/:id/report" element={<TechnicalReport />} />
+        <Route path="leads/:id/internal" element={<SnapshotReport />} />
         <Route path="leads/:id/waterfall" element={<WaterfallPage />} />
         <Route path="settings" element={<SettingsGeneral />} />
         <Route path="branding" element={<SettingsBranding />} />
+        <Route path="plugin-vault" element={<SettingsPluginVault />} />
         <Route path="home" element={<SettingsHomeCMS />} />
         <Route path="messages" element={<SettingsMessages />} />
         <Route path="plans" element={<SettingsPlans />} />

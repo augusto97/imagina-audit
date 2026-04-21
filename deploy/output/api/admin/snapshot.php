@@ -3,14 +3,19 @@
  * Snapshot de WordPress (plugin wp-snapshot)
  *
  * POST /api/admin/snapshot.php
- *   Body: { auditId, source: 'url'|'upload', shareUrl?, jsonData? }
- *   Guarda el snapshot para una auditoría y genera análisis interno.
+ *   Body: { auditId, jsonData }
+ *   Guarda el snapshot para una auditoría, ejecuta el analyzer y re-ejecuta
+ *   la auditoría completa inyectando los datos del snapshot.
  *
  * GET /api/admin/snapshot.php?audit_id=X
  *   Retorna el snapshot + análisis de una auditoría.
  *
  * DELETE /api/admin/snapshot.php?audit_id=X
  *   Elimina el snapshot de una auditoría.
+ *
+ * NOTA: La obtención por URL share se quitó — muchos hostings bloquean
+ * fetches externos a la página share (WAF, UA blocking, auth checks), así
+ * que obliga al operador a subir el JSON manualmente. Es más confiable.
  */
 
 require_once __DIR__ . '/../bootstrap.php';
@@ -18,103 +23,6 @@ Auth::requireAuth();
 
 $db = Database::getInstance();
 $method = $_SERVER['REQUEST_METHOD'];
-
-/**
- * Intenta obtener el JSON del snapshot desde una URL share de wp-snapshot.
- *
- * El plugin genera un share link público en /site-audit-snapshot/share/{TOKEN}
- * que renderiza una página HTML con el JSON embebido, pero:
- *   - Algunas instalaciones exponen un endpoint .json directo
- *   - Otras respetan Content-Negotiation (Accept: application/json)
- *   - Algunas bloquean accesos externos (WAF, rate limit, UA blocking)
- *
- * Probamos 4 variantes y 4 patrones de extracción del HTML. Si ninguna
- * funciona devolvemos null para que el caller sepa que debe pedir upload manual.
- */
-function fetchSnapshotFromShareUrl(string $shareUrl): ?array {
-    $base = rtrim($shareUrl, '/');
-
-    // 1. Variantes de URL a probar (en orden, nos quedamos con la primera que
-    //    devuelva JSON válido o HTML parseable).
-    $variants = [
-        $base,
-        $base . '.json',
-        $base . '?format=json',
-        $base . '/download',
-    ];
-
-    foreach ($variants as $url) {
-        try {
-            $response = Fetcher::get($url, 15, true, 0);
-        } catch (Throwable $e) {
-            continue;
-        }
-
-        if (($response['statusCode'] ?? 0) !== 200) {
-            continue;
-        }
-
-        $body = (string) ($response['body'] ?? '');
-        if ($body === '') continue;
-
-        // Respuesta JSON directa (content-type application/json)
-        $contentType = strtolower($response['headers']['content-type'] ?? '');
-        if (str_contains($contentType, 'application/json') || $body[0] === '{') {
-            $decoded = json_decode($body, true, 128);
-            if (is_array($decoded) && isset($decoded['sections'])) {
-                return $decoded;
-            }
-        }
-
-        // Respuesta HTML — probar patrones de extracción del JSON embebido.
-        $extracted = extractSnapshotJsonFromHtml($body);
-        if ($extracted !== null) return $extracted;
-    }
-
-    return null;
-}
-
-/**
- * Busca el JSON del snapshot embebido en el HTML de la página share.
- * El plugin puede usar distintos patrones según versión, así que probamos varios.
- */
-function extractSnapshotJsonFromHtml(string $html): ?array {
-    $patterns = [
-        // <script id="wps-snapshot-data" type="application/json">{...}</script>
-        '/<script[^>]*id=["\']wps?-?snapshot-data["\'][^>]*>(.*?)<\/script>/is',
-        // <script type="application/json" ...>{...}</script>
-        '/<script[^>]*type=["\']application\/json["\'][^>]*>(.*?)<\/script>/is',
-        // <script id="site-audit-snapshot-data"...>...</script>
-        '/<script[^>]*id=["\'][^"\']*snapshot[^"\']*["\'][^>]*>(.*?)<\/script>/is',
-        // <pre id="..." class="snapshot-json">{...}</pre>
-        '/<pre[^>]*(?:id|class)=["\'][^"\']*snapshot[^"\']*["\'][^>]*>(.*?)<\/pre>/is',
-        // <div data-snapshot="{...}">
-        '/data-snapshot=["\']([^"\']+)["\']/i',
-        // window.wpsSnapshot = {...};
-        '/window\.(?:wps?|siteAudit)?Snapshot\s*=\s*(\{.*?\});/s',
-    ];
-
-    foreach ($patterns as $pattern) {
-        if (preg_match($pattern, $html, $m)) {
-            $raw = trim($m[1]);
-            // Si viene escapado con &quot; etc. (atributo data-*)
-            $raw = html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $decoded = json_decode($raw, true, 128);
-            if (is_array($decoded) && isset($decoded['sections'])) {
-                return $decoded;
-            }
-        }
-    }
-
-    // Último intento: buscar el primer bloque JSON que contenga "sections" y parecer un snapshot
-    if (preg_match('/(\{\s*"generated_at"[\s\S]*?"sections"[\s\S]*?\})\s*(?:<|$)/', $html, $m)) {
-        $decoded = json_decode($m[1], true, 128);
-        if (is_array($decoded) && isset($decoded['sections'])) {
-            return $decoded;
-        }
-    }
-    return null;
-}
 
 // Auto-migration
 try {
@@ -158,63 +66,33 @@ if ($method === 'POST') {
     // de plugins, DB stats, etc.). Tope de 10MB + profundidad 128.
     $body = Response::getJsonBody(10 * 1024 * 1024, 128);
     $auditId = $body['auditId'] ?? '';
-    $source = $body['source'] ?? '';
 
     if (empty($auditId)) Response::error('auditId requerido', 400);
-    if (!in_array($source, ['url', 'upload'])) Response::error('source debe ser url o upload', 400);
+
+    $jsonData = $body['jsonData'] ?? null;
+    if (empty($jsonData)) Response::error('jsonData requerido', 400);
 
     $snapshotData = null;
-    $sourceUrl = null;
-
-    if ($source === 'url') {
-        $shareUrl = trim($body['shareUrl'] ?? '');
-        if (empty($shareUrl)) Response::error('shareUrl requerido', 400);
-
-        if (!filter_var($shareUrl, FILTER_VALIDATE_URL)) {
-            Response::error('URL inválida', 400);
+    if (is_string($jsonData)) {
+        if (strlen($jsonData) > 10 * 1024 * 1024) {
+            Response::error('jsonData excede el tope de 10MB', 413);
         }
-
-        if (!preg_match('#/site-audit-snapshot/share/[a-f0-9]{64}/?$#', rtrim($shareUrl, '/') . '/')) {
-            Response::error('No parece una URL válida de wp-snapshot. Debe terminar en /site-audit-snapshot/share/{token}', 400);
+        $snapshotData = json_decode($jsonData, true, 128);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            Response::error('JSON inválido: ' . json_last_error_msg(), 400);
         }
-
-        $sourceUrl = $shareUrl;
-        $snapshotData = fetchSnapshotFromShareUrl($shareUrl);
-        if ($snapshotData === null) {
-            Response::error(
-                'No se pudo obtener el snapshot desde la URL. Puede que el enlace haya expirado (dura 72h por defecto), ' .
-                'que el servidor bloquee accesos externos al share, o que el plugin wp-snapshot esté desactualizado. ' .
-                'Como alternativa, entra al sitio → Herramientas → Site Audit Snapshot → Download JSON y súbelo desde la pestaña "Subir JSON".',
-                422
-            );
-        }
-        // source = 'upload'
-        $jsonData = $body['jsonData'] ?? null;
-        if (empty($jsonData)) Response::error('jsonData requerido', 400);
-
-        if (is_string($jsonData)) {
-            // Verificar tamaño antes de decodificar
-            if (strlen($jsonData) > 10 * 1024 * 1024) {
-                Response::error('jsonData excede el tope de 10MB', 413);
-            }
-            $snapshotData = json_decode($jsonData, true, 128);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                Response::error('JSON inválido: ' . json_last_error_msg(), 400);
-            }
-        } elseif (is_array($jsonData)) {
-            $snapshotData = $jsonData;
-        }
-
-        if (!is_array($snapshotData)) {
-            Response::error('JSON inválido', 400);
-        }
+    } elseif (is_array($jsonData)) {
+        $snapshotData = $jsonData;
     }
 
-    // Validate snapshot structure de wp-snapshot
+    if (!is_array($snapshotData)) {
+        Response::error('JSON inválido', 400);
+    }
+
+    // Validar estructura esperada de wp-snapshot
     if (!isset($snapshotData['sections']) || !is_array($snapshotData['sections'])) {
         Response::error('El JSON no tiene la estructura esperada de wp-snapshot (falta "sections").', 422);
     }
-    // Límite defensivo sobre el número de secciones (el plugin tiene ~29 fijas)
     if (count($snapshotData['sections']) > 200) {
         Response::error('El snapshot tiene demasiadas secciones (posible payload malicioso).', 422);
     }
@@ -236,12 +114,12 @@ if ($method === 'POST') {
     if ($existing) {
         $db->execute(
             "UPDATE wp_snapshots SET source = ?, source_url = ?, snapshot_json = ?, analysis_json = ?, created_at = datetime('now') WHERE audit_id = ?",
-            [$source, $sourceUrl, $snapshotJson, $analysisJson, $auditId]
+            ['upload', null, $snapshotJson, $analysisJson, $auditId]
         );
     } else {
         $db->execute(
             "INSERT INTO wp_snapshots (audit_id, source, source_url, snapshot_json, analysis_json) VALUES (?, ?, ?, ?, ?)",
-            [$auditId, $source, $sourceUrl, $snapshotJson, $analysisJson]
+            [$auditId, 'upload', null, $snapshotJson, $analysisJson]
         );
     }
 
