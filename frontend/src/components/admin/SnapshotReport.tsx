@@ -5,6 +5,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAdmin } from '@/hooks/useAdmin'
 import SnapshotUploader from './SnapshotUploader'
+import OverviewSection from './snapshot/OverviewSection'
+import PluginsSection from './snapshot/PluginsSection'
 import type { SnapshotReportResponse } from '@/types/snapshotReport'
 
 /**
@@ -104,9 +106,8 @@ export default function SnapshotReport() {
         </div>
       </div>
 
-      {/* Stubs — Fase 3-4 llenará cada uno */}
-      <SectionStub title="Vista general" subtitle="KPIs del sitio" />
-      <SectionStub title="Plugins" subtitle={`${report.plugins.summary.total ?? 0} instalados · ${report.plugins.summary.vulnerable ?? 0} vulnerables`} />
+      <OverviewSection report={report} />
+      <PluginsSection report={report} />
       <SectionStub title="Seguridad" subtitle={`${report.security.summary.critical} críticos · ${report.security.summary.warning} warnings`} />
       <SectionStub title="Entorno y servidor" subtitle="Stack WordPress/PHP/DB/server" />
       <SectionStub title="Rendimiento" subtitle="Cache stack, OPcache, image editor" />
