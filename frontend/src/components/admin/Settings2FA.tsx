@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { QRCodeSVG } from 'qrcode.react'
 import { Loader2, ShieldCheck, ShieldOff, Copy, Check, AlertTriangle, KeyRound, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -18,6 +19,7 @@ import { useAdmin } from '@/hooks/useAdmin'
  *   - activo: botones para regenerar recovery codes o desactivar
  */
 export default function Settings2FA() {
+  const { t } = useTranslation()
   const { fetch2faStatus, setup2fa, enable2fa, disable2fa, regenerateRecoveryCodes } = useAdmin()
   const [loading, setLoading] = useState(true)
   const [enabled, setEnabled] = useState(false)
@@ -57,7 +59,7 @@ export default function Settings2FA() {
     try {
       const data = await setup2fa()
       if (data) setSetupData({ secret: data.secret, otpauthUri: data.otpauthUri })
-    } catch { toast.error('Error iniciando la configuración') }
+    } catch { toast.error(t('settings.twofa_setup_start_error')) }
     setSetupLoading(false)
   }
 
@@ -67,9 +69,9 @@ export default function Settings2FA() {
     try {
       const res = await enable2fa(setupData.secret, setupCode)
       setNewRecoveryCodes(res.recoveryCodes)
-      toast.success('2FA activado correctamente')
+      toast.success(t('settings.twofa_enabled_toast'))
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Código incorrecto'
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || t('settings.twofa_setup_wrong_code')
       toast.error(msg)
     }
     setSetupLoading(false)
@@ -84,11 +86,11 @@ export default function Settings2FA() {
     setDisableLoading(true)
     try {
       await disable2fa(disablePassword, disableCode)
-      toast.success('2FA desactivado')
+      toast.success(t('settings.twofa_disabled_toast'))
       setDisableOpen(false); setDisablePassword(''); setDisableCode('')
       await loadStatus()
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error'
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || t('settings.save_error')
       toast.error(msg)
     }
     setDisableLoading(false)
@@ -101,7 +103,7 @@ export default function Settings2FA() {
       setNewRecoveryCodes(res.recoveryCodes)
       setRegenOpen(false); setRegenCode('')
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error'
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || t('settings.save_error')
       toast.error(msg)
     }
     setRegenLoading(false)
@@ -140,10 +142,9 @@ export default function Settings2FA() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Seguridad del login (2FA)</h1>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('settings.twofa_title')}</h1>
         <p className="mt-1 text-sm text-[var(--text-secondary)]">
-          Autenticación de dos factores con una app compatible con TOTP (Google Authenticator, Authy, 1Password, Bitwarden, etc.).
-          Cuando está activa, ingresar la contraseña no basta — el atacante también necesita el código temporal de tu dispositivo.
+          {t('settings.twofa_subtitle')}
         </p>
       </div>
 
@@ -151,32 +152,29 @@ export default function Settings2FA() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             {enabled
-              ? <><ShieldCheck className="h-5 w-5 text-emerald-600" strokeWidth={1.5} /> 2FA activado <Badge variant="success" className="ml-1 text-[10px]">ON</Badge></>
-              : <><ShieldOff className="h-5 w-5 text-[var(--text-tertiary)]" strokeWidth={1.5} /> 2FA desactivado <Badge variant="secondary" className="ml-1 text-[10px]">OFF</Badge></>}
+              ? <><ShieldCheck className="h-5 w-5 text-emerald-600" strokeWidth={1.5} /> {t('settings.twofa_on')} <Badge variant="success" className="ml-1 text-[10px]">ON</Badge></>
+              : <><ShieldOff className="h-5 w-5 text-[var(--text-tertiary)]" strokeWidth={1.5} /> {t('settings.twofa_off')} <Badge variant="secondary" className="ml-1 text-[10px]">OFF</Badge></>}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {enabled ? (
             <>
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
-                <p className="font-medium text-emerald-900">Todo listo</p>
-                <p className="mt-0.5 text-xs text-emerald-800">
-                  Al loguear, tras ingresar la contraseña se te pedirá un código de tu app autenticadora.
-                  Te quedan <b>{codesLeft}</b> recovery codes disponibles.
-                </p>
+                <p className="font-medium text-emerald-900">{t('settings.twofa_on_ok_title')}</p>
+                <p className="mt-0.5 text-xs text-emerald-800" dangerouslySetInnerHTML={{ __html: t('settings.twofa_on_ok_body', { count: codesLeft }) }} />
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => setRegenOpen(!regenOpen)}>
-                  <RefreshCw className="h-4 w-4" strokeWidth={1.5} /> Regenerar recovery codes
+                  <RefreshCw className="h-4 w-4" strokeWidth={1.5} /> {t('settings.twofa_regenerate')}
                 </Button>
                 <Button variant="destructive" onClick={() => setDisableOpen(!disableOpen)}>
-                  <ShieldOff className="h-4 w-4" strokeWidth={1.5} /> Desactivar 2FA
+                  <ShieldOff className="h-4 w-4" strokeWidth={1.5} /> {t('settings.twofa_disable')}
                 </Button>
               </div>
 
               {regenOpen && (
                 <div className="rounded-lg border border-[var(--border-default)] p-3 space-y-2">
-                  <Label className="text-xs">Ingresa un código TOTP actual para regenerar los recovery codes</Label>
+                  <Label className="text-xs">{t('settings.twofa_regen_label')}</Label>
                   <Input
                     value={regenCode}
                     onChange={(e) => setRegenCode(e.target.value)}
@@ -186,20 +184,20 @@ export default function Settings2FA() {
                     className="font-mono tracking-widest max-w-[120px]"
                   />
                   <Button size="sm" onClick={doRegen} disabled={regenLoading || regenCode.length < 6}>
-                    {regenLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Regenerar'}
+                    {regenLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('settings.twofa_regenerate_btn')}
                   </Button>
                 </div>
               )}
 
               {disableOpen && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-2">
-                  <Label className="text-xs text-red-900">Contraseña del admin + código TOTP (o recovery code)</Label>
+                  <Label className="text-xs text-red-900">{t('settings.twofa_disable_label')}</Label>
                   <div className="flex flex-wrap gap-2">
-                    <Input type="password" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} placeholder="Contraseña" className="max-w-[240px]" />
+                    <Input type="password" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} placeholder={t('settings.twofa_password_placeholder')} className="max-w-[240px]" />
                     <Input value={disableCode} onChange={(e) => setDisableCode(e.target.value)} placeholder="000000" className="font-mono tracking-widest max-w-[120px]" />
                   </div>
                   <Button size="sm" variant="destructive" onClick={doDisable} disabled={disableLoading || !disablePassword || !disableCode}>
-                    {disableLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirmar desactivación'}
+                    {disableLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('settings.twofa_confirm_disable')}
                   </Button>
                 </div>
               )}
@@ -210,15 +208,15 @@ export default function Settings2FA() {
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
                   <div>
-                    <p className="font-medium text-amber-900">Recomendado</p>
+                    <p className="font-medium text-amber-900">{t('settings.twofa_recommended')}</p>
                     <p className="mt-0.5 text-xs text-amber-800">
-                      Si un atacante obtiene la contraseña (phishing, reutilización, credential stuffing), sin 2FA entra directo.
+                      {t('settings.twofa_recommended_body')}
                     </p>
                   </div>
                 </div>
               </div>
               <Button onClick={startSetup} disabled={setupLoading}>
-                {setupLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><KeyRound className="h-4 w-4" strokeWidth={1.5} /> Activar 2FA</>}
+                {setupLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><KeyRound className="h-4 w-4" strokeWidth={1.5} /> {t('settings.twofa_activate')}</>}
               </Button>
             </div>
           )}
@@ -242,11 +240,12 @@ function SetupView({
   onCancel: () => void
   onConfirm: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Configurar 2FA</h1>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">Escanea el QR con tu app autenticadora y confirma con un código.</p>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('settings.twofa_setup_title')}</h1>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">{t('settings.twofa_setup_subtitle')}</p>
       </div>
 
       <Card>
@@ -255,13 +254,13 @@ function SetupView({
             {/* QR */}
             <div className="flex flex-col items-center gap-3 rounded-lg border border-[var(--border-default)] bg-white p-4">
               <QRCodeSVG value={data.otpauthUri} size={200} level="M" />
-              <p className="text-[10px] text-[var(--text-tertiary)]">QR renderizado localmente — el secret no sale de tu navegador</p>
+              <p className="text-[10px] text-[var(--text-tertiary)]">{t('settings.twofa_setup_qr_note')}</p>
             </div>
 
             {/* Manual entry */}
             <div className="space-y-4">
               <div>
-                <Label className="text-xs">¿No puedes escanear? Ingresa este código manualmente en tu app</Label>
+                <Label className="text-xs">{t('settings.twofa_setup_manual')}</Label>
                 <div className="mt-1 flex items-center gap-2">
                   <code className="flex-1 rounded border border-[var(--border-default)] bg-[var(--bg-secondary)] px-2 py-1.5 font-mono text-xs break-all">
                     {data.secret}
@@ -270,11 +269,11 @@ function SetupView({
                     {copiedSecret ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
                   </Button>
                 </div>
-                <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">Formato: base32 · tipo: Time-based · dígitos: 6 · periodo: 30s</p>
+                <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">{t('settings.twofa_setup_manual_hint')}</p>
               </div>
 
               <div>
-                <Label className="text-xs">Código actual de tu app (6 dígitos)</Label>
+                <Label className="text-xs">{t('settings.twofa_setup_code_label')}</Label>
                 <Input
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
@@ -288,9 +287,9 @@ function SetupView({
 
               <div className="flex gap-2">
                 <Button onClick={onConfirm} disabled={loading || code.length < 6}>
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirmar y activar'}
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('settings.twofa_setup_confirm')}
                 </Button>
-                <Button variant="ghost" onClick={onCancel} disabled={loading}>Cancelar</Button>
+                <Button variant="ghost" onClick={onCancel} disabled={loading}>{t('settings.twofa_setup_cancel')}</Button>
               </div>
             </div>
           </div>
@@ -305,18 +304,19 @@ function SetupView({
 function RecoveryCodesView({
   codes, ack, setAck, onDone,
 }: { codes: string[]; ack: boolean; setAck: (v: boolean) => void; onDone: () => void }) {
+  const { t } = useTranslation()
   const copyAll = async () => {
     await navigator.clipboard.writeText(codes.join('\n'))
-    toast.success('Recovery codes copiados')
+    toast.success(t('settings.twofa_recovery_copied'))
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Guarda tus recovery codes</h1>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('settings.twofa_recovery_title')}</h1>
         <p className="mt-1 text-sm text-[var(--text-secondary)]">
-          Te permiten acceder si pierdes tu dispositivo 2FA. Cada código funciona solo una vez.
-          <b className="text-red-600"> No se muestran otra vez.</b> Guárdalos en tu password manager ahora.
+          {t('settings.twofa_recovery_body_1')}
+          <b className="text-red-600"> {t('settings.twofa_recovery_body_2')}</b> {t('settings.twofa_recovery_body_3')}
         </p>
       </div>
 
@@ -329,7 +329,7 @@ function RecoveryCodesView({
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={copyAll}>
-              <Copy className="h-4 w-4" strokeWidth={1.5} /> Copiar todos
+              <Copy className="h-4 w-4" strokeWidth={1.5} /> {t('settings.twofa_recovery_copy_all')}
             </Button>
             <Button variant="outline" onClick={() => {
               const blob = new Blob([codes.join('\n') + '\n'], { type: 'text/plain' })
@@ -340,7 +340,7 @@ function RecoveryCodesView({
               a.click()
               URL.revokeObjectURL(url)
             }}>
-              Descargar .txt
+              {t('settings.twofa_recovery_download')}
             </Button>
           </div>
         </CardContent>
@@ -348,10 +348,10 @@ function RecoveryCodesView({
 
       <label className="flex items-start gap-2 text-sm">
         <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-1 h-4 w-4" />
-        <span>Confirmo que guardé los recovery codes en un lugar seguro. Entiendo que si los pierdo junto con el dispositivo 2FA, perderé acceso al admin.</span>
+        <span>{t('settings.twofa_recovery_ack')}</span>
       </label>
 
-      <Button disabled={!ack} onClick={onDone}>Listo</Button>
+      <Button disabled={!ack} onClick={onDone}>{t('settings.twofa_recovery_done')}</Button>
     </div>
   )
 }

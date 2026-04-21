@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Package, RefreshCw, Download, Copy, Check, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,6 +31,7 @@ interface PluginInfo {
  * por ahora; se puede ampliar editando PluginVault::catalog en PHP).
  */
 export default function SettingsPluginVault() {
+  const { t, i18n } = useTranslation()
   const { fetchPluginVault, refreshPluginVault } = useAdmin()
   const [plugins, setPlugins] = useState<PluginInfo[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,10 +53,10 @@ export default function SettingsPluginVault() {
       const res = await refreshPluginVault(slug, force)
       if (res?.plugin) {
         setPlugins(plugins.map(p => p.slug === slug ? res.plugin as PluginInfo : p))
-        toast.success(`Plugin actualizado a v${(res.plugin as PluginInfo).version ?? '?'}`)
+        toast.success(t('settings.vault_updated', { version: (res.plugin as PluginInfo).version ?? '?' }))
       }
     } catch {
-      toast.error('Error al refrescar el plugin')
+      toast.error(t('settings.vault_refresh_error'))
     }
     setRefreshing(null)
   }
@@ -65,10 +67,22 @@ export default function SettingsPluginVault() {
     try {
       await navigator.clipboard.writeText(fullUrl(publicUrl))
       setCopied(publicUrl)
-      toast.success('Link copiado al portapapeles')
+      toast.success(t('settings.vault_copied'))
       setTimeout(() => setCopied(null), 2000)
     } catch {
-      toast.error('No se pudo copiar')
+      toast.error(t('settings.vault_copy_error'))
+    }
+  }
+
+  const formatDate = (iso: string | null): string => {
+    if (!iso) return t('settings.vault_date_never')
+    try {
+      return new Date(iso).toLocaleString(i18n.language, {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      })
+    } catch {
+      return iso
     }
   }
 
@@ -77,11 +91,9 @@ export default function SettingsPluginVault() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Plugin Vault</h1>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('settings.vault_title')}</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">
-          Caché local de plugins de terceros que compartimos con clientes. Sirve dos propósitos: (1) tener una
-          copia si el repo de GitHub desaparece, (2) ofrecer al cliente un link de descarga desde nuestro
-          dominio en vez de pedirle ir a GitHub. El refresco automático se ejecuta mensualmente vía cron.
+          {t('settings.vault_subtitle')}
         </p>
       </div>
 
@@ -93,8 +105,8 @@ export default function SettingsPluginVault() {
               {p.displayName}
               {p.version && <Badge variant="secondary" className="ml-1 font-mono text-[10px]">v{p.version}</Badge>}
               {p.fileExists
-                ? <Badge variant="success" className="text-[10px]">Cacheado</Badge>
-                : <Badge variant="destructive" className="text-[10px]">Sin caché</Badge>}
+                ? <Badge variant="success" className="text-[10px]">{t('settings.vault_badge_cached')}</Badge>
+                : <Badge variant="destructive" className="text-[10px]">{t('settings.vault_badge_uncached')}</Badge>}
             </CardTitle>
             <p className="mt-1 text-xs text-[var(--text-secondary)]">{p.description}</p>
           </CardHeader>
@@ -102,16 +114,16 @@ export default function SettingsPluginVault() {
 
             {/* Stats */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="Versión" value={p.version || '—'} mono />
-              <Stat label="Tamaño" value={p.sizeBytes ? formatSize(p.sizeBytes) : '—'} />
-              <Stat label="Descargado" value={formatDate(p.downloadedAt)} hint={p.source ? `vía ${p.source}` : undefined} />
-              <Stat label="Última verificación" value={formatDate(p.checkedAt)} />
+              <Stat label={t('settings.vault_stat_version')} value={p.version || '—'} mono />
+              <Stat label={t('settings.vault_stat_size')} value={p.sizeBytes ? formatSize(p.sizeBytes) : '—'} />
+              <Stat label={t('settings.vault_stat_downloaded')} value={formatDate(p.downloadedAt)} hint={p.source ? t('settings.vault_stat_via', { source: p.source }) : undefined} />
+              <Stat label={t('settings.vault_stat_checked')} value={formatDate(p.checkedAt)} />
             </div>
 
             {/* Link público */}
             <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] p-3">
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-                Link público para compartir con el cliente
+                {t('settings.vault_public_link')}
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <code className="flex-1 rounded bg-white px-2 py-1.5 font-mono text-[11px] break-all">
@@ -119,12 +131,12 @@ export default function SettingsPluginVault() {
                 </code>
                 <Button size="sm" variant="outline" onClick={() => copyLink(p.publicUrl)}>
                   {copied === p.publicUrl
-                    ? <><Check className="h-3.5 w-3.5 text-emerald-600" strokeWidth={2} /> Copiado</>
-                    : <><Copy className="h-3.5 w-3.5" strokeWidth={1.5} /> Copiar</>}
+                    ? <><Check className="h-3.5 w-3.5 text-emerald-600" strokeWidth={2} /> {t('settings.vault_copied_label')}</>
+                    : <><Copy className="h-3.5 w-3.5" strokeWidth={1.5} /> {t('settings.vault_copy_label')}</>}
                 </Button>
               </div>
               <p className="mt-1.5 text-[10px] text-[var(--text-tertiary)]">
-                Sin autenticación. El cliente entra a este link y obtiene el ZIP listo para subir a WP Admin → Plugins → Añadir nuevo → Subir plugin.
+                {t('settings.vault_public_hint')}
               </p>
             </div>
 
@@ -140,21 +152,21 @@ export default function SettingsPluginVault() {
             <div className="flex flex-wrap gap-2 border-t border-[var(--border-default)] pt-3">
               <Button asChild size="sm">
                 <a href={p.publicUrl} download>
-                  <Download className="h-3.5 w-3.5" strokeWidth={1.5} /> Descargar ZIP
+                  <Download className="h-3.5 w-3.5" strokeWidth={1.5} /> {t('settings.vault_action_download')}
                 </a>
               </Button>
               <Button size="sm" variant="outline" onClick={() => handleRefresh(p.slug, false)} disabled={refreshing === p.slug}>
                 {refreshing === p.slug
                   ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   : <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />}
-                Buscar nueva versión
+                {t('settings.vault_action_check')}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => handleRefresh(p.slug, true)} disabled={refreshing === p.slug}>
-                Forzar re-descarga
+                {t('settings.vault_action_force')}
               </Button>
               <Button asChild size="sm" variant="ghost" className="ml-auto">
                 <a href={p.githubUrl} target="_blank" rel="noreferrer">
-                  Ver en GitHub <ExternalLink className="h-3 w-3" />
+                  {t('settings.vault_action_github')} <ExternalLink className="h-3 w-3" />
                 </a>
               </Button>
             </div>
@@ -165,18 +177,16 @@ export default function SettingsPluginVault() {
       {/* Cómo automatizar */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Refresco automático mensual</CardTitle>
+          <CardTitle className="text-sm">{t('settings.vault_cron_card')}</CardTitle>
         </CardHeader>
         <CardContent className="text-xs text-[var(--text-secondary)] space-y-2">
           <p>
-            El refresco no se programa solo desde la app. Para que se ejecute mensualmente, configura un cron del sistema en tu hosting:
+            {t('settings.vault_cron_intro')}
           </p>
           <pre className="rounded bg-[var(--bg-secondary)] p-2 text-[10px] font-mono overflow-x-auto">
 {`30 3 1 * *  /usr/bin/php /var/www/audit/cron/refresh-plugin-vault.php`}
           </pre>
-          <p>
-            O alternativamente vía web (necesita <code>CRON_TOKEN</code> en el .env):
-          </p>
+          <p dangerouslySetInnerHTML={{ __html: t('settings.vault_cron_web_intro') }} />
           <pre className="rounded bg-[var(--bg-secondary)] p-2 text-[10px] font-mono overflow-x-auto">
 {`30 3 1 * *  curl -s "https://${window.location.hostname}/api/cron/refresh-plugin-vault.php?token=$CRON_TOKEN" >/dev/null`}
           </pre>
@@ -200,16 +210,4 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / 1048576).toFixed(2)} MB`
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return 'Nunca'
-  try {
-    return new Date(iso).toLocaleString('es-CO', {
-      day: '2-digit', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    })
-  } catch {
-    return iso
-  }
 }

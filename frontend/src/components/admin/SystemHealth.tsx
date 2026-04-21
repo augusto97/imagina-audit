@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CheckCircle2, AlertTriangle, XCircle, Activity, RefreshCw, Clock, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,6 +47,7 @@ interface Diag {
  * para que los usuarios finales no lo vean).
  */
 export default function SystemHealth() {
+  const { t, i18n } = useTranslation()
   const [diag, setDiag] = useState<Diag | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -57,11 +59,11 @@ export default function SystemHealth() {
       const res = await api.get('/diag.php', { params: { _t: Date.now() } })
       setDiag(res.data.data as Diag)
     } catch {
-      toast.error('No se pudo cargar el diagnóstico')
+      toast.error(t('settings.health_load_error'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { load() }, [load])
 
@@ -79,9 +81,9 @@ export default function SystemHealth() {
     fail: <XCircle className="h-5 w-5" strokeWidth={2} />,
   }
   const overallLabel = {
-    ok: 'Todo en orden',
-    warn: 'Con advertencias',
-    fail: 'Problemas críticos detectados',
+    ok: t('settings.health_overall_ok'),
+    warn: t('settings.health_overall_warn'),
+    fail: t('settings.health_overall_fail'),
   }
 
   return (
@@ -89,15 +91,15 @@ export default function SystemHealth() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <Activity className="h-6 w-6 text-[var(--accent-primary)]" /> Estado del sistema
+            <Activity className="h-6 w-6 text-[var(--accent-primary)]" /> {t('settings.health_title')}
           </h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
-            Verifica que todos los componentes del backend están funcionando correctamente.
+            {t('settings.health_subtitle')}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={load} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.5} />
-          Revisar de nuevo
+          {t('settings.health_recheck')}
         </Button>
       </div>
 
@@ -108,11 +110,11 @@ export default function SystemHealth() {
           <div className="flex-1">
             <p className="font-bold text-lg">{overallLabel[diag.overall]}</p>
             <p className="text-sm opacity-75">
-              {diag.summary.ok} OK · {diag.summary.warn} advertencias · {diag.summary.fail} fallos
+              {t('settings.health_summary', { ok: diag.summary.ok, warn: diag.summary.warn, fail: diag.summary.fail })}
             </p>
           </div>
           <p className="text-xs text-[var(--text-tertiary)]">
-            {new Date(diag.generatedAt).toLocaleTimeString('es-CO')}
+            {new Date(diag.generatedAt).toLocaleTimeString(i18n.language)}
           </p>
         </CardContent>
       </Card>
@@ -123,17 +125,16 @@ export default function SystemHealth() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-[var(--accent-primary)]" strokeWidth={1.5} />
-              Tareas automáticas (cron)
+              {t('settings.health_cron_title')}
               <span className="ml-2 text-xs font-normal text-[var(--text-tertiary)]">
-                {diag.cronHealth.counts.ok} ok
-                {diag.cronHealth.counts.warning > 0 && <> · {diag.cronHealth.counts.warning} atrasados</>}
-                {diag.cronHealth.counts.critical > 0 && <> · {diag.cronHealth.counts.critical} críticos</>}
-                {diag.cronHealth.counts.never > 0 && <> · {diag.cronHealth.counts.never} nunca</>}
+                {t('settings.health_cron_ok', { count: diag.cronHealth.counts.ok })}
+                {diag.cronHealth.counts.warning > 0 && <> {t('settings.health_cron_warning', { count: diag.cronHealth.counts.warning })}</>}
+                {diag.cronHealth.counts.critical > 0 && <> {t('settings.health_cron_critical', { count: diag.cronHealth.counts.critical })}</>}
+                {diag.cronHealth.counts.never > 0 && <> {t('settings.health_cron_never', { count: diag.cronHealth.counts.never })}</>}
               </span>
             </CardTitle>
             <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-              Si alguna tarea aparece "nunca ejecutada" o "atrasada", el cron del sistema no está configurado.
-              Revisa el panel de ServerAvatar → Cron Jobs y verifica que cada línea apunta al script correcto.
+              {t('settings.health_cron_hint')}
             </p>
           </CardHeader>
           <CardContent>
@@ -157,14 +158,14 @@ export default function SystemHealth() {
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-medium text-[var(--text-primary)]">{cron.label}</p>
                           <code className="rounded bg-white/70 px-1.5 py-0.5 text-[10px] font-mono text-[var(--text-tertiary)]">
-                            cada {cron.intervalHuman}
+                            {t('settings.health_cron_interval_prefix')} {cron.intervalHuman}
                           </code>
                         </div>
                         <p className="mt-0.5 text-xs opacity-85">{cron.description}</p>
                         <p className="mt-1 text-[11px] opacity-85">
                           <b>{cron.message}</b>
                           {cron.lastRunAt && (
-                            <> · última vez hace <b>{cron.ageHuman}</b> ({new Date(cron.lastRunAt).toLocaleString('es-CO')})</>
+                            <span dangerouslySetInnerHTML={{ __html: ' ' + t('settings.health_cron_last_run', { ago: cron.ageHuman, date: new Date(cron.lastRunAt).toLocaleString(i18n.language) }) }} />
                           )}
                         </p>
                       </div>
@@ -180,7 +181,7 @@ export default function SystemHealth() {
       {/* Lista de checks */}
       <Card>
         <CardHeader>
-          <CardTitle>Verificaciones individuales</CardTitle>
+          <CardTitle>{t('settings.health_checks_card')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
@@ -197,7 +198,7 @@ export default function SystemHealth() {
                     {check.details && Object.keys(check.details).length > 0 && check.status !== 'ok' && (
                       <details className="mt-2">
                         <summary className="text-xs cursor-pointer opacity-75 hover:opacity-100">
-                          Ver detalles
+                          {t('settings.health_details')}
                         </summary>
                         <pre className="mt-1 text-[10px] bg-white/50 p-2 rounded overflow-x-auto">
                           {JSON.stringify(check.details, null, 2)}
@@ -216,14 +217,14 @@ export default function SystemHealth() {
       {diag.overall !== 'ok' && (
         <Card>
           <CardHeader>
-            <CardTitle>Cómo resolver</CardTitle>
+            <CardTitle>{t('settings.health_how_card')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-[var(--text-secondary)]">
-            <p><b>Extensiones PHP faltantes:</b> contacta a tu hoster para habilitarlas. Si usas ServerAvatar o similar, actívalas desde el panel (PHP Modules).</p>
-            <p><b>Carpetas no escribibles:</b> la app intentó auto-arreglar los permisos pero no lo logró. Desde el File Manager cambia <code>cache/</code>, <code>logs/</code> y <code>database/</code> a permisos <b>755</b>.</p>
-            <p><b>Cron drain-queue no activo:</b> desde el panel de tu hosting configura un cron <code>*/5 * * * * php /ruta/al/sitio/cron/drain-queue.php</code>.</p>
-            <p><b>Base de datos con problemas:</b> si faltan tablas, borra <code>database/audit.db</code> (si existe) y recarga la página — el schema se recrea automáticamente.</p>
-            <p><b>Google PageSpeed inalcanzable:</b> tu hosting puede tener firewall saliente. Pregunta al soporte si pueden abrir requests a googleapis.com.</p>
+            <p dangerouslySetInnerHTML={{ __html: t('settings.health_how_php') }} />
+            <p dangerouslySetInnerHTML={{ __html: t('settings.health_how_folders') }} />
+            <p dangerouslySetInnerHTML={{ __html: t('settings.health_how_cron') }} />
+            <p dangerouslySetInnerHTML={{ __html: t('settings.health_how_db') }} />
+            <p dangerouslySetInnerHTML={{ __html: t('settings.health_how_pagespeed') }} />
           </CardContent>
         </Card>
       )}
