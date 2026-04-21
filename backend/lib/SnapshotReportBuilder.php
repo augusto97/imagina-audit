@@ -607,8 +607,283 @@ class SnapshotReportBuilder {
             'issues' => $issues,
         ];
     }
-    private function buildCron(): array        { return []; }
-    private function buildMedia(): array       { return []; }
-    private function buildUsers(): array       { return []; }
-    private function buildContent(): array     { return []; }
+    // ——— Cron: eventos y schedules ——————————————————————————————
+
+    private function buildCron(): array {
+        $cron = $this->section('cron');
+        $events = $cron['events'] ?? [];
+
+        // Top hooks por recurrencia (detectar plugins que abusan del cron)
+        $byHook = [];
+        foreach ($events as $e) {
+            $hook = $e['hook'] ?? '';
+            if ($hook === '') continue;
+            $byHook[$hook] = ($byHook[$hook] ?? 0) + 1;
+        }
+        arsort($byHook);
+        $topHooks = [];
+        foreach (array_slice($byHook, 0, 15, true) as $hook => $count) {
+            $topHooks[] = ['hook' => $hook, 'count' => $count];
+        }
+
+        // Eventos atrasados
+        $overdueList = array_values(array_filter($events, fn($e) => !empty($e['overdue'])));
+        $overdueItems = array_map(fn($e) => [
+            'hook'     => $e['hook'] ?? '',
+            'nextRun'  => $e['next_run_human'] ?? '',
+            'diff'     => $e['next_run_diff'] ?? '',
+            'schedule' => $e['schedule'] ?? '',
+        ], array_slice($overdueList, 0, 30));
+
+        // Próximos 20 (para dar contexto)
+        usort($events, fn($a, $b) => ((int) ($a['next_run'] ?? 0)) <=> ((int) ($b['next_run'] ?? 0)));
+        $upcoming = array_map(fn($e) => [
+            'hook'     => $e['hook'] ?? '',
+            'nextRun'  => $e['next_run_human'] ?? '',
+            'diff'     => $e['next_run_diff'] ?? '',
+            'schedule' => $e['schedule_label'] ?? ($e['schedule'] ?? ''),
+            'interval' => (int) ($e['interval'] ?? 0),
+        ], array_slice($events, 0, 20));
+
+        $issues = [];
+        $wpCronDisabled = (bool) ($cron['wp_cron_disabled'] ?? false);
+        if (!empty($overdueList)) {
+            $issues[] = [
+                'severity' => count($overdueList) > 10 ? 'critical' : 'warning',
+                'title'    => count($overdueList) . ' cron jobs atrasados',
+                'action'   => $wpCronDisabled
+                    ? 'WP_CRON está deshabilitado. Verificar que el cron del sistema esté llamando a wp-cron.php cada minuto.'
+                    : 'Sitio con poco tráfico no dispara WP_CRON. Configurar cron del servidor: */5 * * * * wget -qO- https://tu-sitio.com/wp-cron.php',
+            ];
+        }
+        // Detectar hooks con abuso (misma tarea registrada muchas veces)
+        foreach ($byHook as $hook => $count) {
+            if ($count >= 10) {
+                $issues[] = [
+                    'severity' => 'info',
+                    'title'    => "Hook $hook registrado $count veces",
+                    'action'   => 'Posible leak de wp_schedule_event sin unscheduling. Revisar el plugin responsable.',
+                ];
+                break; // solo reportar el peor
+            }
+        }
+
+        return [
+            'summary' => [
+                'total'           => (int) ($cron['total_events'] ?? count($events)),
+                'overdue'         => count($overdueList),
+                'wpCronDisabled'  => $wpCronDisabled,
+                'alternateCron'   => (bool) ($cron['alternate_cron'] ?? false),
+                'uniqueHooks'     => count($byHook),
+            ],
+            'topHooks' => $topHooks,
+            'overdue'  => $overdueItems,
+            'upcoming' => $upcoming,
+            'issues'   => $issues,
+        ];
+    }
+
+    // ——— Media: tamaño + mime breakdown ——————————————————————————
+
+    private function buildMedia(): array {
+        $media = $this->section('media');
+        // El plugin expone mime_summary como {group: count} (enteros), no objetos
+        $summary = $media['mime_summary'] ?? [];
+        $byType = [];
+        foreach ($summary as $group => $value) {
+            $count = is_array($value) ? (int) ($value['count'] ?? 0) : (int) $value;
+            if ($count === 0) continue;
+            $byType[] = ['group' => $group, 'count' => $count];
+        }
+        usort($byType, fn($a, $b) => $b['count'] <=> $a['count']);
+
+        // mime_breakdown es {mime: count} (enteros)
+        $breakdown = $media['mime_breakdown'] ?? [];
+        $mimeDetail = [];
+        foreach ($breakdown as $mime => $value) {
+            $count = is_array($value) ? (int) ($value['count'] ?? 0) : (int) $value;
+            if ($count === 0) continue;
+            $mimeDetail[] = ['mime' => $mime, 'count' => $count];
+        }
+        usort($mimeDetail, fn($a, $b) => $b['count'] <=> $a['count']);
+
+        $size = (int) ($media['upload_dir_size'] ?? 0);
+        $gb = $size / (1024 * 1024 * 1024);
+
+        $issues = [];
+        // WebP adoption
+        $hasWebP = false;
+        foreach ($mimeDetail as $m) {
+            if (stripos($m['mime'], 'webp') !== false) { $hasWebP = true; break; }
+        }
+        $hasJpegOrPng = false;
+        foreach ($mimeDetail as $m) {
+            if (preg_match('#image/(jpeg|jpg|png)#i', $m['mime'])) { $hasJpegOrPng = true; break; }
+        }
+        if ($hasJpegOrPng && !$hasWebP) {
+            $issues[] = [
+                'severity' => 'warning',
+                'title'    => 'Imágenes sin formato WebP',
+                'action'   => 'Instalar ShortPixel / Imagify / EWWW para convertir JPEG/PNG a WebP automáticamente — reduce peso 25-35% típico.',
+            ];
+        }
+        if ($gb > 3) {
+            $issues[] = [
+                'severity' => 'warning',
+                'title'    => 'Biblioteca pesada (' . ($media['upload_dir_size_human'] ?? '?') . ')',
+                'action'   => 'Activar lazy loading nativo (ya en WP 5.5+), servir imágenes via CDN, comprimir con calidad 75-85%.',
+            ];
+        }
+
+        return [
+            'summary' => [
+                'totalAttachments' => (int) ($media['total_attachments'] ?? 0),
+                'sizeBytes'        => $size,
+                'sizeHuman'        => $media['upload_dir_size_human'] ?? '',
+                'uploadPath'       => $media['upload_path'] ?? '',
+                'uploadUrl'        => $media['upload_url'] ?? '',
+            ],
+            'byType'     => $byType,          // group (image/video/audio/document...)
+            'mimeDetail' => $mimeDetail,      // mime específico
+            'issues'     => $issues,
+        ];
+    }
+
+    // ——— Users: roles y admins ——————————————————————————————————
+
+    private function buildUsers(): array {
+        $users = $this->section('users');
+        $roles = $users['roles'] ?? [];
+
+        $roleList = [];
+        $admins = 0;
+        foreach ($roles as $r) {
+            $count = (int) ($r['user_count'] ?? 0);
+            if ($count === 0) continue;
+            $slug = $r['slug'] ?? '';
+            if ($slug === 'administrator') $admins = $count;
+            $roleList[] = [
+                'slug'      => $slug,
+                'name'      => $r['name'] ?? $slug,
+                'userCount' => $count,
+                'capCount'  => (int) ($r['cap_count'] ?? 0),
+            ];
+        }
+        usort($roleList, fn($a, $b) => $b['userCount'] <=> $a['userCount']);
+
+        $issues = [];
+        if ($admins > 3) {
+            $issues[] = [
+                'severity' => 'warning',
+                'title'    => "$admins usuarios con rol administrator",
+                'action'   => 'Aplicar principio de mínimo privilegio: bajar a Editor a los que no necesiten tocar plugins/temas. Exigir 2FA en los que queden.',
+            ];
+        } elseif ($admins === 0) {
+            $issues[] = [
+                'severity' => 'info',
+                'title'    => 'Ningún administrator visible',
+                'action'   => 'Puede ser un sitio con rol personalizado. Verificar quién tiene "manage_options" realmente.',
+            ];
+        }
+
+        $totalUsers = (int) ($users['total_users'] ?? 0);
+        if ($totalUsers > 1000) {
+            $issues[] = [
+                'severity' => 'info',
+                'title'    => "$totalUsers usuarios registrados",
+                'action'   => 'Revisar si la tabla wp_users está creciendo por spam signups. Considerar un antispam en registro (Cloudflare Turnstile, reCAPTCHA).',
+            ];
+        }
+
+        return [
+            'summary' => [
+                'totalUsers'     => $totalUsers,
+                'administrators' => $admins,
+                'uniqueRoles'    => count($roleList),
+            ],
+            'roles'  => $roleList,
+            'issues' => $issues,
+        ];
+    }
+
+    // ——— Content: post types, taxonomies, REST API ———————————————
+
+    private function buildContent(): array {
+        $pt = $this->section('post_types');
+        $tx = $this->section('taxonomies');
+        $rest = $this->section('rest_api');
+
+        $postTypes = $pt['post_types'] ?? [];
+        $customTypes = array_values(array_filter($postTypes, fn($p) => !($p['is_builtin'] ?? true)));
+        $ptOut = array_map(fn($p) => [
+            'slug'        => $p['slug'] ?? '',
+            'label'       => $p['label'] ?? '',
+            'isBuiltin'   => (bool) ($p['is_builtin'] ?? false),
+            'isPublic'    => (bool) ($p['is_public'] ?? false),
+            'hasArchive'  => (bool) ($p['has_archive'] ?? false),
+            'hierarchical' => (bool) ($p['hierarchical'] ?? false),
+            'showInRest'  => (bool) ($p['show_in_rest'] ?? false),
+            'restBase'    => $p['rest_base'] ?? '',
+        ], $postTypes);
+        // Non-builtin primero
+        usort($ptOut, fn($a, $b) => [$a['isBuiltin'], strtolower($a['label'])] <=> [$b['isBuiltin'], strtolower($b['label'])]);
+
+        $taxonomies = $tx['taxonomies'] ?? [];
+        $txOut = array_map(fn($t) => [
+            'slug'        => $t['slug'] ?? '',
+            'label'       => $t['label'] ?? '',
+            'isBuiltin'   => (bool) ($t['is_builtin'] ?? false),
+            'isPublic'    => (bool) ($t['is_public'] ?? false),
+            'hierarchical' => (bool) ($t['hierarchical'] ?? false),
+            'showInRest'  => (bool) ($t['show_in_rest'] ?? false),
+        ], $taxonomies);
+        usort($txOut, fn($a, $b) => [$a['isBuiltin'], strtolower($a['label'])] <=> [$b['isBuiltin'], strtolower($b['label'])]);
+
+        // REST API: top namespaces por nº rutas
+        $byNs = $rest['by_namespace'] ?? [];
+        $topNs = [];
+        foreach ($byNs as $ns => $info) {
+            $routes = is_array($info) ? (int) ($info['count'] ?? count($info)) : (int) $info;
+            $topNs[] = ['namespace' => $ns, 'routes' => $routes];
+        }
+        usort($topNs, fn($a, $b) => $b['routes'] <=> $a['routes']);
+        $topNs = array_slice($topNs, 0, 15);
+
+        $issues = [];
+        $totalRestRoutes = (int) ($rest['total_routes'] ?? 0);
+        if ($totalRestRoutes > 800) {
+            $issues[] = [
+                'severity' => 'info',
+                'title'    => "$totalRestRoutes rutas REST expuestas",
+                'action'   => 'Volumen alto indica plugin bloat. Auditar los top namespaces — algunos quizá se puedan desactivar en el frontend con rest_api_init.',
+            ];
+        }
+        // Exposed-in-REST + public CPTs (potencial leak de datos)
+        foreach ($customTypes as $p) {
+            if (($p['show_in_rest'] ?? false) && ($p['is_public'] ?? false) && !($p['hierarchical'] ?? false)) {
+                // Solo uno de ejemplo, no spammear
+                $issues[] = [
+                    'severity' => 'info',
+                    'title'    => "CPT público \"{$p['slug']}\" expuesto en REST API",
+                    'action'   => 'Si no debería ser accesible sin auth, restringir con rest_authentication_errors o show_in_rest=false.',
+                ];
+                break;
+            }
+        }
+
+        return [
+            'summary' => [
+                'totalPostTypes'   => (int) ($pt['total_post_types'] ?? count($postTypes)),
+                'customPostTypes'  => (int) ($pt['custom_count'] ?? count($customTypes)),
+                'totalTaxonomies'  => (int) ($tx['total_taxonomies'] ?? count($taxonomies)),
+                'customTaxonomies' => (int) ($tx['custom_count'] ?? 0),
+                'totalRestRoutes'  => $totalRestRoutes,
+                'restNamespaces'   => count($rest['namespaces'] ?? []),
+            ],
+            'postTypes'    => $ptOut,
+            'taxonomies'   => $txOut,
+            'topRestNs'    => $topNs,
+            'issues'       => $issues,
+        ];
+    }
 }
