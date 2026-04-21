@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Upload, Trash2, CheckCircle, Loader2, Database, FileCheck2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
@@ -27,6 +28,7 @@ interface Props {
 type ProgressStep = 'uploading' | 'analyzing' | 'reauditing' | null
 
 export default function SnapshotUploader({ auditId, onChange }: Props) {
+  const { t, i18n } = useTranslation()
   const [existing, setExisting] = useState<SnapshotMetadata | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -70,9 +72,9 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
       const res = await api.post('/admin/snapshot.php', { auditId, jsonData: parsed })
       const data = res.data?.data
       if (data?.reaudit) {
-        toast.success(`Snapshot conectado y auditoría re-ejecutada (Score: ${data.newScore}/100)`)
+        toast.success(t('settings.uploader_success_reaudit', { score: data.newScore }))
       } else {
-        toast.success('Snapshot cargado y analizado')
+        toast.success(t('settings.uploader_success'))
       }
       await load()
       onChange?.()
@@ -82,20 +84,20 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
         window.scrollTo({ top: 0, behavior: 'smooth' })
       }, 300)
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'JSON inválido o error al analizar'
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('settings.uploader_invalid')
       toast.error(msg, { duration: 10000 })
     }
     setSubmitting(false)
   }
 
   const deleteSnapshot = async () => {
-    if (!confirm('¿Eliminar el snapshot de esta auditoría?')) return
+    if (!confirm(t('settings.uploader_delete_confirm'))) return
     try {
       await api.delete('/admin/snapshot.php', { params: { audit_id: auditId } })
-      toast.success('Snapshot eliminado')
+      toast.success(t('settings.uploader_deleted'))
       setExisting(null)
       onChange?.()
-    } catch { toast.error('Error al eliminar') }
+    } catch { toast.error(t('settings.uploader_delete_error')) }
   }
 
   if (loading) return null
@@ -112,26 +114,26 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-sm text-gray-900">Snapshot interno conectado</span>
+                  <span className="font-semibold text-sm text-gray-900">{t('settings.uploader_connected')}</span>
                   <CheckCircle className="h-4 w-4 text-emerald-500" />
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">
                   {existing.siteName ? `${existing.siteName} · ` : ''}
-                  Generado: {existing.generatedAt || '—'} · Cargado: {new Date(existing.createdAt).toLocaleString('es-CO')}
+                  {t('settings.uploader_metadata', { generated: existing.generatedAt || '—', loaded: new Date(existing.createdAt).toLocaleString(i18n.language) })}
                 </p>
                 {a && (
                   <div className="mt-2 flex items-center gap-2 text-xs">
                     <span className={`font-bold ${a.level === 'critical' ? 'text-red-600' : a.level === 'warning' ? 'text-amber-600' : 'text-emerald-600'}`}>
                       {a.score}/100
                     </span>
-                    <span className="text-gray-500">{a.metrics.length} métricas internas</span>
+                    <span className="text-gray-500">{t('settings.uploader_metrics_count', { count: a.metrics.length })}</span>
                   </div>
                 )}
               </div>
             </div>
             <Button variant="ghost" size="sm" onClick={deleteSnapshot} className="text-red-500 hover:text-red-700">
               <Trash2 className="h-4 w-4" strokeWidth={1.5} />
-              Quitar
+              {t('settings.uploader_remove')}
             </Button>
           </div>
         </CardContent>
@@ -147,9 +149,9 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
             <Database className="h-5 w-5 text-blue-600" strokeWidth={1.5} />
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold text-sm text-gray-900">Conectar snapshot interno</h3>
+            <h3 className="font-semibold text-sm text-gray-900">{t('settings.uploader_connect_title')}</h3>
             <p className="text-xs text-gray-500 mt-1">
-              Conecta la auditoría al plugin <a href="https://github.com/mrabro/wp-snapshot" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">wp-snapshot</a> para obtener datos internos (plugins con versiones, base de datos, cron, seguridad). El cliente descarga el JSON desde WP Admin → Herramientas → Site Audit Snapshot → Download JSON y lo subes aquí.
+              {t('settings.uploader_connect_body_prefix')} <a href="https://github.com/mrabro/wp-snapshot" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">wp-snapshot</a> {t('settings.uploader_connect_body_suffix')}
             </p>
           </div>
         </div>
@@ -158,8 +160,8 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
           <label className="flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed border-[var(--border-default)] bg-white px-4 py-6 transition-colors hover:border-[var(--accent-primary)]">
             <Upload className="h-5 w-5 text-[var(--text-tertiary)]" strokeWidth={1.5} />
             <div className="flex-1">
-              <p className="text-sm font-medium text-[var(--text-primary)]">Seleccionar archivo JSON</p>
-              <p className="text-[11px] text-[var(--text-tertiary)]">Máximo 10 MB. Solo .json exportado por wp-snapshot.</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">{t('settings.uploader_select_file')}</p>
+              <p className="text-[11px] text-[var(--text-tertiary)]">{t('settings.uploader_select_hint')}</p>
             </div>
             <input
               ref={fileInputRef}
@@ -183,14 +185,14 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
         {/* Progress indicator visible mientras se procesa */}
         {submitting && (
           <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
-            <p className="text-xs font-semibold text-blue-900 mb-2">Procesando snapshot…</p>
+            <p className="text-xs font-semibold text-blue-900 mb-2">{t('settings.uploader_processing')}</p>
             <div className="space-y-1.5 text-[11px]">
-              <ProgressLine label="Subiendo datos al servidor" active={progressStep === 'uploading'} done={progressStep !== 'uploading' && progressStep !== null} />
-              <ProgressLine label="Analizando secciones del snapshot" active={progressStep === 'analyzing'} done={progressStep === 'reauditing'} />
-              <ProgressLine label="Re-ejecutando la auditoría con los datos internos" active={progressStep === 'reauditing'} done={false} />
+              <ProgressLine label={t('settings.uploader_step_upload')} active={progressStep === 'uploading'} done={progressStep !== 'uploading' && progressStep !== null} />
+              <ProgressLine label={t('settings.uploader_step_analyze')} active={progressStep === 'analyzing'} done={progressStep === 'reauditing'} />
+              <ProgressLine label={t('settings.uploader_step_reaudit')} active={progressStep === 'reauditing'} done={false} />
             </div>
             <p className="mt-2 text-[11px] text-blue-700">
-              Esto puede tardar 30-90 segundos si el sitio es grande. No cierres esta página.
+              {t('settings.uploader_duration_note')}
             </p>
           </div>
         )}

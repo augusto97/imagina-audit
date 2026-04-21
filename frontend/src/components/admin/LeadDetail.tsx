@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Mail, MessageCircle, ExternalLink } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import LeadReportNav from './LeadReportNav'
@@ -13,6 +14,7 @@ import { useAdmin } from '@/hooks/useAdmin'
 import type { AuditResult } from '@/types/audit'
 
 export default function LeadDetail() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const { fetchLeadDetail } = useAdmin()
   const [result, setResult] = useState<(AuditResult & { leadName?: string; leadEmail?: string; leadWhatsapp?: string; leadCompany?: string }) | null>(null)
@@ -31,7 +33,7 @@ export default function LeadDetail() {
   }
 
   if (!result) {
-    return <div className="text-center py-12 text-[var(--text-secondary)]">Auditoría no encontrada</div>
+    return <div className="text-center py-12 text-[var(--text-secondary)]">{t('settings.leaddetail_not_found')}</div>
   }
 
   return (
@@ -56,7 +58,7 @@ export default function LeadDetail() {
             )}
             {result.leadCompany && <span className="text-[var(--text-secondary)]">{result.leadCompany}</span>}
             <a href={result.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[var(--text-tertiary)] hover:text-[var(--accent-primary)]">
-              <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} /> Ver sitio
+              <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} /> {t('settings.leaddetail_view_site')}
             </a>
           </div>
         </CardContent>

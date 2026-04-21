@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft, FileText, BarChart3, Database, FileText as DetailIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -18,22 +19,23 @@ interface Props {
 }
 
 export default function LeadReportNav({ auditId, domain, showBackToList = true }: Props) {
+  const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
   const path = location.pathname
 
   const tabs = [
-    { to: `/admin/leads/${auditId}`,           label: 'Lead',             icon: DetailIcon, exact: true },
-    { to: `/admin/leads/${auditId}/report`,    label: 'Reporte técnico',  icon: FileText },
-    { to: `/admin/leads/${auditId}/waterfall`, label: 'Waterfall',        icon: BarChart3 },
-    { to: `/admin/leads/${auditId}/internal`,  label: 'Análisis interno', icon: Database },
+    { to: `/admin/leads/${auditId}`,           label: t('settings.leadnav_lead'),      icon: DetailIcon, exact: true },
+    { to: `/admin/leads/${auditId}/report`,    label: t('settings.leadnav_report'),    icon: FileText },
+    { to: `/admin/leads/${auditId}/waterfall`, label: t('settings.leadnav_waterfall'), icon: BarChart3 },
+    { to: `/admin/leads/${auditId}/internal`,  label: t('settings.leadnav_internal'),  icon: Database },
   ]
 
   return (
     <div className="flex flex-wrap items-center gap-3">
       {showBackToList && (
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin/leads')}>
-          <ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> Leads
+          <ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> {t('settings.leadnav_back')}
         </Button>
       )}
       {domain && (
