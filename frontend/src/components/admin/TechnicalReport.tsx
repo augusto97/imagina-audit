@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback, memo } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Database, ArrowRight } from 'lucide-react'
+import { Database, ArrowRight, LayoutDashboard, ListChecks, Boxes } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
 import { useAdmin } from '@/hooks/useAdmin'
 import api from '@/lib/api'
 import LeadReportNav from './LeadReportNav'
@@ -16,14 +18,14 @@ import { ModuleDetail } from './report/ModuleDetail'
 import { getAllMetricsByLevel, type ChecklistState } from './report/helpers'
 
 /**
- * Orquestador del reporte técnico.
+ * Orquestador del reporte técnico. Estructura de 3 tabs:
+ *   - Resumen: vista de un vistazo (executive + tech + banner snapshot)
+ *   - Plan de acción: checklist de críticos + importantes
+ *   - Detalles por módulo: deep-dive técnico por cada módulo auditado
  *
- * Responsabilidades:
- *  - Cargar la auditoría, el checklist y el snapshot (si existe).
- *  - Manejar el toggle del checklist con actualización optimista.
- *  - Componer las sub-secciones (header, resumen, action plan, detalles).
- *
- * Toda la presentación vive en subcomponentes bajo `report/`.
+ * El estado del tab activo se guarda en el query param ?tab=, así el
+ * operador puede compartir links a un tab específico (se implementa en
+ * fase E; por ahora se mantiene solo en state local).
  */
 function TechnicalReport() {
   const { id } = useParams<{ id: string }>()
@@ -32,15 +34,15 @@ function TechnicalReport() {
   const [checklist, setChecklist] = useState<ChecklistState>({})
   const [loading, setLoading] = useState(true)
   const [snapshotModule, setSnapshotModule] = useState<ModuleResult | null>(null)
-  const [snapshotReloadKey] = useState(0)
   const [isPinned, setIsPinned] = useState(false)
+  const [activeTab, setActiveTab] = useState<'summary' | 'plan' | 'modules'>('summary')
 
   useEffect(() => {
     if (!id) return
     api.get('/admin/snapshot.php', { params: { audit_id: id } })
       .then(res => setSnapshotModule(res.data?.data?.analysis || null))
       .catch(() => setSnapshotModule(null))
-  }, [id, snapshotReloadKey])
+  }, [id])
 
   useEffect(() => {
     if (!id) return
@@ -57,7 +59,7 @@ function TechnicalReport() {
       setChecklist(state)
       setLoading(false)
     }).catch(() => setLoading(false))
-  }, [id, fetchLeadDetail, snapshotReloadKey])
+  }, [id, fetchLeadDetail])
 
   const toggleCheck = useCallback((metricId: string) => {
     if (!id) return
@@ -68,21 +70,16 @@ function TechnicalReport() {
       return { ...prev, [metricId]: { completed: newVal, notes: prev[metricId]?.notes ?? null, completedAt: newVal ? new Date().toISOString() : null } }
     })
     api.put('/admin/checklist.php', { auditId: id, metricId, completed: !previousCompleted }).catch(() => {
-      // Revertir en caso de error
       setChecklist(prev => ({ ...prev, [metricId]: { completed: previousCompleted, notes: prev[metricId]?.notes ?? null, completedAt: null } }))
     })
   }, [id])
 
-
   const handleTogglePin = useCallback(async () => {
     if (!id) return
     const newVal = !isPinned
-    setIsPinned(newVal) // optimista
-    try {
-      await pinAudit(id, newVal)
-    } catch {
-      setIsPinned(!newVal) // revertir si falla
-    }
+    setIsPinned(newVal)
+    try { await pinAudit(id, newVal) }
+    catch { setIsPinned(!newVal) }
   }, [id, isPinned, pinAudit])
 
   if (loading) {
@@ -94,28 +91,88 @@ function TechnicalReport() {
 
   const criticalMetrics = getAllMetricsByLevel(result, 'critical')
   const warningMetrics = getAllMetricsByLevel(result, 'warning')
+  const totalPlanItems = criticalMetrics.length + warningMetrics.length
+  const donePlanItems = [...criticalMetrics, ...warningMetrics].filter(m => checklist[m.id]?.completed).length
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {id && <LeadReportNav auditId={id} domain={result.domain} />}
       <ReportHeader result={result} isPinned={isPinned} onTogglePin={handleTogglePin} />
-      <ExecutiveSummary result={result} criticalCount={criticalMetrics.length} warningCount={warningMetrics.length} snapshotModule={snapshotModule} />
-      {result.techStack && <TechStackSummary techStack={result.techStack} scanDuration={result.scanDurationMs} />}
-      {result.isWordPress && id && (
-        <SnapshotAvailabilityBanner auditId={id} hasSnapshot={!!snapshotModule} />
-      )}
-      <ActionPlan critical={criticalMetrics} warning={warningMetrics} checklist={checklist} onToggle={toggleCheck} />
-      {result.modules.map(m => (
-        <ModuleDetail key={m.id} module={m} />
-      ))}
-      {snapshotModule && <ModuleDetail module={snapshotModule} />}
+
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+        <TabsList>
+          <TabsTrigger value="summary">
+            <LayoutDashboard className="h-4 w-4 mr-1" strokeWidth={1.5} /> Resumen
+          </TabsTrigger>
+          <TabsTrigger value="plan">
+            <ListChecks className="h-4 w-4 mr-1" strokeWidth={1.5} /> Plan de acción
+            {totalPlanItems > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px]">
+                {donePlanItems}/{totalPlanItems}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="modules">
+            <Boxes className="h-4 w-4 mr-1" strokeWidth={1.5} /> Detalles por módulo
+            <Badge variant="secondary" className="ml-1.5 text-[10px]">
+              {result.modules.length + (snapshotModule ? 1 : 0)}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ─── Tab 1: Resumen ───────────────────────────────────── */}
+        <TabsContent value="summary" className="mt-4 space-y-5">
+          <ExecutiveSummary
+            result={result}
+            criticalCount={criticalMetrics.length}
+            warningCount={warningMetrics.length}
+            snapshotModule={snapshotModule}
+          />
+          {result.techStack && (
+            <TechStackSummary techStack={result.techStack} scanDuration={result.scanDurationMs} />
+          )}
+          {result.isWordPress && id && (
+            <SnapshotAvailabilityBanner auditId={id} hasSnapshot={!!snapshotModule} />
+          )}
+          {totalPlanItems > 0 && (
+            <Card className="cursor-pointer border-[var(--accent-primary)]/20 bg-[var(--accent-primary)]/5 transition-colors hover:bg-[var(--accent-primary)]/10" onClick={() => setActiveTab('plan')}>
+              <CardContent className="flex items-center justify-between gap-3 py-4">
+                <div>
+                  <p className="font-semibold text-[var(--text-primary)]">
+                    {totalPlanItems} acciones detectadas ({criticalMetrics.length} críticas + {warningMetrics.length} importantes)
+                  </p>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Ver el plan de acción paso a paso con checklist →
+                  </p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-[var(--accent-primary)]" />
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* ─── Tab 2: Plan de acción ────────────────────────────── */}
+        <TabsContent value="plan" className="mt-4">
+          <ActionPlan
+            critical={criticalMetrics}
+            warning={warningMetrics}
+            checklist={checklist}
+            onToggle={toggleCheck}
+          />
+        </TabsContent>
+
+        {/* ─── Tab 3: Detalles por módulo ────────────────────────── */}
+        <TabsContent value="modules" className="mt-4 space-y-5">
+          {result.modules.map(m => <ModuleDetail key={m.id} module={m} />)}
+          {snapshotModule && <ModuleDetail module={snapshotModule} />}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
 
 /**
- * Banner que invita a ir a la pestaña de análisis interno. Si ya hay
- * snapshot, ofrece ver el detalle; si no, explica cómo subirlo.
+ * Banner que invita a ir a la pestaña de análisis interno.
  */
 function SnapshotAvailabilityBanner({ auditId, hasSnapshot }: { auditId: string; hasSnapshot: boolean }) {
   return (
