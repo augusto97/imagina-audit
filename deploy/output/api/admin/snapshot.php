@@ -188,6 +188,7 @@ if ($method === 'POST') {
                 422
             );
         }
+    } else {
         // source = 'upload'
         $jsonData = $body['jsonData'] ?? null;
         if (empty($jsonData)) Response::error('jsonData requerido', 400);
