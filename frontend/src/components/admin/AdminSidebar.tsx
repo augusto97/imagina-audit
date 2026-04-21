@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard, Users, Settings, MessageSquare,
-  CreditCard, SlidersHorizontal, ShieldAlert, Shield, ShieldCheck, Server, Archive, Activity, Palette, Home, Package,
+  CreditCard, SlidersHorizontal, ShieldAlert, Shield, ShieldCheck, Server, Archive, Activity, Palette, Home, Package, Languages,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
@@ -29,8 +29,9 @@ const NAV_SECTIONS = [
       { to: '/admin/plans',     icon: CreditCard,         labelKey: 'nav.plans' },
       { to: '/admin/scoring',   icon: SlidersHorizontal,  labelKey: 'nav.scoring' },
       { to: '/admin/queue',     icon: Server,             labelKey: 'nav.queue' },
-      { to: '/admin/retention', icon: Archive,            labelKey: 'nav.retention' },
-      { to: '/admin/health',    icon: Activity,           labelKey: 'nav.health' },
+      { to: '/admin/retention',    icon: Archive,            labelKey: 'nav.retention' },
+      { to: '/admin/translations', icon: Languages,          labelKey: 'nav.translations' },
+      { to: '/admin/health',       icon: Activity,           labelKey: 'nav.health' },
     ],
   },
   {

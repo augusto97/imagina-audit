@@ -260,6 +260,49 @@ export default function SettingsGeneral() {
           </CardContent>
         </Card>
 
+        {/* AI providers for translations */}
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('settings.ai_card_title')}</CardTitle>
+            <p className="text-sm text-[var(--text-secondary)]">{t('settings.ai_card_subtitle')}</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.ai_provider_default')}</label>
+              <select {...register('defaultAiProvider')} className="h-10 w-full rounded-xl border border-[var(--border-default)] bg-white px-3 text-sm">
+                <option value="claude">Claude (Anthropic)</option>
+                <option value="chatgpt">ChatGPT (OpenAI)</option>
+                <option value="google">Google Translate</option>
+              </select>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.ai_openai_key')}</label>
+                <Input {...register('openaiApiKey')} type="password" placeholder="sk-..." />
+                <p className="text-xs text-[var(--text-tertiary)]">{t('settings.ai_openai_key_hint')}</p>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.ai_openai_model')}</label>
+                <Input {...register('openaiModel')} placeholder="gpt-4o-mini" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.ai_anthropic_key')}</label>
+                <Input {...register('anthropicApiKey')} type="password" placeholder="sk-ant-..." />
+                <p className="text-xs text-[var(--text-tertiary)]">{t('settings.ai_anthropic_key_hint')}</p>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.ai_anthropic_model')}</label>
+                <Input {...register('anthropicModel')} placeholder="claude-sonnet-4-5" />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.ai_google_key')}</label>
+                <Input {...register('googleTranslateApiKey')} type="password" placeholder="AIza..." />
+                <p className="text-xs text-[var(--text-tertiary)]">{t('settings.ai_google_key_hint')}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Cambiar contraseña */}
         <Card>
           <CardHeader><CardTitle>{t('settings.general_password_card')}</CardTitle></CardHeader>

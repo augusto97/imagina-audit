@@ -174,6 +174,74 @@ export function useAdmin() {
    * `multipart/form-data; boundary=...` automáticamente. Si lo forzamos
    * nosotros, el servidor no encuentra el boundary y el parsing falla.
    */
+  const fetchTranslationsMeta = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/translations.php', { params: { meta: 'namespaces' } })
+      return res.data.data as { namespaces: string[]; languages: string[]; defaultLang: string }
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const fetchTranslations = useCallback(async (lang: string, namespace: string) => {
+    try {
+      const res = await api.get('/admin/translations.php', { params: { lang, namespace } })
+      return res.data.data as {
+        lang: string
+        namespace: string
+        totalKeys: number
+        overriddenCount: number
+        items: Array<{
+          key: string
+          value: string
+          defaultValue: string | null
+          sourceValue: string | null
+          overridden: boolean
+          source: 'manual' | 'ai' | 'import' | null
+          aiProvider: string | null
+          reviewed: boolean
+          updatedAt: string | null
+        }>
+      }
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const updateTranslation = useCallback(async (lang: string, namespace: string, key: string, value: string, opts: { source?: string; aiProvider?: string | null; reviewed?: boolean } = {}) => {
+    try {
+      await api.put('/admin/translations.php', {
+        lang, namespace, key, value,
+        source: opts.source ?? 'manual',
+        aiProvider: opts.aiProvider ?? null,
+        reviewed: opts.reviewed ?? true,
+      })
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const deleteTranslation = useCallback(async (lang: string, namespace: string, key?: string) => {
+    try {
+      const params: Record<string, string> = { lang, namespace }
+      if (key) params.key = key
+      await api.delete('/admin/translations.php', { params })
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const aiTranslate = useCallback(async (payload: {
+    provider?: 'chatgpt' | 'claude' | 'google'
+    sourceLang: string
+    targetLang: string
+    namespace: string
+    items: Array<{ key: string; text: string; context?: string }>
+    persist?: boolean
+  }) => {
+    const res = await api.post('/admin/ai-translate.php', payload)
+    return res.data.data as {
+      provider: string
+      providerName: string
+      totalCount: number
+      okCount: number
+      errorCount: number
+      translations: Array<{ key: string; text: string; translated: string | null; ok: boolean; error?: string }>
+    }
+  }, [])
+
   const uploadBrandAsset = useCallback(async (type: 'logo' | 'logo_collapsed' | 'favicon', file: File) => {
     try {
       const form = new FormData()
@@ -195,5 +263,6 @@ export function useAdmin() {
     fetchSnapshotReport,
     fetchPluginVault, refreshPluginVault,
     fetch2faStatus, setup2fa, enable2fa, disable2fa, regenerateRecoveryCodes,
+    fetchTranslationsMeta, fetchTranslations, updateTranslation, deleteTranslation, aiTranslate,
   }
 }
