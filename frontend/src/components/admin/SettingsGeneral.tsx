@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useForm } from 'react-hook-form'
 import { Loader2, Save, Send, Copy, Code, X, Plus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -10,6 +11,7 @@ import { useAdmin } from '@/hooks/useAdmin'
 import api from '@/lib/api'
 
 export default function SettingsGeneral() {
+  const { t } = useTranslation()
   const { fetchSettings, updateSettings } = useAdmin()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -56,21 +58,21 @@ export default function SettingsGeneral() {
 
       if (newPass && newPass.length >= 8) {
         if (newPass !== confirmPass) {
-          toast.error('Las contraseñas no coinciden')
+          toast.error(t('settings.general_password_mismatch'))
           setSaving(false)
           return
         }
         payload.adminPassword = newPass
       } else if (newPass && newPass.length < 8) {
-        toast.error('La contraseña debe tener al menos 8 caracteres')
+        toast.error(t('settings.general_password_too_short'))
         setSaving(false)
         return
       }
 
       await updateSettings(payload)
-      toast.success('Configuración guardada correctamente')
+      toast.success(t('settings.general_saved'))
     } catch {
-      toast.error('Error al guardar')
+      toast.error(t('settings.save_error'))
     }
     setSaving(false)
   }
@@ -78,15 +80,15 @@ export default function SettingsGeneral() {
   const sendTestEmail = async () => {
     const email = watch('leadNotificationEmail') as string
     if (!email) {
-      toast.error('Primero configura el email de notificaciones')
+      toast.error(t('settings.general_smtp_test_need_email'))
       return
     }
     setTestingEmail(true)
     try {
       await api.post('/admin/test-email.php', { to: email })
-      toast.success(`Email de prueba enviado a ${email}`)
+      toast.success(t('settings.general_smtp_test_sent', { email }))
     } catch {
-      toast.error('Error al enviar. Verifica la configuración SMTP.')
+      toast.error(t('settings.general_smtp_test_error'))
     }
     setTestingEmail(false)
   }
@@ -96,21 +98,21 @@ export default function SettingsGeneral() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Configuración General</h1>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('settings.general_title')}</h1>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Datos de empresa */}
         <Card>
-          <CardHeader><CardTitle>Datos de la Empresa</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t('settings.general_company_card')}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div><label className="text-xs font-medium text-[var(--text-secondary)]">Nombre</label><Input {...register('companyName')} /></div>
-              <div><label className="text-xs font-medium text-[var(--text-secondary)]">URL del sitio</label><Input {...register('companyUrl')} type="url" /></div>
-              <div><label className="text-xs font-medium text-[var(--text-secondary)]">WhatsApp</label><Input {...register('companyWhatsapp')} placeholder="+573001234567" /></div>
-              <div><label className="text-xs font-medium text-[var(--text-secondary)]">Email de contacto</label><Input {...register('companyEmail')} type="email" /></div>
-              <div><label className="text-xs font-medium text-[var(--text-secondary)]">URL de planes</label><Input {...register('companyPlansUrl')} type="url" /></div>
-              <div><label className="text-xs font-medium text-[var(--text-secondary)]">URL del logo</label><Input {...register('logoUrl')} type="url" /></div>
+              <div><label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_company_name')}</label><Input {...register('companyName')} /></div>
+              <div><label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_company_url')}</label><Input {...register('companyUrl')} type="url" /></div>
+              <div><label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_company_whatsapp')}</label><Input {...register('companyWhatsapp')} placeholder="+573001234567" /></div>
+              <div><label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_company_email')}</label><Input {...register('companyEmail')} type="email" /></div>
+              <div><label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_company_plans_url')}</label><Input {...register('companyPlansUrl')} type="url" /></div>
+              <div><label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_company_logo_url')}</label><Input {...register('logoUrl')} type="url" /></div>
             </div>
             {watch('logoUrl') && (
               <div className="mt-2"><img src={watch('logoUrl') as string} alt="Logo preview" className="h-10 object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} /></div>
@@ -120,18 +122,18 @@ export default function SettingsGeneral() {
 
         {/* Límites y Cache */}
         <Card>
-          <CardHeader><CardTitle>Límites y Cache</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t('settings.general_limits_card')}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-xs font-medium text-[var(--text-secondary)]">Auditorías por hora (por IP)</label>
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_rate_limit_label')}</label>
                 <Input {...register('rateLimitMaxPerHour')} type="number" min={1} max={1000} placeholder="100" />
-                <p className="mt-1 text-xs text-[var(--text-tertiary)]">Usuarios no administradores. Tú como admin no tienes límite.</p>
+                <p className="mt-1 text-xs text-[var(--text-tertiary)]">{t('settings.general_rate_limit_hint')}</p>
               </div>
               <div>
-                <label className="text-xs font-medium text-[var(--text-secondary)]">Cache de auditorías (horas)</label>
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_cache_label')}</label>
                 <Input {...register('cacheTtlHours')} type="number" min={0} max={168} placeholder="24" />
-                <p className="mt-1 text-xs text-[var(--text-tertiary)]">Tiempo que se reutiliza un resultado antes de re-escanear. 0 = sin cache.</p>
+                <p className="mt-1 text-xs text-[var(--text-tertiary)]">{t('settings.general_cache_hint')}</p>
               </div>
             </div>
           </CardContent>
@@ -140,9 +142,9 @@ export default function SettingsGeneral() {
         {/* Dominios permitidos (CORS) */}
         <Card>
           <CardHeader>
-            <CardTitle>Dominios Permitidos</CardTitle>
+            <CardTitle>{t('settings.general_origins_card')}</CardTitle>
             <p className="text-sm text-[var(--text-secondary)]">
-              Dominios desde los cuales se permite acceder a la API. Si no agregas ninguno, se permite cualquier origen.
+              {t('settings.general_origins_subtitle')}
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -151,12 +153,12 @@ export default function SettingsGeneral() {
                 value={originInput}
                 onChange={e => setOriginInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOrigin() } }}
-                placeholder="https://midominio.com"
+                placeholder={t('settings.general_origins_placeholder')}
                 className="flex-1"
               />
               <Button type="button" variant="outline" size="sm" onClick={addOrigin} disabled={!originInput.trim()}>
                 <Plus className="h-4 w-4" strokeWidth={1.5} />
-                Agregar
+                {t('settings.general_origins_add')}
               </Button>
             </div>
             {origins.length > 0 ? (
@@ -172,7 +174,7 @@ export default function SettingsGeneral() {
               </div>
             ) : (
               <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-                Sin dominios configurados — se permite cualquier origen (*). Agrega al menos el dominio de tu app para mayor seguridad.
+                {t('settings.general_origins_empty')}
               </p>
             )}
           </CardContent>
@@ -180,12 +182,12 @@ export default function SettingsGeneral() {
 
         {/* Notificaciones email */}
         <Card>
-          <CardHeader><CardTitle>Notificaciones de Leads</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t('settings.general_notifications_card')}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-xs font-medium text-[var(--text-secondary)]">Email para notificaciones</label>
-              <Input {...register('leadNotificationEmail')} type="email" placeholder="tu@email.com (recibe aviso por cada lead)" />
-              <p className="mt-1 text-xs text-[var(--text-tertiary)]">Recibirás un email cada vez que un prospecto deje datos de contacto.</p>
+              <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_notifications_email_label')}</label>
+              <Input {...register('leadNotificationEmail')} type="email" placeholder={t('settings.general_notifications_email_placeholder')} />
+              <p className="mt-1 text-xs text-[var(--text-tertiary)]">{t('settings.general_notifications_email_hint')}</p>
             </div>
           </CardContent>
         </Card>
@@ -193,81 +195,81 @@ export default function SettingsGeneral() {
         {/* Configuración SMTP */}
         <Card>
           <CardHeader>
-            <CardTitle>Configuración SMTP</CardTitle>
-            <p className="text-sm text-[var(--text-secondary)]">Necesario para enviar notificaciones por email. Si tu hosting no tiene mail() configurado, usa un servicio SMTP externo.</p>
+            <CardTitle>{t('settings.general_smtp_card')}</CardTitle>
+            <p className="text-sm text-[var(--text-secondary)]">{t('settings.general_smtp_subtitle')}</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-xs font-medium text-[var(--text-secondary)]">Servidor SMTP</label>
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_smtp_host')}</label>
                 <Input {...register('smtpHost')} placeholder="smtp.gmail.com" />
               </div>
               <div>
-                <label className="text-xs font-medium text-[var(--text-secondary)]">Puerto</label>
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_smtp_port')}</label>
                 <Input {...register('smtpPort')} type="number" placeholder="587" />
               </div>
               <div>
-                <label className="text-xs font-medium text-[var(--text-secondary)]">Usuario SMTP</label>
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_smtp_username')}</label>
                 <Input {...register('smtpUsername')} placeholder="tu@gmail.com" />
               </div>
               <div>
-                <label className="text-xs font-medium text-[var(--text-secondary)]">Contraseña SMTP</label>
-                <Input {...register('smtpPassword')} type="password" placeholder="Contraseña o app password" />
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_smtp_password')}</label>
+                <Input {...register('smtpPassword')} type="password" placeholder={t('settings.general_smtp_password_placeholder')} />
               </div>
               <div>
-                <label className="text-xs font-medium text-[var(--text-secondary)]">Encriptación</label>
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_smtp_encryption')}</label>
                 <select {...register('smtpEncryption')} className="h-10 w-full rounded-xl border border-[var(--border-default)] bg-white px-3 text-sm">
-                  <option value="tls">TLS (recomendado, puerto 587)</option>
-                  <option value="ssl">SSL (puerto 465)</option>
-                  <option value="">Ninguna (puerto 25)</option>
+                  <option value="tls">{t('settings.general_smtp_encryption_tls')}</option>
+                  <option value="ssl">{t('settings.general_smtp_encryption_ssl')}</option>
+                  <option value="">{t('settings.general_smtp_encryption_none')}</option>
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-[var(--text-secondary)]">Email remitente</label>
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_smtp_from_email')}</label>
                 <Input {...register('smtpFromEmail')} type="email" placeholder="noreply@tudominio.com" />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-xs font-medium text-[var(--text-secondary)]">Nombre remitente</label>
+                <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_smtp_from_name')}</label>
                 <Input {...register('smtpFromName')} placeholder="Imagina Audit" />
               </div>
             </div>
 
             <div className="rounded-xl bg-[var(--bg-tertiary)] p-3 text-xs text-[var(--text-secondary)] space-y-1">
-              <p className="font-medium">Ejemplos de configuración:</p>
-              <p><strong>Gmail:</strong> smtp.gmail.com / 587 / TLS / Usa una "App Password" de Google</p>
-              <p><strong>cPanel:</strong> mail.tudominio.com / 465 / SSL / Tu email del hosting</p>
-              <p><strong>Brevo (gratis):</strong> smtp-relay.brevo.com / 587 / TLS / Tu API key como contraseña</p>
+              <p className="font-medium">{t('settings.general_smtp_examples')}</p>
+              <p dangerouslySetInnerHTML={{ __html: t('settings.general_smtp_example_gmail') }} />
+              <p dangerouslySetInnerHTML={{ __html: t('settings.general_smtp_example_cpanel') }} />
+              <p dangerouslySetInnerHTML={{ __html: t('settings.general_smtp_example_brevo') }} />
             </div>
 
             <Button type="button" variant="outline" size="sm" onClick={sendTestEmail} disabled={testingEmail}>
               {testingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" strokeWidth={1.5} />}
-              Enviar email de prueba
+              {t('settings.general_smtp_send_test')}
             </Button>
           </CardContent>
         </Card>
 
         {/* API Keys */}
         <Card>
-          <CardHeader><CardTitle>API Keys</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t('settings.general_apikeys_card')}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-[var(--text-secondary)]">Google PageSpeed API Key</label>
+              <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_pagespeed_label')}</label>
               <Input {...register('googlePagespeedApiKey')} placeholder="AIza..." />
-              <p className="text-xs text-[var(--text-tertiary)]">Opcional. Sin key funciona con cuota limitada.</p>
+              <p className="text-xs text-[var(--text-tertiary)]">{t('settings.general_pagespeed_hint')}</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Cambiar contraseña */}
         <Card>
-          <CardHeader><CardTitle>Cambiar Contraseña del Admin</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t('settings.general_password_card')}</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-[var(--text-secondary)]">Nueva contraseña</label>
-              <Input {...register('newPassword')} type="password" placeholder="Mínimo 8 caracteres" />
+              <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_password_new')}</label>
+              <Input {...register('newPassword')} type="password" placeholder={t('settings.general_password_new_placeholder')} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-[var(--text-secondary)]">Confirmar contraseña</label>
+              <label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_password_confirm')}</label>
               <Input {...register('confirmPassword')} type="password" />
             </div>
           </CardContent>
@@ -275,7 +277,7 @@ export default function SettingsGeneral() {
 
         <Button type="submit" disabled={saving} className="w-full sm:w-auto">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" strokeWidth={1.5} />}
-          Guardar Cambios
+          {t('settings.general_save')}
         </Button>
       </form>
 
@@ -287,6 +289,7 @@ export default function SettingsGeneral() {
 
 /** Sección del widget embebible con código copiable y personalización */
 function WidgetSection() {
+  const { t } = useTranslation()
   const [widgetColor, setWidgetColor] = useState('#0CC0DF')
   const [widgetPosition, setWidgetPosition] = useState('bottom-right')
   const [widgetLang, setWidgetLang] = useState('es')
@@ -298,7 +301,7 @@ function WidgetSection() {
 
   const copyCode = () => {
     navigator.clipboard.writeText(widgetCode)
-    toast.success('Código copiado al portapapeles')
+    toast.success(t('settings.widget_copied'))
   }
 
   return (
@@ -306,26 +309,26 @@ function WidgetSection() {
       <CardHeader>
         <div className="flex items-center gap-2">
           <Code className="h-5 w-5 text-[var(--accent-primary)]" strokeWidth={1.5} />
-          <CardTitle>Widget Embebible</CardTitle>
+          <CardTitle>{t('settings.widget_card')}</CardTitle>
         </div>
         <p className="text-sm text-[var(--text-secondary)]">
-          Pega este código en cualquier sitio web para ofrecer auditorías desde esa página. Aparece un botón flotante que abre un popup de auditoría.
+          {t('settings.widget_subtitle')}
         </p>
       </CardHeader>
       <CardContent className="space-y-5">
         {/* Personalizadores */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">WhatsApp</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{t('settings.widget_whatsapp_label')}</label>
             <Input
               value={widgetWhatsapp}
               onChange={(e) => setWidgetWhatsapp(e.target.value)}
               placeholder="+573001234567"
             />
-            <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">Si se configura, aparece botón de WhatsApp en el resultado</p>
+            <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">{t('settings.widget_whatsapp_hint')}</p>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Color del botón</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{t('settings.widget_color_label')}</label>
             <div className="flex items-center gap-2">
               <input
                 type="color"
@@ -337,25 +340,25 @@ function WidgetSection() {
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Posición</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{t('settings.widget_position_label')}</label>
             <select
               value={widgetPosition}
               onChange={(e) => setWidgetPosition(e.target.value)}
               className="h-10 w-full rounded-xl border border-[var(--border-default)] bg-white px-3 text-sm"
             >
-              <option value="bottom-right">Inferior derecha</option>
-              <option value="bottom-left">Inferior izquierda</option>
+              <option value="bottom-right">{t('settings.widget_position_bottom_right')}</option>
+              <option value="bottom-left">{t('settings.widget_position_bottom_left')}</option>
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Idioma</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{t('settings.widget_lang_label')}</label>
             <select
               value={widgetLang}
               onChange={(e) => setWidgetLang(e.target.value)}
               className="h-10 w-full rounded-xl border border-[var(--border-default)] bg-white px-3 text-sm"
             >
-              <option value="es">Español</option>
-              <option value="en">Inglés</option>
+              <option value="es">{t('settings.widget_lang_es')}</option>
+              <option value="en">{t('settings.widget_lang_en')}</option>
             </select>
           </div>
         </div>
@@ -373,12 +376,12 @@ function WidgetSection() {
             onClick={copyCode}
           >
             <Copy className="h-3.5 w-3.5" strokeWidth={1.5} />
-            Copiar
+            {t('settings.widget_copy')}
           </Button>
         </div>
 
         <p className="text-xs text-[var(--text-tertiary)]">
-          El widget es un archivo JavaScript de ~12KB, sin dependencias externas. Se carga de forma asíncrona y no afecta la velocidad del sitio donde se instale.
+          {t('settings.widget_footer_note')}
         </p>
       </CardContent>
     </Card>
