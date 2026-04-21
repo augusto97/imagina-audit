@@ -49,6 +49,13 @@ export function useAdmin() {
     } catch (err) { handleError(err) }
   }, [handleError])
 
+  const bulkLeads = useCallback(async (ids: string[], action: 'delete' | 'pin' | 'unpin') => {
+    try {
+      const res = await api.post('/admin/leads-bulk.php', { ids, action })
+      return res.data.data as { processed: number; skipped: number; action: string }
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
   const fetchSettings = useCallback(async () => {
     try {
       const res = await api.get('/admin/settings.php')
@@ -180,7 +187,7 @@ export function useAdmin() {
   }, [handleError])
 
   return {
-    fetchDashboard, fetchLeads, fetchLeadDetail, deleteLead,
+    fetchDashboard, fetchLeads, fetchLeadDetail, deleteLead, bulkLeads,
     fetchSettings, updateSettings, fetchQueueStatus,
     pinAudit, fetchRetentionPreview,
     fetchVulnerabilities, createVulnerability, updateVulnerability, deleteVulnerability,
