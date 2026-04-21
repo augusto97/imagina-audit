@@ -236,9 +236,18 @@ $summary = [
 ];
 $overall = $summary['fail'] > 0 ? 'fail' : ($summary['warn'] > 0 ? 'warn' : 'ok');
 
+// Cron health: cada cron registra su último run y aquí leemos el catálogo
+// completo para saber cuáles están atrasados (sospecha de que el cron del
+// sistema no está configurado correctamente).
+$cronHealth = null;
+try {
+    $cronHealth = CronHealth::summary();
+} catch (Throwable $e) { /* tolerar ausencia temporal de la clase */ }
+
 Response::success([
     'overall' => $overall,
     'summary' => $summary,
     'checks' => $checks,
+    'cronHealth' => $cronHealth,
     'generatedAt' => date('c'),
 ]);

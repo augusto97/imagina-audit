@@ -48,5 +48,7 @@ foreach (PluginVault::catalog() as $slug => $info) {
     }
 }
 
+CronHealth::markRun('refresh-plugin-vault', null, implode(',', array_map(fn($s, $r) => "$s=$r", array_keys($results), $results)));
+
 echo "\nDone.\n";
 exit(in_array('fail', $results, true) ? 1 : 0);

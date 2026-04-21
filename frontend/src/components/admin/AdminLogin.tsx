@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/useAuth'
+import { useConfigStore } from '@/store/configStore'
 import api from '@/lib/api'
 
 export default function AdminLogin() {
@@ -42,6 +43,7 @@ function LoginForm({
   setLoading: (v: boolean) => void
 }) {
   const { register, handleSubmit } = useForm<{ password: string }>()
+  const { logoUrl, companyName } = useConfigStore((s) => s.config)
 
   const onSubmit = async (data: { password: string }) => {
     setLoading(true)
@@ -69,9 +71,13 @@ function LoginForm({
       >
         <div className="rounded-2xl border border-[var(--border-default)] bg-white p-8 shadow-xl shadow-black/[0.03]">
           <div className="mb-8 flex flex-col items-center gap-3">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--accent-primary)] to-[#0a9db8] shadow-lg shadow-[var(--accent-primary)]/25">
-              <Shield className="h-7 w-7 text-white" strokeWidth={2} />
-            </div>
+            {logoUrl ? (
+              <img src={logoUrl} alt={companyName || 'Logo'} className="h-14 max-w-[200px] object-contain" />
+            ) : (
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--accent-primary)] to-[#0a9db8] shadow-lg shadow-[var(--accent-primary)]/25">
+                <Shield className="h-7 w-7 text-white" strokeWidth={2} />
+              </div>
+            )}
             <div className="text-center">
               <h1 className="text-xl font-bold text-[var(--text-primary)]">Bienvenido</h1>
               <p className="text-sm text-[var(--text-tertiary)] mt-0.5">Ingresa al panel de administración</p>
@@ -99,7 +105,7 @@ function LoginForm({
           </form>
 
           <p className="mt-6 text-center text-[11px] text-[var(--text-tertiary)]">
-            Imagina Audit &middot; Panel de Administración
+            {companyName || 'Imagina Audit'} &middot; Panel de Administración
           </p>
         </div>
       </motion.div>
