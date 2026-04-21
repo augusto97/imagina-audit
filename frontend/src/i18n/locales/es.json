@@ -1,0 +1,28 @@
+{
+  "common": {
+    "loading": "Cargando…",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "close": "Cerrar",
+    "yes": "Sí",
+    "no": "No",
+    "search": "Buscar",
+    "actions": "Acciones",
+    "error": "Error",
+    "success": "Éxito",
+    "confirm": "Confirmar",
+    "back": "Volver",
+    "next": "Siguiente",
+    "previous": "Anterior"
+  },
+  "languages": {
+    "en": "Inglés",
+    "es": "Español",
+    "pt": "Portugués",
+    "fr": "Francés",
+    "de": "Alemán",
+    "it": "Italiano"
+  }
+}

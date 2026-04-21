@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
+import './i18n'      // inicializa i18next antes del render
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
