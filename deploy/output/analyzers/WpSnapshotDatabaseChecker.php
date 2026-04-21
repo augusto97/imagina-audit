@@ -1,10 +1,9 @@
 <?php
 /**
- * Checks del snapshot sobre base de datos y contenido acumulado:
- * tamaño, autoload, revisiones, transients, metadata huérfana, spam,
- * papelera, cron y biblioteca de medios.
+ * Checks del snapshot sobre base de datos, contenido acumulado, cron y medios.
  *
- * Sub-checker de WpSnapshotAnalyzer.
+ * Sub-checker de WpSnapshotAnalyzer. Lee la estructura real de
+ * sections.database.data, sections.cron.data y sections.media.data.
  */
 
 class WpSnapshotDatabaseChecker {
@@ -14,62 +13,42 @@ class WpSnapshotDatabaseChecker {
         return $this->snapshot['sections'][$key]['data'] ?? [];
     }
 
-    public function analyzeDatabase(): ?array {
+    public function analyzeDbSize(): ?array {
         $db = $this->getSection('database');
         if (empty($db)) return null;
 
-        $totalSize = $db['total_db_size'] ?? 0;
-        $totalRows = $db['total_rows'] ?? 0;
-        $totalTables = $db['total_tables'] ?? 0;
+        $totalSize = (int) ($db['total_db_size'] ?? 0);
         $humanSize = $db['total_db_size_human'] ?? '?';
+        $totalRows = (int) ($db['total_rows'] ?? 0);
+        $totalTables = (int) ($db['total_tables'] ?? 0);
 
+        if ($totalSize === 0) return null;
+
+        $mb = $totalSize / (1024 * 1024);
+        $score = $mb < 200 ? 100 : ($mb < 500 ? 85 : ($mb < 1500 ? 60 : 30));
+
+        // Top 5 tablas por tamaño
         $tables = $db['tables'] ?? [];
-        $topTables = array_slice($tables, 0, 5);
-        $topTablesFmt = array_map(fn($t) => [
-            'name' => $t['name'],
-            'rows' => $t['rows'],
-            'size' => $this->formatBytes($t['total_size']),
-        ], $topTables);
-
-        $gbSize = $totalSize / (1024 * 1024 * 1024);
-        $score = $gbSize < 0.5 ? 100 : ($gbSize < 1 ? 80 : ($gbSize < 3 ? 60 : 30));
+        $sorted = $tables;
+        usort($sorted, fn($a, $b) => ($b['total_size'] ?? 0) <=> ($a['total_size'] ?? 0));
+        $topTables = array_map(fn($t) => [
+            'name' => $t['name'] ?? '?',
+            'rows' => (int) ($t['rows'] ?? 0),
+            'sizeMb' => round(((int) ($t['total_size'] ?? 0)) / (1024 * 1024), 1),
+            'engine' => $t['engine'] ?? '',
+        ], array_slice($sorted, 0, 10));
 
         return Scoring::createMetric(
             'db_size', 'Tamaño de la base de datos',
-            $totalSize, $humanSize,
+            $humanSize,
+            "$humanSize · $totalRows filas · $totalTables tablas",
             $score,
-            "La base de datos pesa $humanSize con $totalRows filas en $totalTables tablas. " . ($gbSize > 1 ? 'DB grande — considerar optimización.' : 'Tamaño razonable.'),
-            $gbSize > 1 ? 'Limpiar revisiones, transients, meta huérfana. Considerar migrar datos históricos a archivos externos.' : '',
-            'Optimizamos la base de datos eliminando datos innecesarios y creando índices.',
-            ['totalSize' => $totalSize, 'humanSize' => $humanSize, 'totalRows' => $totalRows, 'totalTables' => $totalTables, 'topTables' => $topTablesFmt]
-        );
-    }
-
-    public function analyzeDbEngine(): ?array {
-        $db = $this->getSection('database');
-        if (empty($db)) return null;
-
-        $tables = $db['tables'] ?? [];
-        $myisamTables = [];
-        foreach ($tables as $t) {
-            $engine = $t['engine'] ?? ($t['Engine'] ?? '');
-            if (stripos($engine, 'myisam') !== false) {
-                $myisamTables[] = $t['name'] ?? '?';
-            }
-        }
-
-        if (empty($myisamTables)) return null;
-
-        $count = count($myisamTables);
-
-        return Scoring::createMetric(
-            'db_engine', 'Motor de base de datos',
-            'MyISAM', "$count tablas con MyISAM",
-            $count <= 2 ? 70 : 40,
-            "$count tablas usan el motor MyISAM, que no soporta transacciones, bloqueo a nivel de fila, ni foreign keys. InnoDB es superior en rendimiento y confiabilidad.",
-            'Convertir las tablas MyISAM a InnoDB con: ALTER TABLE nombre ENGINE=InnoDB;',
-            'Migramos tablas a InnoDB para mejor rendimiento y confiabilidad.',
-            ['count' => $count, 'tables' => array_slice($myisamTables, 0, 10)]
+            $mb < 200
+                ? "Base de datos de $humanSize ($totalRows filas, $totalTables tablas). Tamaño saludable."
+                : "Base de datos de $humanSize — " . ($mb > 1500 ? 'CRÍTICO: DB muy pesada' : 'grande') . ". En las tablas top se ve dónde está el peso (ver detalles).",
+            $mb > 500 ? 'Revisar las tablas top: plugins de seguridad (Wordfence = wfHits, wfLogins), orders (WooCommerce), logs. Muchas veces un plugin acumula logs sin rotación.' : '',
+            'Optimizamos la DB: purgamos logs de plugins, ajustamos retención, y añadimos índices donde hace falta.',
+            ['totalSize' => $totalSize, 'humanSize' => $humanSize, 'totalRows' => $totalRows, 'totalTables' => $totalTables, 'topTables' => $topTables]
         );
     }
 
@@ -77,120 +56,121 @@ class WpSnapshotDatabaseChecker {
         $db = $this->getSection('database');
         if (empty($db)) return null;
 
-        $autoloadSize = $db['autoload_size'] ?? 0;
+        $autoloadSize = (int) ($db['autoload_size'] ?? 0);
         $autoloadHuman = $db['autoload_size_human'] ?? '?';
-        $autoloadedCount = $db['autoloaded_options'] ?? 0;
+        $count = (int) ($db['autoloaded_options'] ?? 0);
+        if ($autoloadSize === 0) return null;
+
         $mb = $autoloadSize / (1024 * 1024);
-        $score = $mb < 0.5 ? 100 : ($mb < 1 ? 80 : ($mb < 2 ? 50 : 20));
+        $score = $mb < 0.5 ? 100 : ($mb < 1 ? 85 : ($mb < 3 ? 55 : 20));
 
         return Scoring::createMetric(
-            'autoload_size', 'Opciones autoload',
-            $autoloadSize, "$autoloadHuman ($autoloadedCount opciones)",
+            'db_autoload', 'Opciones autoload',
+            $autoloadHuman,
+            "$autoloadHuman · $count opciones",
             $score,
             $mb < 0.5
-                ? "Autoload de $autoloadHuman con $autoloadedCount opciones. Dentro del rango saludable."
-                : "Autoload de $autoloadHuman con $autoloadedCount opciones. Cada petición a WP carga estas opciones — un autoload grande ralentiza TODO el sitio.",
-            $mb > 1 ? 'Identificar opciones autoload pesadas que no se necesiten en cada request y cambiar autoload=no. Usar plugins como "Autoload Options Monitor".' : '',
-            'Optimizamos las opciones autoload reduciendo el peso de cada petición a WordPress.',
-            ['size' => $autoloadSize, 'human' => $autoloadHuman, 'count' => $autoloadedCount]
+                ? "Autoload de $autoloadHuman con $count opciones. Saludable (<512 KB es lo deseable)."
+                : "Autoload pesado ($autoloadHuman, $count opciones). Cada request a WP carga TODAS estas opciones en memoria — un autoload de varios MB ralentiza absolutamente todo el sitio.",
+            $mb > 1
+                ? 'Instalar plugin "WP-Optimize" o "Autoload Options Monitor" para identificar qué opciones pesan más. Muchas veces plugins desactivados dejan basura con autoload=yes.'
+                : '',
+            'Limpiamos opciones autoload pesadas y configuramos buenas prácticas.',
+            ['size' => $autoloadSize, 'human' => $autoloadHuman, 'count' => $count]
+        );
+    }
+
+    public function analyzeDbEngine(): ?array {
+        $db = $this->getSection('database');
+        $tables = $db['tables'] ?? [];
+        if (empty($tables)) return null;
+
+        $myisam = [];
+        foreach ($tables as $t) {
+            $engine = strtolower((string) ($t['engine'] ?? ''));
+            if ($engine === 'myisam') {
+                $myisam[] = [
+                    'name' => $t['name'] ?? '?',
+                    'rows' => (int) ($t['rows'] ?? 0),
+                    'sizeMb' => round(((int) ($t['total_size'] ?? 0)) / (1024 * 1024), 1),
+                ];
+            }
+        }
+        if (empty($myisam)) return null;
+
+        $count = count($myisam);
+        $score = $count <= 2 ? 75 : ($count <= 10 ? 55 : 35);
+
+        return Scoring::createMetric(
+            'db_engine', 'Motor de base de datos',
+            $count,
+            "$count tablas con MyISAM",
+            $score,
+            "$count tablas usan MyISAM. Sin transacciones, sin row-level locking, sin foreign keys. InnoDB es superior en rendimiento y concurrencia.",
+            'Convertir a InnoDB: ALTER TABLE nombre_tabla ENGINE=InnoDB; (una por una, empezando por las más pequeñas). Hacer backup antes.',
+            'Migramos tablas MyISAM a InnoDB para concurrencia y rendimiento.',
+            ['count' => $count, 'tables' => array_slice($myisam, 0, 15)]
         );
     }
 
     public function analyzeRevisions(): ?array {
         $db = $this->getSection('database');
-        if (empty($db)) return null;
+        $revisions = (int) ($db['revisions_count'] ?? 0);
+        if ($revisions === 0) return null;
 
-        $revisions = $db['revisions_count'] ?? 0;
-        $score = $revisions < 100 ? 100 : ($revisions < 500 ? 80 : ($revisions < 2000 ? 50 : 20));
+        $score = $revisions < 100 ? 100 : ($revisions < 500 ? 90 : ($revisions < 2000 ? 65 : 30));
 
         return Scoring::createMetric(
-            'db_revisions', 'Revisiones en base de datos',
-            $revisions, "$revisions revisiones",
+            'db_revisions', 'Revisiones de posts',
+            $revisions,
+            "$revisions revisiones",
             $score,
             $revisions < 100
-                ? "$revisions revisiones. Cantidad normal."
-                : "$revisions revisiones en la DB. Cada revisión ocupa espacio innecesario.",
-            $revisions > 500 ? 'Limpiar revisiones antiguas y limitar con define("WP_POST_REVISIONS", 5) en wp-config.php.' : '',
-            'Limpiamos revisiones antiguas y configuramos límites saludables.',
+                ? "$revisions revisiones acumuladas. Cantidad normal."
+                : "$revisions revisiones ocupando espacio en wp_posts. Cada edición genera una revisión nueva sin límite por defecto.",
+            $revisions > 500 ? 'Limitar revisiones: en wp-config.php, define("WP_POST_REVISIONS", 5). Limpiar las antiguas con WP-Optimize o plugin similar.' : '',
+            'Limpiamos revisiones antiguas y limitamos las futuras.',
             ['count' => $revisions]
         );
     }
 
     public function analyzeTransients(): ?array {
         $db = $this->getSection('database');
-        if (empty($db)) return null;
+        $t = (int) ($db['transients_count'] ?? 0);
+        if ($t === 0) return null;
 
-        $transients = $db['transients_count'] ?? 0;
-        $score = $transients < 500 ? 100 : ($transients < 2000 ? 80 : ($transients < 5000 ? 50 : 20));
+        $score = $t < 300 ? 100 : ($t < 1000 ? 85 : ($t < 5000 ? 50 : 25));
 
         return Scoring::createMetric(
-            'db_transients', 'Transients en base de datos',
-            $transients, "$transients transients",
+            'db_transients', 'Transients en options',
+            $t,
+            "$t transients",
             $score,
-            $transients < 500
-                ? "$transients transients. Normal."
-                : "$transients transients. Muchos transients (caches temporales) pueden quedarse huérfanos y acumularse.",
-            $transients > 2000 ? 'Limpiar transients expirados. Considerar cache de objetos (Redis/Memcached) para reducirlos.' : '',
-            'Configuramos cache de objetos y limpiamos transients huérfanos regularmente.',
-            ['count' => $transients]
+            $t < 300
+                ? "$t transients. Normal."
+                : "$t transients. Muchos plugins dejan transients expirados que se acumulan — WP no los limpia solo si no usan TTL correcto.",
+            $t > 1000 ? 'Limpiar con WP-Optimize. Configurar cache de objetos (Redis) para que los transients vayan a memoria en vez de a wp_options.' : '',
+            'Configuramos Redis object cache para que transients no toquen la DB.',
+            ['count' => $t]
         );
     }
 
     public function analyzeOrphanedMeta(): ?array {
         $db = $this->getSection('database');
-        if (empty($db)) return null;
-
-        $orphaned = $db['orphaned_postmeta'] ?? 0;
+        $orphaned = (int) ($db['orphaned_postmeta'] ?? 0);
         if ($orphaned === 0) return null;
-        $score = $orphaned < 100 ? 80 : ($orphaned < 1000 ? 50 : 20);
+
+        $score = $orphaned < 100 ? 80 : ($orphaned < 1000 ? 55 : 25);
 
         return Scoring::createMetric(
-            'orphaned_meta', 'Metadata huérfana',
-            $orphaned, "$orphaned registros huérfanos",
+            'db_orphaned_meta', 'Metadata huérfana',
+            $orphaned,
+            "$orphaned registros huérfanos",
             $score,
-            "$orphaned registros en wp_postmeta referencian posts que ya no existen. Son datos basura acumulados.",
-            'Limpiar metadata huérfana con un plugin de optimización DB o query manual.',
-            'Limpiamos datos huérfanos acumulados en la base de datos.',
+            "$orphaned registros en wp_postmeta apuntan a posts que ya no existen. Son datos basura acumulados por plugins que no limpian al borrar posts.",
+            'Limpiar con WP-Optimize o SQL: DELETE pm FROM wp_postmeta pm LEFT JOIN wp_posts p ON pm.post_id = p.ID WHERE p.ID IS NULL;',
+            'Limpiamos metadata huérfana y otros residuos de la DB.',
             ['count' => $orphaned]
-        );
-    }
-
-    public function analyzeSpamComments(): ?array {
-        $db = $this->getSection('database');
-        if (empty($db)) return null;
-
-        $spam = $db['spam_comments'] ?? ($db['spam_comment_count'] ?? null);
-        if ($spam === null || $spam === 0) return null;
-
-        $score = $spam < 100 ? 80 : ($spam < 1000 ? 50 : 20);
-
-        return Scoring::createMetric(
-            'spam_comments', 'Comentarios spam',
-            $spam, "$spam comentarios spam",
-            $score,
-            "$spam comentarios marcados como spam en la base de datos. Estos ocupan espacio y afectan el rendimiento de consultas.",
-            'Vaciar la carpeta de spam desde Comentarios → Spam → Vaciar spam. Instalar Akismet o similar para prevención.',
-            'Limpiamos spam acumulado y configuramos protección anti-spam efectiva.',
-            ['count' => $spam]
-        );
-    }
-
-    public function analyzeTrashedPosts(): ?array {
-        $db = $this->getSection('database');
-        $pt = $this->getSection('post_types');
-        $trashed = $db['trashed_posts'] ?? ($pt['trashed_count'] ?? null);
-        if ($trashed === null || $trashed === 0) return null;
-
-        $score = $trashed < 50 ? 90 : ($trashed < 200 ? 70 : 40);
-
-        return Scoring::createMetric(
-            'trashed_posts', 'Posts en papelera',
-            $trashed, "$trashed posts",
-            $score,
-            "$trashed posts en la papelera. Estos se mantienen en la DB ocupando espacio innecesario.",
-            'Vaciar la papelera desde Posts → Papelera → Vaciar papelera. Configurar limpieza automática con EMPTY_TRASH_DAYS.',
-            'Configuramos limpieza automática de la papelera para mantener la DB limpia.',
-            ['count' => $trashed]
         );
     }
 
@@ -198,68 +178,147 @@ class WpSnapshotDatabaseChecker {
         $cron = $this->getSection('cron');
         if (empty($cron)) return null;
 
-        $total = $cron['total_events'] ?? 0;
-        $overdue = $cron['overdue_count'] ?? 0;
-        $wpCronDisabled = ($this->getSection('environment')['wp_cron_disabled'] ?? false);
+        $total = (int) ($cron['total_events'] ?? 0);
+        $overdue = (int) ($cron['overdue_count'] ?? 0);
+        $wpCronDisabled = (bool) ($cron['wp_cron_disabled'] ?? false);
+        $alternate = (bool) ($cron['alternate_cron'] ?? false);
 
-        $score = $overdue === 0 ? 100 : ($overdue < 5 ? 70 : 30);
+        $score = $overdue === 0 ? 100 : ($overdue < 5 ? 70 : ($overdue < 20 ? 50 : 25));
 
-        return Scoring::createMetric(
-            'cron_status', 'Tareas programadas (cron)',
-            $overdue, $overdue === 0 ? "$total tareas OK" : "$overdue atrasadas de $total",
-            $score,
-            $overdue === 0
-                ? "$total cron jobs registrados, todos ejecutándose a tiempo." . ($wpCronDisabled ? ' WP_CRON está deshabilitado (debe tener cron real del servidor).' : '')
-                : "Hay $overdue cron jobs atrasados de $total totales. Tareas automáticas no se están ejecutando correctamente.",
-            $overdue > 0 ? 'Verificar que WP_CRON funcione. En sitios grandes, configurar un cron real del servidor y desactivar WP_CRON.' : '',
-            'Configuramos cron real del servidor y monitoreamos tareas programadas.',
-            ['total' => $total, 'overdue' => $overdue, 'wpCronDisabled' => $wpCronDisabled]
-        );
-    }
-
-    public function analyzeMediaSize(): ?array {
-        $media = $this->getSection('media');
-        if (empty($media)) return null;
-
-        $totalCount = $media['total_count'] ?? ($media['total_items'] ?? 0);
-        $totalSize = $media['total_size'] ?? ($media['uploads_size'] ?? 0);
-        $orphaned = $media['orphaned_count'] ?? ($media['unattached'] ?? null);
-
-        if ($totalCount === 0 && $totalSize === 0) return null;
-
-        $humanSize = $this->formatBytes($totalSize);
-        $gbSize = $totalSize / (1024 * 1024 * 1024);
-
-        $score = 100;
-        if ($gbSize > 5) $score -= 30;
-        elseif ($gbSize > 2) $score -= 15;
-        if ($orphaned !== null && $orphaned > 50) $score -= 20;
-
-        $desc = "$totalCount archivos de medios ($humanSize).";
-        if ($orphaned !== null && $orphaned > 0) {
-            $desc .= " $orphaned archivos no están asociados a ningún contenido (huérfanos).";
+        // Tareas próximas (nombres de hooks)
+        $events = $cron['events'] ?? [];
+        $upcomingHooks = [];
+        $seen = [];
+        foreach ($events as $e) {
+            $hook = $e['hook'] ?? '';
+            if ($hook === '' || isset($seen[$hook])) continue;
+            $seen[$hook] = true;
+            $upcomingHooks[] = $hook;
+            if (count($upcomingHooks) >= 20) break;
         }
 
         return Scoring::createMetric(
-            'media_size', 'Biblioteca de medios',
-            $totalCount, "$totalCount archivos · $humanSize",
-            Scoring::clamp($score),
-            $desc . ($gbSize > 2 ? ' La biblioteca es muy pesada — considerar limpieza y optimización de imágenes.' : ''),
-            ($gbSize > 2 || ($orphaned !== null && $orphaned > 50))
-                ? 'Eliminar medios no usados, comprimir imágenes con ShortPixel/Imagify, y servir en formato WebP.'
+            'cron_status', 'Tareas programadas (WP Cron)',
+            $overdue,
+            $overdue === 0 ? "$total tareas OK" : "$overdue atrasadas de $total",
+            $score,
+            $overdue === 0
+                ? "$total cron jobs registrados, ejecutando a tiempo." . ($wpCronDisabled ? ' WP_CRON está deshabilitado (debería haber cron real del servidor configurado).' : '')
+                : "$overdue de $total cron jobs atrasados. Tareas automáticas (actualizaciones, emails, backups) no se están ejecutando.",
+            $overdue > 0
+                ? ($wpCronDisabled
+                    ? 'Verificar que el cron del servidor esté llamando a wp-cron.php cada minuto.'
+                    : 'En sitios con tráfico bajo, WP_CRON no se dispara. Configurar cron real del sistema: */5 * * * * wget -qO- https://tu-sitio.com/wp-cron.php')
                 : '',
-            'Optimizamos la biblioteca de medios: compresión, formato WebP y limpieza de archivos no utilizados.',
-            ['totalCount' => $totalCount, 'totalSize' => $totalSize, 'humanSize' => $humanSize, 'orphaned' => $orphaned]
+            'Configuramos cron real del servidor para que las tareas se ejecuten a tiempo.',
+            ['total' => $total, 'overdue' => $overdue, 'wpCronDisabled' => $wpCronDisabled, 'alternate' => $alternate, 'hooks' => $upcomingHooks]
         );
     }
 
-    /**
-     * Formatea bytes como KB/MB/GB legible.
-     */
-    private function formatBytes(int $bytes): string {
-        if ($bytes < 1024) return $bytes . 'B';
-        if ($bytes < 1024 * 1024) return round($bytes / 1024, 1) . 'KB';
-        if ($bytes < 1024 * 1024 * 1024) return round($bytes / (1024 * 1024), 1) . 'MB';
-        return round($bytes / (1024 * 1024 * 1024), 2) . 'GB';
+    public function analyzeMedia(): ?array {
+        $media = $this->getSection('media');
+        if (empty($media)) return null;
+
+        $count = (int) ($media['total_attachments'] ?? 0);
+        $size = (int) ($media['upload_dir_size'] ?? 0);
+        $humanSize = $media['upload_dir_size_human'] ?? '?';
+        $mimeSummary = $media['mime_summary'] ?? [];
+
+        if ($count === 0 && $size === 0) return null;
+
+        $gb = $size / (1024 * 1024 * 1024);
+        $score = $gb < 1 ? 100 : ($gb < 5 ? 80 : ($gb < 15 ? 55 : 25));
+
+        // Detalles de mime types
+        $mimeDetail = [];
+        foreach ($mimeSummary as $group => $info) {
+            if (is_array($info)) {
+                $mimeDetail[] = [
+                    'group' => $group,
+                    'count' => (int) ($info['count'] ?? 0),
+                    'sizeMb' => round(((int) ($info['size'] ?? 0)) / (1024 * 1024), 1),
+                ];
+            }
+        }
+
+        return Scoring::createMetric(
+            'media_library', 'Biblioteca de medios',
+            $count,
+            "$count archivos · $humanSize",
+            $score,
+            $gb < 1
+                ? "$count archivos ($humanSize) en la biblioteca. Tamaño razonable."
+                : "$count archivos ocupando $humanSize. " . ($gb > 5 ? 'La biblioteca es pesada — probablemente hay imágenes sin comprimir ni convertir a WebP.' : 'Optimizable con compresión y WebP.'),
+            $gb > 1 ? 'Instalar ShortPixel o Imagify para comprimir y convertir a WebP automáticamente. Configurar lazy loading (WP ya lo hace desde 5.5).' : '',
+            'Comprimimos imágenes, las convertimos a WebP y servimos via CDN.',
+            ['count' => $count, 'size' => $size, 'humanSize' => $humanSize, 'mimeSummary' => $mimeDetail]
+        );
+    }
+
+    public function analyzePostTypes(): ?array {
+        $pt = $this->getSection('post_types');
+        if (empty($pt)) return null;
+
+        $total = (int) ($pt['total_post_types'] ?? 0);
+        $custom = (int) ($pt['custom_count'] ?? 0);
+        if ($total === 0) return null;
+
+        $list = $pt['post_types'] ?? [];
+        $customList = array_values(array_filter($list, fn($p) => !($p['is_builtin'] ?? true)));
+        $customSummary = array_map(fn($p) => [
+            'slug' => $p['slug'] ?? '?',
+            'label' => $p['label'] ?? '',
+            'public' => (bool) ($p['is_public'] ?? false),
+            'hasArchive' => (bool) ($p['has_archive'] ?? false),
+            'inRest' => (bool) ($p['show_in_rest'] ?? false),
+        ], array_slice($customList, 0, 15));
+
+        return Scoring::createMetric(
+            'custom_post_types', 'Tipos de contenido',
+            $custom,
+            "$custom custom · $total total",
+            null,
+            $custom === 0
+                ? 'Solo se usan los tipos nativos de WP (posts, pages). Estructura simple.'
+                : "$custom tipos de contenido personalizados (CPTs) registrados por plugins/tema. Pueden afectar rendimiento si se abusa del REST (show_in_rest=true expone todo el contenido).",
+            '',
+            'Auditamos los CPTs y optimizamos queries/índices para los que manejan mucho contenido.',
+            ['total' => $total, 'custom' => $custom, 'customTypes' => $customSummary]
+        );
+    }
+
+    public function analyzeRestApi(): ?array {
+        $rest = $this->getSection('rest_api');
+        if (empty($rest)) return null;
+
+        $total = (int) ($rest['total_routes'] ?? 0);
+        $namespaces = $rest['namespaces'] ?? [];
+        $byNs = $rest['by_namespace'] ?? [];
+
+        if ($total === 0) return null;
+
+        // Muchas rutas = plugins que exponen mucho vía REST (normal)
+        // Pero >1000 puede indicar bloat extremo
+        $score = $total < 300 ? 100 : ($total < 800 ? 85 : ($total < 1500 ? 65 : 40));
+
+        $topNamespaces = [];
+        foreach ($byNs as $ns => $info) {
+            $topNamespaces[] = ['namespace' => $ns, 'routes' => is_array($info) ? (int) ($info['count'] ?? count($info)) : (int) $info];
+        }
+        usort($topNamespaces, fn($a, $b) => $b['routes'] <=> $a['routes']);
+        $topNamespaces = array_slice($topNamespaces, 0, 10);
+
+        return Scoring::createMetric(
+            'rest_api_routes', 'Rutas REST API',
+            $total,
+            "$total rutas en " . count($namespaces) . ' namespaces',
+            $score,
+            $total < 300
+                ? "$total rutas REST. Volumen normal para un sitio WordPress."
+                : "$total rutas REST expuestas. Cada plugin añade endpoints; demasiados indican plugin bloat y potencialmente datos expuestos.",
+            $total > 800 ? 'Auditar qué plugins exponen tantas rutas. Considerar si alguno puede desactivarse o si el REST debe restringirse a usuarios autenticados.' : '',
+            'Restringimos y auditamos endpoints REST para reducir superficie de ataque.',
+            ['total' => $total, 'namespaces' => $namespaces, 'topNamespaces' => $topNamespaces]
+        );
     }
 }

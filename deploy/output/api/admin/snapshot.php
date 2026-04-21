@@ -19,6 +19,103 @@ Auth::requireAuth();
 $db = Database::getInstance();
 $method = $_SERVER['REQUEST_METHOD'];
 
+/**
+ * Intenta obtener el JSON del snapshot desde una URL share de wp-snapshot.
+ *
+ * El plugin genera un share link público en /site-audit-snapshot/share/{TOKEN}
+ * que renderiza una página HTML con el JSON embebido, pero:
+ *   - Algunas instalaciones exponen un endpoint .json directo
+ *   - Otras respetan Content-Negotiation (Accept: application/json)
+ *   - Algunas bloquean accesos externos (WAF, rate limit, UA blocking)
+ *
+ * Probamos 4 variantes y 4 patrones de extracción del HTML. Si ninguna
+ * funciona devolvemos null para que el caller sepa que debe pedir upload manual.
+ */
+function fetchSnapshotFromShareUrl(string $shareUrl): ?array {
+    $base = rtrim($shareUrl, '/');
+
+    // 1. Variantes de URL a probar (en orden, nos quedamos con la primera que
+    //    devuelva JSON válido o HTML parseable).
+    $variants = [
+        $base,
+        $base . '.json',
+        $base . '?format=json',
+        $base . '/download',
+    ];
+
+    foreach ($variants as $url) {
+        try {
+            $response = Fetcher::get($url, 15, true, 0);
+        } catch (Throwable $e) {
+            continue;
+        }
+
+        if (($response['statusCode'] ?? 0) !== 200) {
+            continue;
+        }
+
+        $body = (string) ($response['body'] ?? '');
+        if ($body === '') continue;
+
+        // Respuesta JSON directa (content-type application/json)
+        $contentType = strtolower($response['headers']['content-type'] ?? '');
+        if (str_contains($contentType, 'application/json') || $body[0] === '{') {
+            $decoded = json_decode($body, true, 128);
+            if (is_array($decoded) && isset($decoded['sections'])) {
+                return $decoded;
+            }
+        }
+
+        // Respuesta HTML — probar patrones de extracción del JSON embebido.
+        $extracted = extractSnapshotJsonFromHtml($body);
+        if ($extracted !== null) return $extracted;
+    }
+
+    return null;
+}
+
+/**
+ * Busca el JSON del snapshot embebido en el HTML de la página share.
+ * El plugin puede usar distintos patrones según versión, así que probamos varios.
+ */
+function extractSnapshotJsonFromHtml(string $html): ?array {
+    $patterns = [
+        // <script id="wps-snapshot-data" type="application/json">{...}</script>
+        '/<script[^>]*id=["\']wps?-?snapshot-data["\'][^>]*>(.*?)<\/script>/is',
+        // <script type="application/json" ...>{...}</script>
+        '/<script[^>]*type=["\']application\/json["\'][^>]*>(.*?)<\/script>/is',
+        // <script id="site-audit-snapshot-data"...>...</script>
+        '/<script[^>]*id=["\'][^"\']*snapshot[^"\']*["\'][^>]*>(.*?)<\/script>/is',
+        // <pre id="..." class="snapshot-json">{...}</pre>
+        '/<pre[^>]*(?:id|class)=["\'][^"\']*snapshot[^"\']*["\'][^>]*>(.*?)<\/pre>/is',
+        // <div data-snapshot="{...}">
+        '/data-snapshot=["\']([^"\']+)["\']/i',
+        // window.wpsSnapshot = {...};
+        '/window\.(?:wps?|siteAudit)?Snapshot\s*=\s*(\{.*?\});/s',
+    ];
+
+    foreach ($patterns as $pattern) {
+        if (preg_match($pattern, $html, $m)) {
+            $raw = trim($m[1]);
+            // Si viene escapado con &quot; etc. (atributo data-*)
+            $raw = html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $decoded = json_decode($raw, true, 128);
+            if (is_array($decoded) && isset($decoded['sections'])) {
+                return $decoded;
+            }
+        }
+    }
+
+    // Último intento: buscar el primer bloque JSON que contenga "sections" y parecer un snapshot
+    if (preg_match('/(\{\s*"generated_at"[\s\S]*?"sections"[\s\S]*?\})\s*(?:<|$)/', $html, $m)) {
+        $decoded = json_decode($m[1], true, 128);
+        if (is_array($decoded) && isset($decoded['sections'])) {
+            return $decoded;
+        }
+    }
+    return null;
+}
+
 // Auto-migration
 try {
     $db->execute("CREATE TABLE IF NOT EXISTS wp_snapshots (
@@ -73,45 +170,24 @@ if ($method === 'POST') {
         $shareUrl = trim($body['shareUrl'] ?? '');
         if (empty($shareUrl)) Response::error('shareUrl requerido', 400);
 
-        // Validate URL format
         if (!filter_var($shareUrl, FILTER_VALIDATE_URL)) {
             Response::error('URL inválida', 400);
         }
 
-        // Verify it's a wp-snapshot share URL
         if (!preg_match('#/site-audit-snapshot/share/[a-f0-9]{64}/?$#', rtrim($shareUrl, '/') . '/')) {
             Response::error('No parece una URL válida de wp-snapshot. Debe terminar en /site-audit-snapshot/share/{token}', 400);
         }
 
         $sourceUrl = $shareUrl;
-
-        // Fetch the share page — the plugin renders it as HTML with embedded JSON
-        try {
-            $response = Fetcher::get($shareUrl, 15, true, 1);
-        } catch (Throwable $e) {
-            Response::error('Error al obtener el snapshot: ' . $e->getMessage(), 500);
-        }
-
-        if ($response['statusCode'] !== 200) {
-            Response::error("Error al obtener el snapshot (HTTP {$response['statusCode']}). El enlace puede haber expirado.", 500);
-        }
-
-        $html = $response['body'];
-
-        // Extract the JSON from the HTML. The plugin embeds it in a script tag or data attribute.
-        // Try common patterns
-        if (preg_match('/<script[^>]*id=["\']wps-snapshot-data["\'][^>]*>(.*?)<\/script>/is', $html, $m)) {
-            $snapshotData = json_decode(trim($m[1]), true);
-        } elseif (preg_match('/<script[^>]*type=["\']application\/json["\'][^>]*>(.*?)<\/script>/is', $html, $m)) {
-            $snapshotData = json_decode(trim($m[1]), true);
-        } elseif (preg_match('/window\.wpsSnapshot\s*=\s*({.*?});/s', $html, $m)) {
-            $snapshotData = json_decode($m[1], true);
-        }
-
+        $snapshotData = fetchSnapshotFromShareUrl($shareUrl);
         if ($snapshotData === null) {
-            Response::error('No se pudo extraer el JSON del snapshot de la URL. Verifica que el plugin wp-snapshot esté actualizado, o descarga el JSON y súbelo manualmente.', 422);
+            Response::error(
+                'No se pudo obtener el snapshot desde la URL. Puede que el enlace haya expirado (dura 72h por defecto), ' .
+                'que el servidor bloquee accesos externos al share, o que el plugin wp-snapshot esté desactualizado. ' .
+                'Como alternativa, entra al sitio → Herramientas → Site Audit Snapshot → Download JSON y súbelo desde la pestaña "Subir JSON".',
+                422
+            );
         }
-    } else {
         // source = 'upload'
         $jsonData = $body['jsonData'] ?? null;
         if (empty($jsonData)) Response::error('jsonData requerido', 400);

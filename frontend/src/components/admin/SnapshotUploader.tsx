@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
-import { Upload, Link as LinkIcon, Trash2, CheckCircle, Loader2, Database, AlertCircle } from 'lucide-react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { Upload, Link as LinkIcon, Trash2, CheckCircle, Loader2, Database, AlertCircle, FileCheck2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,12 +26,17 @@ interface Props {
   onChange?: () => void
 }
 
+type ProgressStep = 'uploading' | 'analyzing' | 'reauditing' | null
+
 export default function SnapshotUploader({ auditId, onChange }: Props) {
   const [existing, setExisting] = useState<SnapshotMetadata | null>(null)
   const [loading, setLoading] = useState(true)
   const [shareUrl, setShareUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [progressStep, setProgressStep] = useState<ProgressStep>(null)
+  const [selectedFile, setSelectedFile] = useState<{ name: string; size: number } | null>(null)
   const [tab, setTab] = useState<'url' | 'upload'>('url')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -42,6 +47,23 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
   }, [auditId])
 
   useEffect(() => { load() }, [load])
+
+  // Timer que avanza los "pasos" visibles para que el usuario perciba actividad
+  // aunque el servidor esté procesando en sync. El paso real se actualiza cuando
+  // se recibe la respuesta.
+  useEffect(() => {
+    if (!submitting) { setProgressStep(null); return }
+    setProgressStep('uploading')
+    const t1 = setTimeout(() => setProgressStep('analyzing'), 2000)
+    const t2 = setTimeout(() => setProgressStep('reauditing'), 8000)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [submitting])
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / 1048576).toFixed(1)} MB`
+  }
 
   const submitUrl = async () => {
     if (!shareUrl.trim()) { toast.error('Pega la URL del share'); return }
@@ -57,14 +79,19 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
       setShareUrl('')
       await load()
       onChange?.()
+      // Scroll al informe para que el usuario vea el resultado
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }, 300)
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al cargar el snapshot'
-      toast.error(msg)
+      toast.error(msg, { duration: 10000 })
     }
     setSubmitting(false)
   }
 
   const submitFile = async (file: File) => {
+    setSelectedFile({ name: file.name, size: file.size })
     setSubmitting(true)
     try {
       const text = await file.text()
@@ -78,9 +105,14 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
       }
       await load()
       onChange?.()
+      setSelectedFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }, 300)
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'JSON inválido o error al analizar'
-      toast.error(msg)
+      toast.error(msg, { duration: 10000 })
     }
     setSubmitting(false)
   }
@@ -178,6 +210,7 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
           <TabsContent value="upload" className="mt-3">
             <label className="block">
               <input
+                ref={fileInputRef}
                 type="file"
                 accept="application/json,.json"
                 onChange={(e) => {
@@ -191,9 +224,44 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
             <p className="text-[11px] text-gray-400 mt-2">
               Descargar desde WP Admin → Tools → Site Audit Snapshot → Download JSON
             </p>
+            {selectedFile && !submitting && (
+              <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1">
+                <FileCheck2 className="h-3 w-3" /> {selectedFile.name} ({formatSize(selectedFile.size)})
+              </p>
+            )}
           </TabsContent>
         </Tabs>
+
+        {/* Progress indicator visible mientras se procesa */}
+        {submitting && (
+          <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+            <p className="text-xs font-semibold text-blue-900 mb-2">Procesando snapshot…</p>
+            <div className="space-y-1.5 text-[11px]">
+              <ProgressLine label="Subiendo datos al servidor" active={progressStep === 'uploading'} done={progressStep !== 'uploading' && progressStep !== null} />
+              <ProgressLine label="Analizando secciones del snapshot" active={progressStep === 'analyzing'} done={progressStep === 'reauditing'} />
+              <ProgressLine label="Re-ejecutando la auditoría con los datos internos" active={progressStep === 'reauditing'} done={false} />
+            </div>
+            <p className="mt-2 text-[11px] text-blue-700">
+              Esto puede tardar 30-90 segundos si el sitio es grande. No cierres esta página.
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
+  )
+}
+
+function ProgressLine({ label, active, done }: { label: string; active: boolean; done: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      {done ? (
+        <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+      ) : active ? (
+        <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin shrink-0" />
+      ) : (
+        <div className="h-3.5 w-3.5 rounded-full border border-gray-300 shrink-0" />
+      )}
+      <span className={done ? 'text-emerald-700' : active ? 'text-blue-900 font-medium' : 'text-gray-500'}>{label}</span>
+    </div>
   )
 }
