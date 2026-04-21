@@ -28,6 +28,25 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Tabla de traducciones (overrides editados desde admin)
+-- La tupla (lang, namespace, key) es única. Si existe, gana sobre el bundle
+-- de archivos en backend/locales/{lang}/{namespace}.php.
+-- Si source='ai', significa que la traducción fue generada por un provider
+-- (ChatGPT/Claude/Google) y el admin podría no haberla revisado.
+CREATE TABLE IF NOT EXISTS translations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lang TEXT NOT NULL,
+    namespace TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'manual',  -- 'manual' | 'ai' | 'import'
+    ai_provider TEXT,                        -- 'chatgpt' | 'claude' | 'google' si source='ai'
+    reviewed INTEGER NOT NULL DEFAULT 0,     -- 1 si el admin confirmó la traducción AI
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(lang, namespace, key)
+);
+CREATE INDEX IF NOT EXISTS idx_translations_lang_ns ON translations(lang, namespace);
+
 -- Tabla de vulnerabilidades
 CREATE TABLE IF NOT EXISTS vulnerabilities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

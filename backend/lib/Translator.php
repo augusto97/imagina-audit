@@ -104,7 +104,11 @@ class Translator
         return null;
     }
 
-    /** Lazy-load de un bundle de locales. */
+    /**
+     * Lazy-load de un bundle de locales. Carga primero el archivo PHP base,
+     * luego superpone los overrides de la tabla `translations` (DB) — así el
+     * admin puede editar cualquier string sin tocar archivos.
+     */
     private static function loadBundle(string $lang, string $namespace): ?array
     {
         $cacheKey = "$lang:$namespace";
@@ -113,17 +117,43 @@ class Translator
         }
         $base = self::$baseDir ??= dirname(__DIR__) . '/locales';
         $file = "$base/$lang/$namespace.php";
-        if (!file_exists($file)) {
-            self::$cache[$cacheKey] = [];
-            return null;
+        $data = [];
+        if (file_exists($file)) {
+            $loaded = require $file;
+            if (is_array($loaded)) $data = $loaded;
         }
-        $data = require $file;
-        if (!is_array($data)) {
-            self::$cache[$cacheKey] = [];
-            return null;
+
+        // Merge DB overrides (se aplican encima del bundle base)
+        $overrides = self::loadDbOverrides($lang, $namespace);
+        if (!empty($overrides)) {
+            $data = array_merge($data, $overrides);
         }
+
         self::$cache[$cacheKey] = $data;
-        return $data;
+        return empty($data) ? null : $data;
+    }
+
+    /**
+     * Lee overrides de la tabla `translations`. Silencioso si la DB aún no
+     * está inicializada o si la tabla no existe (tests, setup inicial).
+     */
+    private static function loadDbOverrides(string $lang, string $namespace): array
+    {
+        if (!class_exists('Database')) return [];
+        try {
+            $db = Database::getInstance();
+            $rows = $db->query(
+                "SELECT key, value FROM translations WHERE lang = ? AND namespace = ?",
+                [$lang, $namespace]
+            );
+            $out = [];
+            foreach ($rows as $row) {
+                $out[$row['key']] = $row['value'];
+            }
+            return $out;
+        } catch (Throwable $e) {
+            return [];
+        }
     }
 
     /** Reemplaza {{name}} con $params['name']. */
