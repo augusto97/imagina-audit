@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ShieldCheck, ShieldOff, Clock, Package, Archive, Server, CheckCircle2, AlertCircle, type LucideIcon } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import type { DashboardData } from '@/types/dashboard'
@@ -9,6 +10,30 @@ import type { DashboardData } from '@/types/dashboard'
  * red/gray) lo calcula StatusTile según cada caso.
  */
 export function SystemStatusBanner({ data }: { data: DashboardData }) {
+  const { t } = useTranslation()
+  const cron = data.cronHealth
+
+  const cronValue = !cron
+    ? t('dashboard.status_cron_no_data')
+    : cron.overallOk
+      ? t('dashboard.status_cron_ok')
+      : cron.counts.critical > 0
+        ? t('dashboard.status_cron_critical', { count: cron.counts.critical })
+        : cron.counts.warning > 0
+          ? t('dashboard.status_cron_overdue', { count: cron.counts.warning })
+          : t('dashboard.status_cron_never', { count: cron.counts.never })
+
+  const cronHint = !cron
+    ? t('dashboard.status_cron_see_health')
+    : cron.overallOk
+      ? t('dashboard.status_cron_ontime', { count: cron.counts.ok })
+      : t('dashboard.status_cron_check_system')
+
+  const cronTone: Tone = !cron ? 'neutral'
+    : cron.counts.critical > 0 ? 'critical'
+    : cron.counts.warning > 0 || cron.counts.never > 0 ? 'warning'
+    : 'ok'
+
   return (
     <Card className="border-0 shadow-sm">
       <CardContent className="p-3 sm:p-4">
@@ -16,47 +41,57 @@ export function SystemStatusBanner({ data }: { data: DashboardData }) {
           <StatusTile
             to="/admin/security"
             icon={data.security.twoFaEnabled ? ShieldCheck : ShieldOff}
-            label="Login 2FA"
-            value={data.security.twoFaEnabled ? 'Activo' : 'Desactivado'}
-            hint={data.security.twoFaEnabled ? `${data.security.recoveryCodesLeft} recovery codes` : 'Recomendado activar'}
+            label={t('dashboard.status_twofa_label')}
+            value={data.security.twoFaEnabled ? t('dashboard.status_twofa_active') : t('dashboard.status_twofa_off')}
+            hint={data.security.twoFaEnabled
+              ? t('dashboard.status_twofa_recovery_codes', { count: data.security.recoveryCodesLeft })
+              : t('dashboard.status_twofa_suggest_enable')}
             tone={data.security.twoFaEnabled ? 'ok' : 'warning'}
           />
           <StatusTile
             to="/admin/health"
             icon={Clock}
-            label="Cron"
-            value={cronLabel(data.cronHealth)}
-            hint={cronHint(data.cronHealth)}
-            tone={cronTone(data.cronHealth)}
+            label={t('dashboard.status_cron_label')}
+            value={cronValue}
+            hint={cronHint}
+            tone={cronTone}
           />
           <StatusTile
             to="/admin/queue"
             icon={Server}
-            label="Cola"
+            label={t('dashboard.status_queue_label')}
             value={`${data.queue.running}/${data.queue.maxConcurrent}`}
             hint={
               data.queue.queued > 0
-                ? `${data.queue.queued} en espera`
+                ? t('dashboard.status_queue_waiting', { count: data.queue.queued })
                 : data.queue.failedLastHour > 0
-                ? `${data.queue.failedLastHour} fallos 1h`
-                : `${data.queue.completedLastHour} completados 1h`
+                ? t('dashboard.status_queue_failed_1h', { count: data.queue.failedLastHour })
+                : t('dashboard.status_queue_completed_1h', { count: data.queue.completedLastHour })
             }
             tone={data.queue.failedLastHour > 3 ? 'warning' : 'ok'}
           />
           <StatusTile
             to="/admin/plugin-vault"
             icon={Package}
-            label="Plugin Vault"
-            value={data.pluginVault.cached ? (data.pluginVault.version ?? 'cacheado') : 'Sin caché'}
-            hint={data.pluginVault.cached ? 'wp-snapshot listo' : 'Click para descargar'}
+            label={t('dashboard.status_vault_label')}
+            value={data.pluginVault.cached
+              ? (data.pluginVault.version ?? t('dashboard.status_vault_cached'))
+              : t('dashboard.status_vault_missing')}
+            hint={data.pluginVault.cached
+              ? t('dashboard.status_vault_ready')
+              : t('dashboard.status_vault_click_download')}
             tone={data.pluginVault.cached ? 'ok' : 'warning'}
           />
           <StatusTile
             to="/admin/retention"
             icon={Archive}
-            label="Retención"
-            value={data.retention.enabled ? `${data.retention.months} meses` : 'Manual'}
-            hint={data.retention.enabled ? 'Borrado automático ON' : 'Sin borrado automático'}
+            label={t('dashboard.status_retention_label')}
+            value={data.retention.enabled
+              ? t('dashboard.status_retention_months', { count: data.retention.months })
+              : t('dashboard.status_retention_manual')}
+            hint={data.retention.enabled
+              ? t('dashboard.status_retention_auto_on')
+              : t('dashboard.status_retention_auto_off')}
             tone="neutral"
           />
         </div>
@@ -64,6 +99,8 @@ export function SystemStatusBanner({ data }: { data: DashboardData }) {
     </Card>
   )
 }
+
+type Tone = 'ok' | 'warning' | 'critical' | 'neutral'
 
 function StatusTile({
   to, icon: Icon, label, value, hint, tone,
@@ -73,7 +110,7 @@ function StatusTile({
   label: string
   value: string
   hint: string
-  tone: 'ok' | 'warning' | 'critical' | 'neutral'
+  tone: Tone
 }) {
   const tones = {
     ok:       { text: 'text-emerald-700', icon: 'text-emerald-600', dot: <CheckCircle2 className="h-3 w-3 text-emerald-600" /> },
@@ -98,23 +135,4 @@ function StatusTile({
       </div>
     </Link>
   )
-}
-
-function cronLabel(c: DashboardData['cronHealth']): string {
-  if (!c) return 'Sin datos'
-  if (c.overallOk) return 'OK'
-  if (c.counts.critical > 0) return `${c.counts.critical} crítico${c.counts.critical > 1 ? 's' : ''}`
-  if (c.counts.warning > 0) return `${c.counts.warning} atrasado${c.counts.warning > 1 ? 's' : ''}`
-  return `${c.counts.never} sin correr`
-}
-function cronHint(c: DashboardData['cronHealth']): string {
-  if (!c) return 'Ver /admin/health'
-  if (c.overallOk) return `${c.counts.ok} tareas a tiempo`
-  return 'Revisar config del sistema'
-}
-function cronTone(c: DashboardData['cronHealth']): 'ok' | 'warning' | 'critical' | 'neutral' {
-  if (!c) return 'neutral'
-  if (c.counts.critical > 0) return 'critical'
-  if (c.counts.warning > 0 || c.counts.never > 0) return 'warning'
-  return 'ok'
 }

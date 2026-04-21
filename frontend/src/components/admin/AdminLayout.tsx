@@ -1,9 +1,12 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Menu, X, PanelLeftClose, PanelLeft, ExternalLink, LogOut, Settings } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
+import { useConfigStore } from '@/store/configStore'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import AdminSidebar from './AdminSidebar'
 
 interface AdminLayoutProps {
@@ -14,6 +17,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const { logout } = useAuth()
+  const { t } = useTranslation()
+  const companyName = useConfigStore((s) => s.config.companyName)
   const navigate = useNavigate()
 
   return (
@@ -59,13 +64,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <button onClick={() => setMobileOpen(true)} className="rounded p-1 text-[#666] hover:bg-[#ebebeb] md:hidden cursor-pointer">
               <Menu className="h-5 w-5" />
             </button>
-            <span className="text-[13px] font-medium text-[#404040]">Imagina Audit</span>
+            <span className="text-[13px] font-medium text-[#404040]">{companyName || 'Imagina Audit'}</span>
           </div>
           <div className="flex items-center gap-1">
+            <LanguageSwitcher variant="compact" align="right" />
             <a href="/" target="_blank" rel="noreferrer">
               <Button variant="ghost" size="sm" className="text-[#666] text-xs h-7 px-2 hover:text-[#404040] hover:bg-[#ebebeb]">
                 <ExternalLink className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Ver herramienta</span>
+                <span className="hidden sm:inline">{t('nav.view_app')}</span>
               </Button>
             </a>
             <Button variant="ghost" size="sm" className="text-[#666] text-xs h-7 px-2 hover:text-[#404040] hover:bg-[#ebebeb]" onClick={() => navigate('/admin/settings')}>

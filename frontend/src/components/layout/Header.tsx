@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Shield, GitCompareArrows, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useConfigStore } from '@/store/configStore'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 
 export default function Header() {
   const { logoUrl, companyName, header } = useConfigStore((s) => s.config)
@@ -26,6 +27,7 @@ export default function Header() {
         </Link>
 
         <nav className="flex items-center gap-1">
+          <LanguageSwitcher variant="compact" align="right" />
           <Link to="/compare">
             <Button variant="ghost" size="sm" className="text-[var(--text-secondary)]">
               <GitCompareArrows className="h-4 w-4" strokeWidth={1.5} />

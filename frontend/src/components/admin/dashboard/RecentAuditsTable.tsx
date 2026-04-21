@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Pin, Eye, MessageCircle, FileSearch } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,11 +14,12 @@ import type { DashboardData } from '@/types/dashboard'
  * el operador identifique a ojo cuáles son clientes activos.
  */
 export function RecentAuditsTable({ audits }: { audits: DashboardData['recentAudits'] }) {
+  const { t } = useTranslation()
   if (audits.length === 0) {
     return (
       <Card className="border-0 shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Últimas auditorías</CardTitle>
+          <CardTitle className="text-base">{t('dashboard.section_recent')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center gap-3 py-12 text-center">
@@ -25,8 +27,8 @@ export function RecentAuditsTable({ audits }: { audits: DashboardData['recentAud
               <FileSearch className="h-7 w-7 text-[var(--text-tertiary)]" strokeWidth={1} />
             </div>
             <div>
-              <p className="text-sm font-medium text-[var(--text-secondary)]">Aún no hay auditorías</p>
-              <p className="mt-0.5 text-xs text-[var(--text-tertiary)]">Realiza tu primera auditoría desde la página principal.</p>
+              <p className="text-sm font-medium text-[var(--text-secondary)]">{t('dashboard.section_recent_empty_title')}</p>
+              <p className="mt-0.5 text-xs text-[var(--text-tertiary)]">{t('dashboard.section_recent_empty_subtitle')}</p>
             </div>
           </div>
         </CardContent>
@@ -38,9 +40,9 @@ export function RecentAuditsTable({ audits }: { audits: DashboardData['recentAud
     <Card className="border-0 shadow-sm">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base">Últimas auditorías</CardTitle>
+          <CardTitle className="text-base">{t('dashboard.section_recent')}</CardTitle>
           <Link to="/admin/leads" className="text-xs text-[var(--accent-primary)] hover:underline">
-            Ver todas →
+            {t('dashboard.section_recent_view_all')}
           </Link>
         </div>
       </CardHeader>
@@ -49,10 +51,10 @@ export function RecentAuditsTable({ audits }: { audits: DashboardData['recentAud
           <table className="w-full min-w-[600px] text-sm">
             <thead>
               <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-                <th className="px-6 pb-3">Dominio</th>
-                <th className="px-3 pb-3">Tipo</th>
-                <th className="px-3 pb-3">Fecha</th>
-                <th className="px-3 pb-3">Contacto</th>
+                <th className="px-6 pb-3">{t('leads.col_domain')}</th>
+                <th className="px-3 pb-3">{t('report.executive_site_type')}</th>
+                <th className="px-3 pb-3">{t('leads.col_date')}</th>
+                <th className="px-3 pb-3">{t('leads.tile_with_contact')}</th>
                 <th className="px-3 pb-3">Score</th>
                 <th className="px-3 pb-3" />
               </tr>
@@ -84,15 +86,15 @@ export function RecentAuditsTable({ audits }: { audits: DashboardData['recentAud
                   </td>
                   <td className="px-3 py-3">
                     {a.isWordPress
-                      ? <Badge variant="secondary" className="text-[10px]">WordPress</Badge>
-                      : <Badge variant="outline" className="text-[10px]">Externo</Badge>}
+                      ? <Badge variant="secondary" className="text-[10px]">{t('report.executive_site_wordpress')}</Badge>
+                      : <Badge variant="outline" className="text-[10px]">{t('report.executive_site_external')}</Badge>}
                   </td>
                   <td className="px-3 py-3 text-xs text-[var(--text-tertiary)]">
                     {new Date(a.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
                   </td>
                   <td className="px-3 py-3">
                     <Badge variant={a.hasContactInfo ? 'success' : 'secondary'} className="text-[10px]">
-                      {a.hasContactInfo ? 'Sí' : 'No'}
+                      {a.hasContactInfo ? t('common.yes') : t('common.no')}
                     </Badge>
                   </td>
                   <td className="px-3 py-3">

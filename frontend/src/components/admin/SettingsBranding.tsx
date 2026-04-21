@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Save, Upload, Image as ImageIcon, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,6 +15,7 @@ type AssetType = 'logo' | 'logo_collapsed' | 'favicon'
 const PRESETS = ['#3B82F6', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#111827']
 
 export default function SettingsBranding() {
+  const { t } = useTranslation()
   const { fetchSettings, updateSettings, uploadBrandAsset } = useAdmin()
   const reloadConfig = useConfigStore((s) => s.reload)
   const [loading, setLoading] = useState(true)
@@ -36,11 +38,11 @@ export default function SettingsBranding() {
 
   const upload = async (type: AssetType, file: File) => {
     if (!/^image\/(jpe?g|png)$/i.test(file.type)) {
-      toast.error('Formato no permitido. Solo JPG y PNG.')
+      toast.error(t('settings.branding_format_error'))
       return
     }
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('Archivo demasiado grande. Máximo 2 MB.')
+      toast.error(t('settings.branding_size_error'))
       return
     }
     setUploadingType(type)
@@ -50,10 +52,10 @@ export default function SettingsBranding() {
         if (type === 'logo') setLogoUrl(res.url)
         if (type === 'logo_collapsed') setLogoCollapsedUrl(res.url)
         if (type === 'favicon') setFaviconUrl(res.url)
-        toast.success('Imagen subida')
+        toast.success(t('settings.branding_uploaded'))
         reloadConfig()
       }
-    } catch { toast.error('Error al subir la imagen') }
+    } catch { toast.error(t('settings.branding_upload_error')) }
     setUploadingType(null)
   }
 
@@ -64,18 +66,18 @@ export default function SettingsBranding() {
       if (type === 'logo') setLogoUrl('')
       if (type === 'logo_collapsed') setLogoCollapsedUrl('')
       if (type === 'favicon') setFaviconUrl('')
-      toast.success('Imagen eliminada')
+      toast.success(t('settings.branding_removed'))
       reloadConfig()
-    } catch { toast.error('No se pudo eliminar') }
+    } catch { toast.error(t('settings.branding_remove_error')) }
   }
 
   const saveColor = async () => {
     setSaving(true)
     try {
       await updateSettings({ brandPrimaryColor: color })
-      toast.success('Color guardado')
+      toast.success(t('settings.branding_color_saved'))
       reloadConfig()
-    } catch { toast.error('Error al guardar') }
+    } catch { toast.error(t('settings.save_error')) }
     setSaving(false)
   }
 
@@ -84,15 +86,15 @@ export default function SettingsBranding() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Branding</h1>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('settings.branding_title')}</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">
-          Color principal, logos y favicon del sitio público.
+          {t('settings.branding_subtitle')}
         </p>
       </div>
 
       {/* Color principal */}
       <Card>
-        <CardHeader><CardTitle>Color principal</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('settings.branding_color_card')}</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-3">
             <input
@@ -123,13 +125,13 @@ export default function SettingsBranding() {
 
           {/* Preview */}
           <div className="rounded-lg border border-[var(--border-default)] p-4 bg-[var(--bg-secondary)]">
-            <p className="text-xs uppercase tracking-wider text-[var(--text-tertiary)] mb-3">Vista previa</p>
+            <p className="text-xs uppercase tracking-wider text-[var(--text-tertiary)] mb-3">{t('settings.branding_preview')}</p>
             <div className="flex flex-wrap items-center gap-3">
               <button style={{ backgroundColor: color }} className="rounded px-4 py-2 text-sm font-medium text-white shadow">
-                Botón primario
+                {t('settings.branding_preview_button')}
               </button>
               <span style={{ color }} className="text-sm font-semibold underline">
-                Texto con acento
+                {t('settings.branding_preview_text')}
               </span>
               <span className="inline-flex h-2 w-24 overflow-hidden rounded-full bg-gray-200">
                 <span style={{ backgroundColor: color, width: '72%' }} className="h-full" />
@@ -139,18 +141,18 @@ export default function SettingsBranding() {
 
           <Button onClick={saveColor} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" strokeWidth={1.5} />}
-            Guardar color
+            {t('settings.branding_save_color')}
           </Button>
         </CardContent>
       </Card>
 
       {/* Logos y favicon */}
       <Card>
-        <CardHeader><CardTitle>Logos y favicon</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('settings.branding_assets_card')}</CardTitle></CardHeader>
         <CardContent className="space-y-5">
           <AssetUploader
-            label="Logo principal"
-            hint="Se muestra en el header del sitio público. Recomendado: PNG con fondo transparente, altura ~40 px."
+            label={t('settings.branding_logo_main')}
+            hint={t('settings.branding_logo_main_hint')}
             currentUrl={logoUrl}
             uploading={uploadingType === 'logo'}
             onSelect={(f) => upload('logo', f)}
@@ -160,8 +162,8 @@ export default function SettingsBranding() {
           />
 
           <AssetUploader
-            label="Logo colapsado / isotipo"
-            hint="Versión reducida (solo símbolo) para sidebars y espacios pequeños. Ideal: cuadrado 80×80 px."
+            label={t('settings.branding_logo_collapsed')}
+            hint={t('settings.branding_logo_collapsed_hint')}
             currentUrl={logoCollapsedUrl}
             uploading={uploadingType === 'logo_collapsed'}
             onSelect={(f) => upload('logo_collapsed', f)}
@@ -171,8 +173,8 @@ export default function SettingsBranding() {
           />
 
           <AssetUploader
-            label="Favicon"
-            hint="Icono del navegador. Recomendado: PNG cuadrado 32×32 o 64×64."
+            label={t('settings.branding_favicon')}
+            hint={t('settings.branding_favicon_hint')}
             currentUrl={faviconUrl}
             uploading={uploadingType === 'favicon'}
             onSelect={(f) => upload('favicon', f)}
@@ -198,6 +200,7 @@ function AssetUploader({
   previewBg: string
   maxHeight: number
 }) {
+  const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
   return (
     <div className="space-y-2">
@@ -227,11 +230,11 @@ function AssetUploader({
         />
         <Button variant="outline" onClick={() => inputRef.current?.click()} disabled={uploading}>
           {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" strokeWidth={1.5} />}
-          {currentUrl ? 'Reemplazar' : 'Subir imagen'}
+          {currentUrl ? t('settings.branding_replace') : t('settings.branding_upload')}
         </Button>
         {currentUrl && (
           <Button variant="ghost" size="sm" onClick={onClear}>
-            <X className="h-4 w-4" strokeWidth={1.5} /> Quitar
+            <X className="h-4 w-4" strokeWidth={1.5} /> {t('settings.branding_remove')}
           </Button>
         )}
       </div>

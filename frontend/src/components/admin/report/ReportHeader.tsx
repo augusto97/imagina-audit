@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ExternalLink, Printer, Pin, PinOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { AuditResult } from '@/types/audit'
@@ -19,14 +20,15 @@ export const ReportHeader = memo(function ReportHeader({
   isPinned: boolean
   onTogglePin: () => void
 }) {
+  const { t, i18n } = useTranslation()
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Reporte Técnico</h2>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">{t('report.header_technical_report')}</h2>
           {isPinned && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-wider">
-              <Pin className="h-3 w-3 fill-current" strokeWidth={2} /> Protegido
+              <Pin className="h-3 w-3 fill-current" strokeWidth={2} /> {t('report.header_protected')}
             </span>
           )}
         </div>
@@ -35,7 +37,7 @@ export const ReportHeader = memo(function ReportHeader({
             {result.domain} <ExternalLink className="h-3 w-3" />
           </a>
           <span className="text-xs text-[var(--text-tertiary)]">
-            {new Date(result.timestamp).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+            {new Date(result.timestamp).toLocaleDateString(i18n.language, { day: 'numeric', month: 'long', year: 'numeric' })}
           </span>
         </div>
       </div>
@@ -47,11 +49,11 @@ export const ReportHeader = memo(function ReportHeader({
           className={isPinned ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''}
         >
           {isPinned
-            ? <><PinOff className="h-4 w-4 mr-1" strokeWidth={1.5} /> Quitar protección</>
-            : <><Pin className="h-4 w-4 mr-1" strokeWidth={1.5} /> Proteger</>}
+            ? <><PinOff className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('report.header_unprotect')}</>
+            : <><Pin className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('report.header_protect')}</>}
         </Button>
         <Button variant="outline" size="sm" onClick={() => window.print()}>
-          <Printer className="h-4 w-4 mr-1" strokeWidth={1.5} /> Imprimir
+          <Printer className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('report.header_print')}
         </Button>
       </div>
     </div>

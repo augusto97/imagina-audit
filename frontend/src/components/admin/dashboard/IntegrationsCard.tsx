@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Database, ShieldAlert, Pin } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { DashboardData } from '@/types/dashboard'
@@ -17,38 +18,39 @@ export function IntegrationsCard({
   vulnerabilities: DashboardData['vulnerabilities']
   pinned: number
 }) {
+  const { t, i18n } = useTranslation()
   return (
     <Card className="border-0 shadow-sm">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Integraciones</CardTitle>
+        <CardTitle className="text-base">{t('dashboard.section_integrations')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <MetricRow
           to="/admin/leads"
           icon={<Database className="h-4 w-4 text-emerald-600" strokeWidth={1.5} />}
-          label="Snapshots wp-snapshot conectados"
+          label={t('dashboard.integrations_snapshots_label')}
           value={String(snapshots.connected)}
           hint={snapshots.connected > 0
-            ? `${snapshots.percentageOfWp}% de los sitios WordPress auditados`
-            : 'Aún ninguno — sube un JSON desde cualquier lead'}
+            ? t('dashboard.integrations_snapshots_pct', { pct: snapshots.percentageOfWp })
+            : t('dashboard.integrations_snapshots_empty')}
         />
         <MetricRow
           to="/admin/vulnerabilities"
           icon={<ShieldAlert className="h-4 w-4 text-red-600" strokeWidth={1.5} />}
-          label="CVEs en base local"
+          label={t('dashboard.integrations_cves_label')}
           value={String(vulnerabilities.total)}
           hint={vulnerabilities.lastUpdate
-            ? `Última sync: ${formatDate(vulnerabilities.lastUpdate)}`
-            : 'Sin sincronizar — configura el cron update-vulnerabilities'}
+            ? t('dashboard.integrations_cves_last_sync', { date: formatDate(vulnerabilities.lastUpdate, i18n.language) })
+            : t('dashboard.integrations_cves_no_sync')}
         />
         <MetricRow
           to="/admin/retention"
           icon={<Pin className="h-4 w-4 fill-amber-500 text-amber-500" strokeWidth={1.5} />}
-          label="Informes protegidos"
+          label={t('dashboard.integrations_pinned_label')}
           value={String(pinned)}
           hint={pinned > 0
-            ? 'Nunca se borrarán por la retención automática'
-            : 'Marca informes importantes con el pin para protegerlos'}
+            ? t('dashboard.integrations_pinned_desc')
+            : t('dashboard.integrations_pinned_empty')}
         />
       </CardContent>
     </Card>
@@ -79,9 +81,9 @@ function MetricRow({
   )
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, lang: string): string {
   try {
-    return new Date(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
+    return new Date(iso).toLocaleDateString(lang, { day: 'numeric', month: 'short', year: 'numeric' })
   } catch {
     return iso
   }

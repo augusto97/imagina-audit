@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard, Users, Settings, MessageSquare,
   CreditCard, SlidersHorizontal, ShieldAlert, Shield, ShieldCheck, Server, Archive, Activity, Palette, Home, Package,
@@ -7,37 +8,40 @@ import { cn } from '@/lib/utils'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { useConfigStore } from '@/store/configStore'
 
-const navSections = [
+// Estructura declarativa: cada item tiene un labelKey que se resuelve vía
+// useTranslation en el render. Así puedes añadir un módulo nuevo con solo
+// 2 líneas (catalog entry + clave en locales/*).
+const NAV_SECTIONS = [
   {
-    title: 'General',
+    titleKey: 'nav.general_section',
     items: [
-      { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/admin/leads', icon: Users, label: 'Leads y Auditorías' },
+      { to: '/admin/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
+      { to: '/admin/leads',     icon: Users,           labelKey: 'nav.leads' },
     ],
   },
   {
-    title: 'Configuración',
+    titleKey: 'nav.config_section',
     items: [
-      { to: '/admin/settings', icon: Settings, label: 'General' },
-      { to: '/admin/branding', icon: Palette, label: 'Branding' },
-      { to: '/admin/home', icon: Home, label: 'Home pública' },
-      { to: '/admin/messages', icon: MessageSquare, label: 'Textos y Mensajes' },
-      { to: '/admin/plans', icon: CreditCard, label: 'Planes y Precios' },
-      { to: '/admin/scoring', icon: SlidersHorizontal, label: 'Scoring' },
-      { to: '/admin/queue', icon: Server, label: 'Cola de Auditorías' },
-      { to: '/admin/retention', icon: Archive, label: 'Retención de Informes' },
-      { to: '/admin/health', icon: Activity, label: 'Estado del Sistema' },
+      { to: '/admin/settings',  icon: Settings,           labelKey: 'nav.general_settings' },
+      { to: '/admin/branding',  icon: Palette,            labelKey: 'nav.branding' },
+      { to: '/admin/home',      icon: Home,               labelKey: 'nav.home_cms' },
+      { to: '/admin/messages',  icon: MessageSquare,      labelKey: 'nav.messages' },
+      { to: '/admin/plans',     icon: CreditCard,         labelKey: 'nav.plans' },
+      { to: '/admin/scoring',   icon: SlidersHorizontal,  labelKey: 'nav.scoring' },
+      { to: '/admin/queue',     icon: Server,             labelKey: 'nav.queue' },
+      { to: '/admin/retention', icon: Archive,            labelKey: 'nav.retention' },
+      { to: '/admin/health',    icon: Activity,           labelKey: 'nav.health' },
     ],
   },
   {
-    title: 'Seguridad',
+    titleKey: 'nav.security_section',
     items: [
-      { to: '/admin/security',        icon: ShieldCheck, label: '2FA del login' },
-      { to: '/admin/vulnerabilities', icon: ShieldAlert, label: 'Vulnerabilidades' },
-      { to: '/admin/plugin-vault',    icon: Package,     label: 'Plugin Vault' },
+      { to: '/admin/security',        icon: ShieldCheck, labelKey: 'nav.twofa' },
+      { to: '/admin/vulnerabilities', icon: ShieldAlert, labelKey: 'nav.vulnerabilities' },
+      { to: '/admin/plugin-vault',    icon: Package,     labelKey: 'nav.plugin_vault' },
     ],
   },
-]
+] as const
 
 interface AdminSidebarProps {
   onNavigate?: () => void
@@ -45,6 +49,7 @@ interface AdminSidebarProps {
 }
 
 export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSidebarProps) {
+  const { t } = useTranslation()
   const { logoUrl, logoCollapsedUrl, companyName } = useConfigStore((s) => s.config)
   const displayLogo = collapsed ? (logoCollapsedUrl || logoUrl) : logoUrl
 
@@ -72,15 +77,16 @@ export default function AdminSidebar({ onNavigate, collapsed = false }: AdminSid
 
       {/* Nav */}
       <nav className={cn("flex-1 overflow-y-auto", collapsed ? "px-1.5 py-3" : "px-2 py-2")}>
-        {navSections.map((section, sectionIdx) => (
-          <div key={section.title} className={collapsed ? (sectionIdx > 0 ? "mt-3" : "") : "mb-2"}>
+        {NAV_SECTIONS.map((section, sectionIdx) => (
+          <div key={section.titleKey} className={collapsed ? (sectionIdx > 0 ? "mt-3" : "") : "mb-2"}>
             {!collapsed && (
               <p className="mb-0.5 px-2 pt-2 text-[11px] font-medium text-[#999] uppercase tracking-wide">
-                {section.title}
+                {t(section.titleKey)}
               </p>
             )}
             <div className={collapsed ? "space-y-0.5" : "space-y-px"}>
-              {section.items.map(({ to, icon: Icon, label }) => {
+              {section.items.map(({ to, icon: Icon, labelKey }) => {
+                const label = t(labelKey)
                 const link = (
                   <NavLink
                     key={to}

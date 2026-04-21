@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Search, Eye, MessageCircle, Trash2, Copy, ChevronLeft, ChevronRight, SearchX, Download, FileText, BarChart3, Pin, PinOff } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, SearchX, Download, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,282 +9,392 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { useAdmin } from '@/hooks/useAdmin'
 import api from '@/lib/api'
+import { LeadsSummaryTiles } from './leads/LeadsSummaryTiles'
+import { LeadsBulkBar } from './leads/LeadsBulkBar'
+import { ActiveFiltersBar, type FilterChip } from './leads/ActiveFiltersBar'
+import { MoreFiltersPopover } from './leads/MoreFiltersPopover'
+import { DomainCell } from './leads/DomainCell'
+import { LeadActionsCell } from './leads/LeadActionsCell'
+import { ScorePill } from './leads/ScorePill'
+import type { Lead, LeadsSummary } from '@/types/lead'
 
-interface Lead {
-  id: string; url: string; domain: string; leadName: string | null
-  leadEmail: string | null; leadWhatsapp: string | null; globalScore: number
-  globalLevel: string; createdAt: string; hasContactInfo: boolean
-  isPinned: boolean
-}
+type MainFilter = 'all' | 'with_contact' | 'critical' | 'warning' | 'this_week' | 'this_month'
+type Sort = 'date_desc' | 'date_asc' | 'score_asc' | 'score_desc' | 'domain_asc'
+type Dimensional = 'any' | 'yes' | 'no'
 
-function ScorePill({ score, level }: { score: number; level: string }) {
-  const colors: Record<string, string> = {
-    critical: 'bg-red-100 text-red-700 ring-red-200',
-    warning: 'bg-amber-100 text-amber-700 ring-amber-200',
-    good: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
-    excellent: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
-  }
-  return (
-    <span className={`inline-flex items-center justify-center min-w-[40px] rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${colors[level] || 'bg-gray-100 text-gray-600 ring-gray-200'}`}>
-      {score}
-    </span>
-  )
-}
-
+/**
+ * Tabla de leads completa. Composición:
+ *   - SummaryTiles (7 contadores globales, clickeables para filtrar)
+ *   - Controls row (search + sort + CSV)
+ *   - Tabla con DomainCell + ScorePill + LeadActionsCell
+ *   - Paginación
+ *
+ * El click en una fila abre el detalle del lead (los action icons hacen
+ * stopPropagation). El filtro activo se sincroniza con los tiles
+ * (un solo filtro activo a la vez, para que sea fácil entender el estado).
+ */
 export default function LeadsTable() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
-  const { fetchLeads, deleteLead, pinAudit } = useAdmin()
+  const { fetchLeads, deleteLead, pinAudit, bulkLeads } = useAdmin()
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
   const [leads, setLeads] = useState<Lead[]>([])
+  const [summary, setSummary] = useState<LeadsSummary | null>(null)
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [page, setPage] = useState(1)
-  const [filter, setFilter] = useState('all')
-  const [sort, setSort] = useState('date_desc')
-  const [search, setSearch] = useState('')
+  const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  const loadLeads = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await fetchLeads({ page, limit: 20, filter, sort, search })
-      setLeads(data.leads)
-      setTotal(data.total)
-      setTotalPages(data.totalPages)
-    } catch { /* handled */ }
-    setLoading(false)
-  }, [fetchLeads, page, filter, sort, search])
-
-  useEffect(() => { loadLeads() }, [loadLeads])
+  const [mainFilter, setMainFilter] = useState<MainFilter>('all')
+  const [filterWp, setFilterWp] = useState<Dimensional>('any')
+  const [filterSnap, setFilterSnap] = useState<Dimensional>('any')
+  const [filterPinned, setFilterPinned] = useState<Dimensional>('any')
+  const [sort, setSort] = useState<Sort>('date_desc')
 
   const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 500)
     return () => clearTimeout(t)
   }, [searchInput])
 
-  const handleDelete = async (id: string) => {
+  const loadLeads = useCallback(async () => {
+    setLoading(true)
     try {
-      await deleteLead(id)
-      toast.success('Auditoría eliminada')
-      setDeleteId(null)
+      const data = await fetchLeads({
+        page, limit: pageSize,
+        filter: mainFilter,
+        sort, search,
+        wp: filterWp, snapshot: filterSnap, pinned: filterPinned,
+      })
+      setLeads(data.leads)
+      setTotal(data.total)
+      setTotalPages(data.totalPages)
+      setSummary(data.summary || null)
+    } catch { /* handled */ }
+    setLoading(false)
+  }, [fetchLeads, page, pageSize, mainFilter, sort, search, filterWp, filterSnap, filterPinned])
+
+  useEffect(() => { loadLeads() }, [loadLeads])
+
+  // ─── Handlers de acciones de fila ────────────────────────────────
+  const handleOpen = useCallback((lead: Lead) => navigate(`/admin/leads/${lead.id}`), [navigate])
+
+  const handleTogglePin = useCallback(async (lead: Lead) => {
+    try {
+      await pinAudit(lead.id, !lead.isPinned)
+      toast.success(lead.isPinned ? t('leads.toast_unprotected') : t('leads.toast_protected'))
+      loadLeads()
+    } catch { toast.error(t('leads.toast_protect_failed')) }
+  }, [pinAudit, loadLeads, t])
+
+  const handleDelete = useCallback(async (lead: Lead) => {
+    try {
+      await deleteLead(lead.id)
+      toast.success(t('common.success'))
       loadLeads()
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number; data?: { error?: string } } }
-      if (axiosErr.response?.status === 409) {
-        toast.error(axiosErr.response.data?.error || 'Informe protegido. Desprotégelo antes de eliminar.')
-      } else {
-        toast.error('Error al eliminar')
-      }
-      setDeleteId(null)
+      toast.error(axiosErr.response?.data?.error || t('common.error'))
     }
-  }
+  }, [deleteLead, loadLeads, t])
 
-  const handleTogglePin = async (id: string, currentlyPinned: boolean) => {
-    try {
-      await pinAudit(id, !currentlyPinned)
-      toast.success(currentlyPinned ? 'Protección retirada' : 'Informe protegido')
-      loadLeads()
-    } catch { toast.error('Error al cambiar protección') }
-  }
-
-  const copyEmail = (email: string) => {
+  const copyEmail = (email: string, e: React.MouseEvent) => {
+    e.stopPropagation()
     navigator.clipboard.writeText(email)
-    toast.success('Email copiado')
+    toast.success(t('leads.toast_email_copied'))
   }
 
+  // ─── Selección múltiple (C.1) ──────────────────────────────────
+  const allOnPageIds = leads.map(l => l.id)
+  const allOnPageSelected = allOnPageIds.length > 0 && allOnPageIds.every(id => selected.has(id))
+  const someOnPageSelected = allOnPageIds.some(id => selected.has(id))
+
+  const toggleRow = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const toggleAllOnPage = () => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (allOnPageSelected) {
+        allOnPageIds.forEach(id => next.delete(id))
+      } else {
+        allOnPageIds.forEach(id => next.add(id))
+      }
+      return next
+    })
+  }
+
+  const clearSelection = () => setSelected(new Set())
+
+  const runBulk = async (action: 'delete' | 'pin' | 'unpin') => {
+    const ids = Array.from(selected)
+    if (ids.length === 0) return
+    if (action === 'delete' && !window.confirm(t('leads.bulk_confirm_delete', { count: ids.length }))) return
+
+    setBulkBusy(true)
+    try {
+      const res = await bulkLeads(ids, action)
+      if (res) {
+        if (action === 'delete') {
+          const msg = res.skipped > 0
+            ? t('leads.bulk_result_delete_with_skipped', { processed: res.processed, skipped: res.skipped })
+            : t('leads.bulk_result_delete', { processed: res.processed })
+          toast.success(msg)
+        } else {
+          toast.success(action === 'pin'
+            ? t('leads.bulk_result_protected', { count: res.processed })
+            : t('leads.bulk_result_unprotected', { count: res.processed }))
+        }
+      }
+      clearSelection()
+      loadLeads()
+    } catch { toast.error(t('leads.toast_bulk_failed')) }
+    setBulkBusy(false)
+  }
+
+  // ─── Filter derivado (qué tile está activo) ─────────────────────
+  const activeFilter = filterWp === 'yes' ? 'wp_yes'
+    : filterSnap === 'yes' ? 'snap_yes'
+    : filterPinned === 'yes' ? 'pin_yes'
+    : mainFilter
+
+  // ─── Chips de filtros activos (labels amigables) ────────────────
+  const resetAll = () => {
+    setMainFilter('all'); setFilterWp('any'); setFilterSnap('any'); setFilterPinned('any')
+    setSearchInput(''); setSearch(''); setPage(1)
+  }
+
+  const mainFilterLabels: Record<MainFilter, string> = {
+    all:          t('common.all'),
+    with_contact: t('leads.filter_label_with_contact'),
+    critical:     t('leads.filter_label_critical'),
+    warning:      t('leads.filter_label_warning'),
+    this_week:    t('leads.filter_label_this_week'),
+    this_month:   t('leads.filter_label_this_month'),
+  }
+
+  const chips: FilterChip[] = []
+  if (mainFilter !== 'all') {
+    chips.push({ key: 'main', label: mainFilterLabels[mainFilter], onRemove: () => { setMainFilter('all'); setPage(1) } })
+  }
+  if (filterWp !== 'any') {
+    chips.push({ key: 'wp', label: filterWp === 'yes' ? t('leads.filter_chip_wp_yes') : t('leads.filter_chip_wp_no'), onRemove: () => { setFilterWp('any'); setPage(1) } })
+  }
+  if (filterSnap !== 'any') {
+    chips.push({ key: 'snap', label: filterSnap === 'yes' ? t('leads.filter_chip_snapshot_yes') : t('leads.filter_chip_snapshot_no'), onRemove: () => { setFilterSnap('any'); setPage(1) } })
+  }
+  if (filterPinned !== 'any') {
+    chips.push({ key: 'pin', label: filterPinned === 'yes' ? t('leads.filter_chip_pinned_yes') : t('leads.filter_chip_pinned_no'), onRemove: () => { setFilterPinned('any'); setPage(1) } })
+  }
+  if (search) {
+    chips.push({ key: 'search', label: `"${search}"`, onRemove: () => { setSearchInput(''); setSearch(''); setPage(1) } })
+  }
+
+  const applyTileFilter = (key: string) => {
+    // Reset todos los filtros al cambiar — un solo tile activo a la vez
+    setFilterWp('any'); setFilterSnap('any'); setFilterPinned('any')
+    setPage(1)
+    if (key === 'wp_yes') { setMainFilter('all'); setFilterWp('yes') }
+    else if (key === 'snap_yes') { setMainFilter('all'); setFilterSnap('yes') }
+    else if (key === 'pin_yes') { setMainFilter('all'); setFilterPinned('yes') }
+    else setMainFilter(key as MainFilter)
+  }
+
+  // ─── CSV Export ─────────────────────────────────────────────────
   const [exporting, setExporting] = useState(false)
   const exportCsv = async () => {
     setExporting(true)
     try {
-      const res = await api.get('/admin/export-leads.php', { params: { filter, search }, responseType: 'blob' })
+      const res = await api.get('/admin/export-leads.php', {
+        params: { filter: mainFilter, search, wp: filterWp, snapshot: filterSnap, pinned: filterPinned },
+        responseType: 'blob',
+      })
       const url = URL.createObjectURL(res.data)
       const a = document.createElement('a')
       a.href = url
       a.download = `imagina-audit-leads-${new Date().toISOString().slice(0, 10)}.csv`
       a.click()
       URL.revokeObjectURL(url)
-      toast.success('CSV exportado')
-    } catch { toast.error('Error al exportar') }
+      toast.success(t('leads.toast_csv_ok'))
+    } catch { toast.error(t('leads.toast_csv_failed')) }
     setExporting(false)
   }
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold text-[var(--text-primary)]">Leads y Auditorías</h1>
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('leads.title')}</h1>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">{t('leads.subtitle_click_row')}</p>
+      </div>
 
-      {/* Filters bar */}
+      {/* Summary tiles (clickeables) */}
+      {summary && (
+        <LeadsSummaryTiles
+          summary={summary}
+          activeFilter={activeFilter}
+          onFilter={applyTileFilter}
+        />
+      )}
+
+      {/* Controls */}
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={filter} onValueChange={(v) => { setFilter(v); setPage(1) }}>
-          <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="with_contact">Con contacto</SelectItem>
-            <SelectItem value="critical">Score crítico</SelectItem>
-            <SelectItem value="warning">Score bajo</SelectItem>
-            <SelectItem value="this_week">Esta semana</SelectItem>
-            <SelectItem value="this_month">Este mes</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={sort} onValueChange={(v) => { setSort(v); setPage(1) }}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="date_desc">Más recientes</SelectItem>
-            <SelectItem value="date_asc">Más antiguos</SelectItem>
-            <SelectItem value="score_asc">Peor score</SelectItem>
-            <SelectItem value="score_desc">Mejor score</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative min-w-[240px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />
-          <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar por dominio, nombre o email..." className="pl-9" />
+          <Input
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder={t('leads.search_placeholder')}
+            className="pl-9"
+          />
         </div>
-
+        <Select value={sort} onValueChange={(v) => { setSort(v as Sort); setPage(1) }}>
+          <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="date_desc">{t('leads.sort_date_desc')}</SelectItem>
+            <SelectItem value="date_asc">{t('leads.sort_date_asc')}</SelectItem>
+            <SelectItem value="score_asc">{t('leads.sort_score_asc')}</SelectItem>
+            <SelectItem value="score_desc">{t('leads.sort_score_desc')}</SelectItem>
+            <SelectItem value="domain_asc">{t('leads.sort_domain_asc')}</SelectItem>
+          </SelectContent>
+        </Select>
+        <MoreFiltersPopover
+          mainFilter={mainFilter}
+          onMainFilterChange={(v) => { setMainFilter(v as MainFilter); setPage(1) }}
+          filterWp={filterWp}
+          onFilterWpChange={(v) => { setFilterWp(v); setPage(1) }}
+          filterSnap={filterSnap}
+          onFilterSnapChange={(v) => { setFilterSnap(v); setPage(1) }}
+          filterPinned={filterPinned}
+          onFilterPinnedChange={(v) => { setFilterPinned(v); setPage(1) }}
+        />
         <Button variant="outline" size="sm" onClick={exportCsv} disabled={exporting}>
           <Download className="h-4 w-4" strokeWidth={1.5} />
-          <span className="hidden sm:inline">{exporting ? 'Exportando...' : 'CSV'}</span>
+          <span className="hidden sm:inline">{exporting ? t('leads.exporting') : t('leads.export_csv')}</span>
         </Button>
       </div>
 
+      {/* Chips de filtros activos */}
+      <ActiveFiltersBar chips={chips} onClearAll={resetAll} />
+
+      {/* Bulk bar (sticky, solo visible con selección) */}
+      <LeadsBulkBar
+        count={selected.size}
+        busy={bulkBusy}
+        onClear={clearSelection}
+        onPin={() => runBulk('pin')}
+        onUnpin={() => runBulk('unpin')}
+        onDelete={() => runBulk('delete')}
+      />
+
       {/* Table */}
-      <Card className="py-0 overflow-hidden">
+      <Card className="overflow-hidden py-0">
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-6 space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-11 rounded-lg" />)}</div>
+            <div className="space-y-3 p-6">
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 rounded-lg" />)}
+            </div>
           ) : leads.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-16 text-[var(--text-tertiary)]">
               <SearchX className="h-10 w-10" strokeWidth={1} />
-              <p className="text-sm">No se encontraron resultados</p>
+              <p className="text-sm">{t('leads.empty_no_results')}</p>
+              {chips.length > 0 && (
+                <Button variant="outline" size="sm" onClick={resetAll}>{t('leads.clear_filters')}</Button>
+              )}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Dominio</TableHead>
-                  <TableHead className="hidden md:table-cell">Nombre</TableHead>
-                  <TableHead className="hidden lg:table-cell">Email</TableHead>
-                  <TableHead className="hidden lg:table-cell">WhatsApp</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead className="w-[40px]">
+                    <input
+                      type="checkbox"
+                      checked={allOnPageSelected}
+                      ref={(el) => { if (el) el.indeterminate = !allOnPageSelected && someOnPageSelected }}
+                      onChange={toggleAllOnPage}
+                      aria-label="Seleccionar todos en la página"
+                      className="h-4 w-4 cursor-pointer accent-[var(--accent-primary)]"
+                    />
+                  </TableHead>
+                  <TableHead className="w-[110px]">{t('leads.col_date')}</TableHead>
+                  <TableHead>{t('leads.col_domain')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('leads.col_email')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('leads.col_whatsapp')}</TableHead>
+                  <TableHead className="w-[80px]">{t('leads.col_score')}</TableHead>
+                  <TableHead className="text-right">{t('common.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {leads.map((l) => (
-                  <TableRow key={l.id}>
-                    <TableCell className="text-xs text-[var(--text-tertiary)] whitespace-nowrap">
+                {leads.map((lead) => (
+                  <TableRow
+                    key={lead.id}
+                    onClick={() => handleOpen(lead)}
+                    className={`cursor-pointer hover:bg-[var(--bg-tertiary)]/40 ${selected.has(lead.id) ? 'bg-[var(--accent-primary)]/5' : ''}`}
+                  >
+                    <TableCell className="w-[40px]" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(lead.id)}
+                        onChange={() => toggleRow(lead.id)}
+                        aria-label={`Seleccionar ${lead.domain}`}
+                        className="h-4 w-4 cursor-pointer accent-[var(--accent-primary)]"
+                      />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-xs text-[var(--text-tertiary)]">
                       <div>
-                        <span>{new Date(l.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
-                        <span className="block text-[10px] text-gray-400">{new Date(l.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>{new Date(lead.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
+                        <span className="block text-[10px] text-gray-400">
+                          {new Date(lead.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-1.5">
-                        <a href={l.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{l.domain}</a>
-                        {l.isPinned && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Pin className="h-3.5 w-3.5 text-amber-500 fill-amber-500 shrink-0" strokeWidth={2} />
-                            </TooltipTrigger>
-                            <TooltipContent>Protegido del borrado automático</TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
+                    <TableCell>
+                      <DomainCell lead={lead} />
                     </TableCell>
-                    <TableCell className="text-[var(--text-secondary)] hidden md:table-cell">{l.leadName || '—'}</TableCell>
                     <TableCell className="hidden lg:table-cell">
-                      {l.leadEmail ? (
-                        <button onClick={() => copyEmail(l.leadEmail!)} className="text-blue-600 hover:underline text-xs truncate max-w-[150px] block cursor-pointer">{l.leadEmail}</button>
+                      {lead.leadEmail ? (
+                        <button
+                          onClick={(e) => copyEmail(lead.leadEmail!, e)}
+                          className="group inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                          title="Copiar email"
+                        >
+                          <span className="max-w-[180px] truncate">{lead.leadEmail}</span>
+                          <Copy className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+                        </button>
                       ) : <span className="text-[var(--text-tertiary)]">—</span>}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
-                      {l.leadWhatsapp ? (
-                        <a href={`https://wa.me/${l.leadWhatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline text-xs">{l.leadWhatsapp}</a>
+                      {lead.leadWhatsapp ? (
+                        <a
+                          href={`https://wa.me/${lead.leadWhatsapp.replace(/[^0-9]/g, '')}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs text-emerald-500 hover:underline"
+                        >
+                          {lead.leadWhatsapp}
+                        </a>
                       ) : <span className="text-[var(--text-tertiary)]">—</span>}
                     </TableCell>
                     <TableCell>
-                      <ScorePill score={l.globalScore} level={l.globalLevel} />
+                      <ScorePill score={lead.globalScore} level={lead.globalLevel} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-0.5">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <a href={`/results/${l.id}`} target="_blank" rel="noreferrer"><Button variant="ghost" size="icon" className="h-8 w-8"><Eye className="h-4 w-4" strokeWidth={1.5} /></Button></a>
-                          </TooltipTrigger>
-                          <TooltipContent>Ver informe</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600" onClick={() => navigate(`/admin/leads/${l.id}/report`)}><FileText className="h-4 w-4" strokeWidth={1.5} /></Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Reporte técnico</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-purple-500" onClick={() => navigate(`/admin/leads/${l.id}/waterfall`)}><BarChart3 className="h-4 w-4" strokeWidth={1.5} /></Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Waterfall</TooltipContent>
-                        </Tooltip>
-                        {l.leadEmail && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyEmail(l.leadEmail!)}><Copy className="h-4 w-4" strokeWidth={1.5} /></Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Copiar email</TooltipContent>
-                          </Tooltip>
-                        )}
-                        {l.leadWhatsapp && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <a href={`https://wa.me/${l.leadWhatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer"><Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-500"><MessageCircle className="h-4 w-4" strokeWidth={1.5} /></Button></a>
-                            </TooltipTrigger>
-                            <TooltipContent>WhatsApp</TooltipContent>
-                          </Tooltip>
-                        )}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost" size="icon"
-                              className={`h-8 w-8 ${l.isPinned ? 'text-amber-500 hover:text-amber-600' : 'text-[var(--text-tertiary)] hover:text-amber-500'}`}
-                              onClick={() => handleTogglePin(l.id, l.isPinned)}
-                            >
-                              {l.isPinned
-                                ? <PinOff className="h-4 w-4" strokeWidth={1.5} />
-                                : <Pin className="h-4 w-4" strokeWidth={1.5} />}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {l.isPinned ? 'Quitar protección' : 'Proteger del borrado automático'}
-                          </TooltipContent>
-                        </Tooltip>
-                        {deleteId === l.id ? (
-                          <div className="flex gap-1">
-                            <Button variant="destructive" size="sm" className="h-8 text-xs" onClick={() => handleDelete(l.id)}>Confirmar</Button>
-                            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setDeleteId(null)}>Cancelar</Button>
-                          </div>
-                        ) : (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost" size="icon"
-                                className="h-8 w-8 text-red-400 hover:text-red-600 disabled:opacity-30"
-                                disabled={l.isPinned}
-                                onClick={() => setDeleteId(l.id)}
-                              >
-                                <Trash2 className="h-4 w-4" strokeWidth={1.5} />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {l.isPinned ? 'Desprotege primero' : 'Eliminar'}
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
+                      <LeadActionsCell
+                        lead={lead}
+                        onOpen={handleOpen}
+                        onTogglePin={handleTogglePin}
+                        onDelete={handleDelete}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -293,20 +404,38 @@ export default function LeadsTable() {
         </CardContent>
       </Card>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-[var(--text-tertiary)]">
-            {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} de {total}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-              <ChevronLeft className="h-4 w-4" /> Anterior
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-              Siguiente <ChevronRight className="h-4 w-4" />
-            </Button>
+      {/* Paginación + page size */}
+      {total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <div className="flex items-center gap-3 text-[var(--text-tertiary)]">
+            <span>{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} de {total}</span>
+            <div className="flex items-center gap-2">
+              <label htmlFor="page-size" className="text-xs">{t('common.rows_per_page')}</label>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => { setPageSize(Number(v)); setPage(1) }}
+              >
+                <SelectTrigger id="page-size" className="h-8 w-[70px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          {totalPages > 1 && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                <ChevronLeft className="h-4 w-4" /> {t('common.previous')}
+              </Button>
+              <span className="self-center text-xs text-[var(--text-tertiary)]">{page} / {totalPages}</span>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+                {t('common.next')} <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Repeat, TrendingUp, TrendingDown, Minus, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getLevelClassName } from '@/lib/utils'
@@ -11,18 +12,19 @@ import type { DashboardData } from '@/types/dashboard'
  * situación está empeorando y requieren seguimiento.
  */
 export function RecurringDomains({ domains }: { domains: DashboardData['recurringDomains'] }) {
+  const { t } = useTranslation()
   return (
     <Card className="border-0 shadow-sm">
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2">
           <Repeat className="h-4 w-4 text-[var(--accent-primary)]" strokeWidth={1.5} />
-          <CardTitle className="text-base">Dominios recurrentes</CardTitle>
+          <CardTitle className="text-base">{t('dashboard.section_recurring')}</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
         {domains.length === 0 ? (
           <div className="py-8 text-center text-sm text-[var(--text-tertiary)]">
-            Aún ningún dominio se ha auditado más de una vez.
+            {t('dashboard.section_recurring_empty')}
           </div>
         ) : (
           <ul className="space-y-1.5">
@@ -42,7 +44,7 @@ export function RecurringDomains({ domains }: { domains: DashboardData['recurrin
                       <ExternalLink className="h-3 w-3 text-[var(--text-tertiary)]" />
                     </div>
                     <div className="text-[10px] text-[var(--text-tertiary)]">
-                      {d.totalAudits} auditorías · rango {d.worstScore}–{d.bestScore}
+                      {t('dashboard.recurring_summary', { total: d.totalAudits, worst: d.worstScore, best: d.bestScore })}
                     </div>
                   </div>
                   <span className={`text-sm font-bold tabular-nums ${getLevelClassName(level)}`}>{d.bestScore}</span>

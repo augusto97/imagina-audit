@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Save, Search, FileText, Eye, Globe, Layout as LayoutIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -64,6 +65,7 @@ const SETTING_KEYS: Record<keyof HomeForm, string> = {
 }
 
 export default function SettingsHomeCMS() {
+  const { t } = useTranslation()
   const { fetchSettings, updateSettings } = useAdmin()
   const reloadConfig = useConfigStore((s) => s.reload)
   const [loading, setLoading] = useState(true)
@@ -120,9 +122,9 @@ export default function SettingsHomeCMS() {
         payload[SETTING_KEYS[k]] = form[k]
       }
       await updateSettings(payload)
-      toast.success('Home actualizado')
+      toast.success(t('settings.home_saved'))
       reloadConfig()
-    } catch { toast.error('Error al guardar') }
+    } catch { toast.error(t('settings.save_error')) }
     setSaving(false)
   }
 
@@ -131,29 +133,29 @@ export default function SettingsHomeCMS() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Home pública</h1>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('settings.home_title')}</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">
-          SEO y textos visibles en la landing pública ({window.location.origin}/).
+          {t('settings.home_subtitle', { origin: window.location.origin })}
         </p>
       </div>
 
       <Tabs defaultValue="seo">
         <TabsList>
-          <TabsTrigger value="seo"><Search className="h-4 w-4 mr-1" strokeWidth={1.5} /> SEO</TabsTrigger>
-          <TabsTrigger value="texts"><FileText className="h-4 w-4 mr-1" strokeWidth={1.5} /> Hero y textos</TabsTrigger>
-          <TabsTrigger value="form"><Globe className="h-4 w-4 mr-1" strokeWidth={1.5} /> Formulario</TabsTrigger>
-          <TabsTrigger value="nav"><LayoutIcon className="h-4 w-4 mr-1" strokeWidth={1.5} /> Header y Footer</TabsTrigger>
-          <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-1" strokeWidth={1.5} /> Preview</TabsTrigger>
+          <TabsTrigger value="seo"><Search className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('settings.home_tab_seo')}</TabsTrigger>
+          <TabsTrigger value="texts"><FileText className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('settings.home_tab_texts')}</TabsTrigger>
+          <TabsTrigger value="form"><Globe className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('settings.home_tab_form')}</TabsTrigger>
+          <TabsTrigger value="nav"><LayoutIcon className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('settings.home_tab_nav')}</TabsTrigger>
+          <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('settings.home_tab_preview')}</TabsTrigger>
         </TabsList>
 
         {/* SEO */}
         <TabsContent value="seo">
           <Card>
-            <CardHeader><CardTitle>Metadatos del home</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t('settings.home_seo_card')}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label>Título SEO (&lt;title&gt;)</Label>
+                  <Label>{t('settings.home_seo_title')}</Label>
                   <span className={`text-[11px] ${form.seoTitle.length > FIELD_LIMITS.seoTitle ? 'text-red-500' : 'text-[var(--text-tertiary)]'}`}>
                     {form.seoTitle.length} / {FIELD_LIMITS.seoTitle}
                   </span>
@@ -161,13 +163,13 @@ export default function SettingsHomeCMS() {
                 <Input
                   value={form.seoTitle}
                   onChange={(e) => update('seoTitle', e.target.value)}
-                  placeholder="Auditoría WordPress gratuita · Tu Marca"
+                  placeholder={t('settings.home_seo_title_placeholder')}
                 />
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label>Meta description</Label>
+                  <Label>{t('settings.home_seo_description')}</Label>
                   <span className={`text-[11px] ${form.seoDescription.length > FIELD_LIMITS.seoDescription ? 'text-red-500' : 'text-[var(--text-tertiary)]'}`}>
                     {form.seoDescription.length} / {FIELD_LIMITS.seoDescription}
                   </span>
@@ -176,29 +178,29 @@ export default function SettingsHomeCMS() {
                   rows={3}
                   value={form.seoDescription}
                   onChange={(e) => update('seoDescription', e.target.value)}
-                  placeholder="Descripción corta que aparece en resultados de búsqueda."
+                  placeholder={t('settings.home_seo_description_placeholder')}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label>Imagen para redes sociales (og:image)</Label>
+                <Label>{t('settings.home_seo_og_image')}</Label>
                 <Input
                   value={form.seoOgImage}
                   onChange={(e) => update('seoOgImage', e.target.value)}
-                  placeholder="https://tusitio.com/og-image.jpg (1200×630 recomendado)"
+                  placeholder={t('settings.home_seo_og_image_placeholder')}
                 />
                 <p className="text-xs text-[var(--text-tertiary)]">
-                  URL absoluta. Aparece al compartir el link en redes sociales.
+                  {t('settings.home_seo_og_image_hint')}
                 </p>
               </div>
 
               {/* Preview Google */}
               <div className="mt-6 rounded-lg border border-[var(--border-default)] bg-white p-4">
-                <p className="text-[11px] uppercase tracking-wider text-[var(--text-tertiary)] mb-2">Preview de Google</p>
+                <p className="text-[11px] uppercase tracking-wider text-[var(--text-tertiary)] mb-2">{t('settings.home_seo_google_preview')}</p>
                 <div className="font-serif">
                   <div className="text-[13px] text-[#4d5156]">{window.location.hostname}</div>
-                  <div className="text-[18px] text-[#1a0dab] truncate">{form.seoTitle || 'Título SEO'}</div>
-                  <div className="text-[13px] text-[#4d5156] line-clamp-2">{form.seoDescription || 'Meta description...'}</div>
+                  <div className="text-[18px] text-[#1a0dab] truncate">{form.seoTitle || t('settings.home_seo_title_fallback')}</div>
+                  <div className="text-[13px] text-[#4d5156] line-clamp-2">{form.seoDescription || t('settings.home_seo_description_fallback')}</div>
                 </div>
               </div>
             </CardContent>
@@ -209,45 +211,51 @@ export default function SettingsHomeCMS() {
         <TabsContent value="texts">
           <Card>
             <CardHeader>
-              <CardTitle>Textos del home</CardTitle>
+              <CardTitle>{t('settings.home_texts_card')}</CardTitle>
               <div className="mt-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] p-3 text-xs text-[var(--text-secondary)]">
-                <p className="font-medium text-[var(--text-primary)] mb-1">Resaltado de palabras</p>
-                <p>
-                  Encierra una palabra entre <code className="px-1 py-0.5 bg-white rounded font-mono">**dobles asteriscos**</code> para pintarla del <span className="text-[var(--accent-primary)] font-semibold">color principal</span>,
-                  o entre <code className="px-1 py-0.5 bg-white rounded font-mono">==iguales==</code> para darle un <span className="highlight-yellow">highlight amarillo</span>.
-                </p>
+                <p className="font-medium text-[var(--text-primary)] mb-1">{t('settings.home_texts_highlight_title')}</p>
+                <p
+                  dangerouslySetInnerHTML={{
+                    __html: t('settings.home_texts_highlight_body')
+                      .replace(/<code>/g, '<code class="px-1 py-0.5 bg-white rounded font-mono">')
+                      .replace(/<accent>/g, '<span class="text-[var(--accent-primary)] font-semibold">')
+                      .replace(/<\/accent>/g, '</span>')
+                      .replace(/<yellow>/g, '<span class="highlight-yellow">')
+                      .replace(/<\/yellow>/g, '</span>')
+                  }}
+                />
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Titular principal (hero)</Label>
+                <Label>{t('settings.home_texts_hero_headline')}</Label>
                 <Input value={form.heroHeadline} onChange={(e) => update('heroHeadline', e.target.value)} />
-                <p className="text-xs text-[var(--text-tertiary)]">El título grande que se ve al cargar la página.</p>
+                <p className="text-xs text-[var(--text-tertiary)]">{t('settings.home_texts_hero_headline_hint')}</p>
               </div>
 
               <div className="space-y-1.5">
-                <Label>Subtítulo (hero)</Label>
+                <Label>{t('settings.home_texts_hero_subheadline')}</Label>
                 <Textarea rows={2} value={form.heroSubheadline} onChange={(e) => update('heroSubheadline', e.target.value)} />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Texto del botón del formulario</Label>
+                  <Label>{t('settings.home_texts_form_btn')}</Label>
                   <Input value={form.formButtonText} onChange={(e) => update('formButtonText', e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Micro-copy bajo el formulario</Label>
+                  <Label>{t('settings.home_texts_form_microcopy')}</Label>
                   <Input value={form.formMicrocopy} onChange={(e) => update('formMicrocopy', e.target.value)} />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label>Título de la sección de features (8 áreas)</Label>
+                <Label>{t('settings.home_texts_features_title')}</Label>
                 <Input value={form.featuresTitle} onChange={(e) => update('featuresTitle', e.target.value)} />
               </div>
 
               <div className="space-y-1.5">
-                <Label>Trust bar (texto de confianza)</Label>
+                <Label>{t('settings.home_texts_trust')}</Label>
                 <Input value={form.trustText} onChange={(e) => update('trustText', e.target.value)} />
               </div>
             </CardContent>
@@ -258,27 +266,27 @@ export default function SettingsHomeCMS() {
         <TabsContent value="form">
           <Card>
             <CardHeader>
-              <CardTitle>Placeholders del formulario</CardTitle>
+              <CardTitle>{t('settings.home_form_card')}</CardTitle>
               <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                Texto gris que aparece dentro de cada campo antes de escribir.
+                {t('settings.home_form_card_hint')}
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Campo URL</Label>
+                <Label>{t('settings.home_form_url')}</Label>
                 <Input value={form.formPlaceholderUrl} onChange={(e) => update('formPlaceholderUrl', e.target.value)} />
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-1.5">
-                  <Label>Campo Nombre</Label>
+                  <Label>{t('settings.home_form_name')}</Label>
                   <Input value={form.formPlaceholderName} onChange={(e) => update('formPlaceholderName', e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Campo Email</Label>
+                  <Label>{t('settings.home_form_email')}</Label>
                   <Input value={form.formPlaceholderEmail} onChange={(e) => update('formPlaceholderEmail', e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Campo WhatsApp</Label>
+                  <Label>{t('settings.home_form_whatsapp')}</Label>
                   <Input value={form.formPlaceholderWhatsapp} onChange={(e) => update('formPlaceholderWhatsapp', e.target.value)} />
                 </div>
               </div>
@@ -290,19 +298,19 @@ export default function SettingsHomeCMS() {
         <TabsContent value="nav">
           <div className="space-y-4">
             <Card>
-              <CardHeader><CardTitle>Header</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t('settings.home_nav_header_card')}</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label>Texto botón "Comparar"</Label>
+                  <Label>{t('settings.home_nav_compare')}</Label>
                   <Input value={form.headerCompareText} onChange={(e) => update('headerCompareText', e.target.value)} />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label>Texto link externo</Label>
+                    <Label>{t('settings.home_nav_ext_text')}</Label>
                     <Input value={form.headerExternalText} onChange={(e) => update('headerExternalText', e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>URL del link externo</Label>
+                    <Label>{t('settings.home_nav_ext_url')}</Label>
                     <Input value={form.headerExternalUrl} onChange={(e) => update('headerExternalUrl', e.target.value)} placeholder="https://..." />
                   </div>
                 </div>
@@ -310,25 +318,25 @@ export default function SettingsHomeCMS() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>Footer</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t('settings.home_nav_footer_card')}</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label>Tagline del footer</Label>
+                  <Label>{t('settings.home_nav_footer_tagline')}</Label>
                   <Input value={form.footerTagline} onChange={(e) => update('footerTagline', e.target.value)} />
-                  <p className="text-xs text-[var(--text-tertiary)]">Aparece junto al nombre de la empresa en el copyright.</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">{t('settings.home_nav_footer_tagline_hint')}</p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Texto de experiencia</Label>
+                  <Label>{t('settings.home_nav_footer_experience')}</Label>
                   <Input value={form.footerExperienceText} onChange={(e) => update('footerExperienceText', e.target.value)} />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label>Texto del link de privacidad</Label>
+                    <Label>{t('settings.home_nav_footer_privacy_text')}</Label>
                     <Input value={form.footerPrivacyText} onChange={(e) => update('footerPrivacyText', e.target.value)} />
-                    <p className="text-xs text-[var(--text-tertiary)]">Dejá vacío si no quieres mostrar este link.</p>
+                    <p className="text-xs text-[var(--text-tertiary)]">{t('settings.home_nav_footer_privacy_text_hint')}</p>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>URL política de privacidad</Label>
+                    <Label>{t('settings.home_nav_footer_privacy_url')}</Label>
                     <Input value={form.footerPrivacyUrl} onChange={(e) => update('footerPrivacyUrl', e.target.value)} placeholder="https://..." />
                   </div>
                 </div>
@@ -341,9 +349,9 @@ export default function SettingsHomeCMS() {
         <TabsContent value="preview">
           <Card>
             <CardHeader>
-              <CardTitle>Vista previa del home</CardTitle>
+              <CardTitle>{t('settings.home_preview_card')}</CardTitle>
               <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                Muestra cómo quedará el home con los textos editados. No refleja los cambios hasta que guardes.
+                {t('settings.home_preview_hint')}
               </p>
             </CardHeader>
             <CardContent>
@@ -355,7 +363,7 @@ export default function SettingsHomeCMS() {
 
       <Button onClick={save} disabled={saving}>
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" strokeWidth={1.5} />}
-        Guardar cambios
+        {t('settings.home_save_changes')}
       </Button>
     </div>
   )
@@ -367,6 +375,7 @@ export default function SettingsHomeCMS() {
  * de 8 módulos + trust bar.
  */
 function HomePreview({ form }: { form: HomeForm }) {
+  const { t } = useTranslation()
   const moduleIds = ['security', 'performance', 'seo', 'wordpress', 'mobile', 'infrastructure', 'conversion', 'page_health']
   const moduleLabels: Record<string, { icon: string; name: string }> = {
     security: { icon: '🛡️', name: 'Seguridad' },
@@ -394,10 +403,10 @@ function HomePreview({ form }: { form: HomeForm }) {
       {/* Hero */}
       <div className="bg-gradient-to-b from-white to-[var(--bg-secondary)] px-8 py-12 text-center">
         <h1 className="text-2xl sm:text-4xl font-bold text-[var(--text-primary)]">
-          {form.heroHeadline ? renderStyledText(form.heroHeadline) : <span className="italic text-[var(--text-tertiary)]">Titular principal (vacío)</span>}
+          {form.heroHeadline ? renderStyledText(form.heroHeadline) : <span className="italic text-[var(--text-tertiary)]">{t('settings.home_preview_empty_headline')}</span>}
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-sm sm:text-base text-[var(--text-secondary)]">
-          {form.heroSubheadline ? renderStyledText(form.heroSubheadline) : <span className="italic">Subtítulo (vacío)</span>}
+          {form.heroSubheadline ? renderStyledText(form.heroSubheadline) : <span className="italic">{t('settings.home_preview_empty_subheadline')}</span>}
         </p>
 
         {/* Form fake */}
@@ -406,10 +415,10 @@ function HomePreview({ form }: { form: HomeForm }) {
             {form.formPlaceholderUrl || 'https://tusitio.com'}
           </div>
           <button className="mt-3 w-full rounded px-5 py-2.5 text-sm font-medium text-white" style={{ backgroundColor: 'var(--accent-primary)' }}>
-            {form.formButtonText || 'Botón del formulario'}
+            {form.formButtonText || t('settings.home_preview_empty_btn')}
           </button>
           <div className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11px] text-[var(--text-tertiary)]">
-            {microItems.length > 0 ? microItems.map((m) => <span key={m}>{m}</span>) : <span className="italic">micro-copy (vacío)</span>}
+            {microItems.length > 0 ? microItems.map((m) => <span key={m}>{m}</span>) : <span className="italic">{t('settings.home_preview_empty_microcopy')}</span>}
           </div>
         </div>
       </div>
@@ -417,7 +426,7 @@ function HomePreview({ form }: { form: HomeForm }) {
       {/* Features */}
       <div className="bg-white px-8 py-10">
         <h2 className="mb-6 text-center text-lg sm:text-xl font-bold text-[var(--text-primary)]">
-          {form.featuresTitle ? renderStyledText(form.featuresTitle) : <span className="italic text-[var(--text-tertiary)]">Título de features (vacío)</span>}
+          {form.featuresTitle ? renderStyledText(form.featuresTitle) : <span className="italic text-[var(--text-tertiary)]">{t('settings.home_preview_empty_features')}</span>}
         </h2>
         <div className="mx-auto grid max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
           {moduleIds.map((id) => (
@@ -432,7 +441,7 @@ function HomePreview({ form }: { form: HomeForm }) {
       {/* Trust bar */}
       <div className="border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-8 py-8 text-center">
         <p className="text-xs sm:text-sm font-medium text-[var(--text-secondary)]">
-          {form.trustText ? renderStyledText(form.trustText) : <span className="italic text-[var(--text-tertiary)]">Trust bar (vacío)</span>}
+          {form.trustText ? renderStyledText(form.trustText) : <span className="italic text-[var(--text-tertiary)]">{t('settings.home_preview_empty_trust')}</span>}
         </p>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           {tools.map((t) => (

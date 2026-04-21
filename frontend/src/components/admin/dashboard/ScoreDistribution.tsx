@@ -1,5 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { BarChart3 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { DashboardData } from '@/types/dashboard'
 
@@ -9,12 +10,13 @@ import type { DashboardData } from '@/types/dashboard'
  * inmediata (rojo=crítico, verde oscuro=excelente).
  */
 export function ScoreDistribution({ data }: { data: DashboardData['scoreDistribution'] }) {
+  const { t } = useTranslation()
   const chartData = [
-    { name: 'Crítico',    range: '0-29',  value: data.critical,  color: '#EF4444' },
-    { name: 'Deficiente', range: '30-49', value: data.deficient, color: '#F97316' },
-    { name: 'Regular',    range: '50-69', value: data.regular,   color: '#FBBF24' },
-    { name: 'Bueno',      range: '70-89', value: data.good,      color: '#34D399' },
-    { name: 'Excelente',  range: '90-100', value: data.excellent, color: '#059669' },
+    { name: t('dashboard.score_level_critical'),  range: '0-29',  value: data.critical,  color: '#EF4444' },
+    { name: t('dashboard.score_level_deficient'), range: '30-49', value: data.deficient, color: '#F97316' },
+    { name: t('dashboard.score_level_regular'),   range: '50-69', value: data.regular,   color: '#FBBF24' },
+    { name: t('dashboard.score_level_good'),      range: '70-89', value: data.good,      color: '#34D399' },
+    { name: t('dashboard.score_level_excellent'), range: '90-100', value: data.excellent, color: '#059669' },
   ]
   const total = chartData.reduce((sum, b) => sum + b.value, 0)
 
@@ -24,14 +26,14 @@ export function ScoreDistribution({ data }: { data: DashboardData['scoreDistribu
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-[var(--accent-primary)]" strokeWidth={1.5} />
-            <CardTitle className="text-base">Distribución de scores</CardTitle>
+            <CardTitle className="text-base">{t('dashboard.section_score_distribution')}</CardTitle>
           </div>
-          <span className="text-xs text-[var(--text-tertiary)]">{total} auditorías totales</span>
+          <span className="text-xs text-[var(--text-tertiary)]">{total} {t('dashboard.section_audits_total_suffix')}</span>
         </div>
       </CardHeader>
       <CardContent>
         {total === 0 ? (
-          <div className="py-8 text-center text-sm text-[var(--text-tertiary)]">Sin datos todavía</div>
+          <div className="py-8 text-center text-sm text-[var(--text-tertiary)]">{t('dashboard.section_score_distribution_empty')}</div>
         ) : (
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={chartData} barCategoryGap="20%">
