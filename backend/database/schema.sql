@@ -109,6 +109,42 @@ CREATE TABLE IF NOT EXISTS audit_jobs (
     completed_at TEXT
 );
 
+-- Planes: cuotas de escaneo configurables por el admin.
+-- Cada usuario tiene un plan asignado (plan_id). El `monthly_limit` es la
+-- cantidad máxima de audits que ese user puede disparar en un mes calendario.
+-- Un monthly_limit = 0 significa cuota ilimitada (ej. plan interno del equipo).
+CREATE TABLE IF NOT EXISTS plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    monthly_limit INTEGER NOT NULL DEFAULT 10,
+    description TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Usuarios: cuentas creadas por el admin. No hay auto-registro — el admin
+-- los da de alta desde /admin/users y les comparte la password inicial.
+-- El user usa esas credenciales en /login (flujo separado de /admin/login).
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    name TEXT,
+    plan_id INTEGER,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_login_at TEXT,
+    FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE SET NULL
+);
+
+-- Rate limit propio para intentos de login de users (sin pisar el de admin)
+CREATE TABLE IF NOT EXISTS user_login_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ip_address TEXT NOT NULL,
+    email TEXT,
+    attempted_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_audits_domain ON audits(domain);
 CREATE INDEX IF NOT EXISTS idx_audits_url ON audits(url);
@@ -123,3 +159,7 @@ CREATE INDEX IF NOT EXISTS idx_wp_snapshots_audit ON wp_snapshots(audit_id);
 CREATE INDEX IF NOT EXISTS idx_audit_jobs_status ON audit_jobs(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_jobs_started ON audit_jobs(started_at);
 CREATE INDEX IF NOT EXISTS idx_audits_pinned ON audits(is_pinned, created_at);
+CREATE INDEX IF NOT EXISTS idx_audits_user ON audits(user_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan_id);
+CREATE INDEX IF NOT EXISTS idx_user_login_attempts ON user_login_attempts(ip_address, attempted_at);

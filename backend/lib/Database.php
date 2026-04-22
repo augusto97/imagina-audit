@@ -167,6 +167,8 @@ class Database {
             "ALTER TABLE audits ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0",
             // Columna `lang` añadida para cachear audits por idioma (P2 i18n)
             "ALTER TABLE audits ADD COLUMN lang TEXT NOT NULL DEFAULT 'en'",
+            // Columna `user_id` añadida para asociar audits a cuentas (P4 users)
+            "ALTER TABLE audits ADD COLUMN user_id INTEGER",
         ];
         foreach ($migrations as $sql) {
             try { $this->pdo->exec($sql); } catch (Throwable $e) { /* columna ya existe */ }
