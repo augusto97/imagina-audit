@@ -50,6 +50,22 @@ export interface ProjectsListResponse {
   quota: { maxProjects: number; used: number; remaining: number | null; unlimited: boolean }
 }
 
+export interface ProjectChecklistItem {
+  metricId: string
+  name: string
+  description: string
+  recommendation: string
+  imaginaSolution: string
+  moduleId: string
+  moduleName: string
+  status: 'open' | 'done' | 'ignored'
+  severity: string | null
+  note: string | null
+  userModified: boolean
+  completedAt: string | null
+  updatedAt: string
+}
+
 export interface ProjectDetail {
   project: {
     id: number
@@ -173,6 +189,21 @@ export function useUser() {
     await api.delete('/user/projects.php', { params: { id } })
   }, [])
 
+  const fetchProjectChecklist = useCallback(async (projectId: number): Promise<ProjectChecklistItem[] | null> => {
+    try {
+      const res = await api.get<{ success: boolean; data: { items: ProjectChecklistItem[] } }>('/user/project-checklist.php', {
+        params: { project_id: projectId },
+      })
+      return res.data?.data?.items ?? null
+    } catch {
+      return null
+    }
+  }, [])
+
+  const updateChecklistItem = useCallback(async (projectId: number, metricId: string, patch: { status?: 'open' | 'done' | 'ignored'; note?: string }) => {
+    await api.put('/user/project-checklist.php', { projectId, metricId, ...patch })
+  }, [])
+
   // Check session al montar
   useEffect(() => {
     checkSession()
@@ -193,5 +224,7 @@ export function useUser() {
     createProject,
     updateProject,
     deleteProject,
+    fetchProjectChecklist,
+    updateChecklistItem,
   }
 }

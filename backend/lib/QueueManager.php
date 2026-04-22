@@ -395,6 +395,21 @@ class QueueManager {
                     $leadData['projectId'] ?? null,
                 ]
             );
+
+            // Reconciliar checklist vivo también desde el drain worker. Mismo
+            // comportamiento que audit.php para que un audit encolado resulte
+            // en el mismo estado final del checklist que uno ejecutado inline.
+            if (!empty($leadData['projectId'])) {
+                try {
+                    Project::reconcileChecklist(
+                        $db,
+                        (int) $leadData['projectId'],
+                        Project::flattenMetrics($resultForStorage)
+                    );
+                } catch (Throwable $e) {
+                    Logger::warning('Project::reconcileChecklist falló en queue: ' . $e->getMessage());
+                }
+            }
         } catch (Throwable $e) {
             Logger::error('processJob error guardando: ' . $e->getMessage());
             self::markFailed($auditId, 'Error guardando el resultado.');

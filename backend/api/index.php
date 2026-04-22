@@ -170,6 +170,10 @@ switch ($endpoint) {
         require __DIR__ . '/user/projects.php';
         break;
 
+    case 'user/project-checklist':
+        require __DIR__ . '/user/project-checklist.php';
+        break;
+
     default:
         Response::error(Translator::t('api.common.endpoint_not_found'), 404);
 }

@@ -268,6 +268,22 @@ try {
             $leadData['projectId'] ?? null,
         ]
     );
+
+    // Reconciliar checklist vivo del proyecto (si hay proyecto asociado).
+    // El audit acaba de insertarse, así que lastAuditsDiff ya puede comparar
+    // con el anterior en P5.5 diff evolutivo — y el reconcile marca done
+    // automáticamente las métricas que pasaron a 🟢.
+    if (!empty($leadData['projectId'])) {
+        try {
+            Project::reconcileChecklist(
+                $db,
+                (int) $leadData['projectId'],
+                Project::flattenMetrics($resultForStorage)
+            );
+        } catch (Throwable $e) {
+            Logger::warning('Project::reconcileChecklist falló: ' . $e->getMessage());
+        }
+    }
 } catch (Throwable $e) {
     Logger::error('Error guardando auditoría: ' . $e->getMessage());
     QueueManager::markFailed($auditId, Translator::t('api.audit.save_error'));
