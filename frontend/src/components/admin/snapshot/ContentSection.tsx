@@ -1,4 +1,5 @@
 import { FileCode2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { SectionCard, KpiTile, IssueList } from './ui'
 import type { SnapshotReport } from '@/types/snapshotReport'
 
@@ -8,29 +9,35 @@ import type { SnapshotReport } from '@/types/snapshotReport'
  * y detectar endpoints REST que podrían exponer datos.
  */
 export default function ContentSection({ report }: { report: SnapshotReport }) {
+  const { t } = useTranslation()
   const s = report.content.summary
   const customPostTypes = report.content.postTypes.filter(p => !p.isBuiltin)
-  const customTaxonomies = report.content.taxonomies.filter(t => !t.isBuiltin)
+  const customTaxonomies = report.content.taxonomies.filter(tx => !tx.isBuiltin)
+  const customSuffix = (count: number) => t('report.snap_content_custom_suffix', { count })
 
   return (
     <SectionCard
-      title="Contenido y REST API"
-      subtitle={`${s.totalPostTypes} post types (${s.customPostTypes} custom) · ${s.totalTaxonomies} taxonomies (${s.customTaxonomies} custom) · ${s.totalRestRoutes} rutas REST`}
+      title={t('report.snap_content_title')}
+      subtitle={t('report.snap_content_subtitle', {
+        pt: s.totalPostTypes, cpt: s.customPostTypes,
+        tax: s.totalTaxonomies, ctax: s.customTaxonomies,
+        rest: s.totalRestRoutes,
+      })}
       icon={<FileCode2 className="h-4 w-4 text-[var(--accent-primary)]" strokeWidth={1.75} />}
     >
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <KpiTile label="Post types" value={s.totalPostTypes} hint={`${s.customPostTypes} custom`} />
-        <KpiTile label="Taxonomies" value={s.totalTaxonomies} hint={`${s.customTaxonomies} custom`} />
+        <KpiTile label={t('report.snap_content_kpi_post_types')} value={s.totalPostTypes} hint={customSuffix(s.customPostTypes)} />
+        <KpiTile label={t('report.snap_content_kpi_taxonomies')} value={s.totalTaxonomies} hint={customSuffix(s.customTaxonomies)} />
         <KpiTile
-          label="Rutas REST"
+          label={t('report.snap_content_kpi_routes')}
           value={s.totalRestRoutes}
           tone={s.totalRestRoutes > 800 ? 'warning' : 'neutral'}
-          hint={`${s.restNamespaces} namespaces`}
+          hint={t('report.snap_content_namespaces_hint', { count: s.restNamespaces })}
         />
         <KpiTile
-          label="CPTs en REST"
+          label={t('report.snap_content_kpi_cpt_rest')}
           value={customPostTypes.filter(p => p.showInRest).length}
-          hint="expuestos públicamente"
+          hint={t('report.snap_content_rest_exposed_hint')}
         />
       </div>
 
@@ -38,15 +45,15 @@ export default function ContentSection({ report }: { report: SnapshotReport }) {
         {/* CPTs custom */}
         <div>
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-            Custom post types ({customPostTypes.length})
+            {t('report.snap_content_cpt_title', { count: customPostTypes.length })}
           </h4>
           <div className="overflow-hidden rounded-lg border border-[var(--border-default)]">
             <table className="w-full text-[11px]">
               <thead className="bg-[var(--bg-secondary)] text-left text-[10px] uppercase tracking-wider text-[var(--text-tertiary)]">
                 <tr>
-                  <th className="px-2 py-1.5">Slug</th>
-                  <th className="px-2 py-1.5">Label</th>
-                  <th className="px-2 py-1.5">REST</th>
+                  <th className="px-2 py-1.5">{t('report.snap_col_slug')}</th>
+                  <th className="px-2 py-1.5">{t('report.snap_col_label')}</th>
+                  <th className="px-2 py-1.5">{t('report.snap_content_col_rest_short')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-default)]">
@@ -55,12 +62,12 @@ export default function ContentSection({ report }: { report: SnapshotReport }) {
                     <td className="px-2 py-1 font-mono text-[10px]">{String(p.slug)}</td>
                     <td className="px-2 py-1">{String(p.label || '')}</td>
                     <td className="px-2 py-1 text-[10px]">
-                      {p.showInRest ? <span className="text-emerald-600">sí</span> : <span className="text-[var(--text-tertiary)]">no</span>}
+                      {p.showInRest ? <span className="text-emerald-600">{t('report.snap_content_yes_short')}</span> : <span className="text-[var(--text-tertiary)]">{t('report.snap_content_no_short')}</span>}
                     </td>
                   </tr>
                 ))}
                 {customPostTypes.length === 0 && (
-                  <tr><td colSpan={3} className="px-2 py-2 text-center text-[var(--text-tertiary)]">Ninguno</td></tr>
+                  <tr><td colSpan={3} className="px-2 py-2 text-center text-[var(--text-tertiary)]">{t('report.snap_none_masc')}</td></tr>
                 )}
               </tbody>
             </table>
@@ -70,27 +77,27 @@ export default function ContentSection({ report }: { report: SnapshotReport }) {
         {/* Taxonomies custom */}
         <div>
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-            Taxonomies custom ({customTaxonomies.length})
+            {t('report.snap_content_ctax_title', { count: customTaxonomies.length })}
           </h4>
           <div className="overflow-hidden rounded-lg border border-[var(--border-default)]">
             <table className="w-full text-[11px]">
               <thead className="bg-[var(--bg-secondary)] text-left text-[10px] uppercase tracking-wider text-[var(--text-tertiary)]">
                 <tr>
-                  <th className="px-2 py-1.5">Slug</th>
-                  <th className="px-2 py-1.5">Label</th>
-                  <th className="px-2 py-1.5">Hier.</th>
+                  <th className="px-2 py-1.5">{t('report.snap_col_slug')}</th>
+                  <th className="px-2 py-1.5">{t('report.snap_col_label')}</th>
+                  <th className="px-2 py-1.5">{t('report.snap_content_col_hier_short')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-default)]">
-                {customTaxonomies.map((t) => (
-                  <tr key={String(t.slug)}>
-                    <td className="px-2 py-1 font-mono text-[10px]">{String(t.slug)}</td>
-                    <td className="px-2 py-1">{String(t.label || '')}</td>
-                    <td className="px-2 py-1 text-[10px]">{t.hierarchical ? 'sí' : 'no'}</td>
+                {customTaxonomies.map((tx) => (
+                  <tr key={String(tx.slug)}>
+                    <td className="px-2 py-1 font-mono text-[10px]">{String(tx.slug)}</td>
+                    <td className="px-2 py-1">{String(tx.label || '')}</td>
+                    <td className="px-2 py-1 text-[10px]">{tx.hierarchical ? t('report.snap_content_yes_short') : t('report.snap_content_no_short')}</td>
                   </tr>
                 ))}
                 {customTaxonomies.length === 0 && (
-                  <tr><td colSpan={3} className="px-2 py-2 text-center text-[var(--text-tertiary)]">Ninguna</td></tr>
+                  <tr><td colSpan={3} className="px-2 py-2 text-center text-[var(--text-tertiary)]">{t('report.snap_none_fem')}</td></tr>
                 )}
               </tbody>
             </table>
@@ -100,14 +107,14 @@ export default function ContentSection({ report }: { report: SnapshotReport }) {
         {/* Top namespaces REST */}
         <div>
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-            Top namespaces REST
+            {t('report.snap_content_rest_title')}
           </h4>
           <div className="overflow-hidden rounded-lg border border-[var(--border-default)]">
             <table className="w-full text-[11px]">
               <thead className="bg-[var(--bg-secondary)] text-left text-[10px] uppercase tracking-wider text-[var(--text-tertiary)]">
                 <tr>
-                  <th className="px-2 py-1.5">Namespace</th>
-                  <th className="px-2 py-1.5 text-right">Rutas</th>
+                  <th className="px-2 py-1.5">{t('report.snap_col_namespace')}</th>
+                  <th className="px-2 py-1.5 text-right">{t('report.snap_content_col_routes')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-default)]">
