@@ -7,12 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useUser, type ProjectDetail, type ProjectChecklistItem } from '@/hooks/useUser'
+import { useAudit } from '@/hooks/useAudit'
 
 export default function UserProjectDetailPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const { isLoading, isAuthenticated, fetchProject, fetchProjectChecklist, updateChecklistItem, enableProjectShare, disableProjectShare } = useUser()
+  const { startAudit: runAudit, status: auditStatus } = useAudit()
 
   const [detail, setDetail] = useState<ProjectDetail | null>(null)
   const [checklist, setChecklist] = useState<ProjectChecklistItem[]>([])
@@ -124,7 +126,17 @@ export default function UserProjectDetailPage() {
   const { project, audits, checklistSummary, evolution } = detail
   const latest = audits[0] ?? null
   const currentScore = latest?.globalScore ?? null
-  const scanHref = `/?url=${encodeURIComponent(project.url)}`
+  const isScanning = auditStatus === 'scanning'
+
+  // Dispara el scan con la URL del proyecto directamente — sin form, sin
+  // lead fields. useAudit pone status='scanning', el ScanningAnimation se
+  // muestra en / y al terminar navega a /account/audits/:id (la redirect
+  // path vive en useAudit y detecta la sesión de user).
+  const runProjectScan = () => {
+    if (isScanning) return
+    runAudit({ url: project.url })
+    navigate('/')
+  }
 
   return (
     <div className="min-h-screen bg-[#F4F6F8]">
@@ -134,12 +146,12 @@ export default function UserProjectDetailPage() {
             <ArrowLeft className="h-4 w-4" />
             {t('projects.detail_back')}
           </Link>
-          <a href={scanHref}>
-            <Button size="sm">
-              <Play className="h-4 w-4" />
-              {t('projects.detail_new_scan')}
-            </Button>
-          </a>
+          <Button size="sm" onClick={runProjectScan} disabled={isScanning}>
+            {isScanning
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <Play className="h-4 w-4" />}
+            {t('projects.detail_new_scan')}
+          </Button>
         </div>
       </header>
 

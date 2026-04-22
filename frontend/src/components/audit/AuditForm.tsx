@@ -1,13 +1,16 @@
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { Globe, User, Mail, Phone, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAudit } from '@/hooks/useAudit'
 import { useConfigStore } from '@/store/configStore'
+import { useUserAuthStore } from '@/store/userAuthStore'
 
 type AuditFormData = {
   url: string
@@ -20,6 +23,11 @@ export default function AuditForm() {
   const { t } = useTranslation()
   const { startAudit, status } = useAudit()
   const { home, form: formCfg } = useConfigStore((s) => s.config)
+  const [searchParams] = useSearchParams()
+  // Si hay sesión de user, escondemos los campos de lead — ya tenemos su
+  // identidad en el backend vía sesión. Para el público anónimo siguen ahí
+  // como lead-capture del flujo CTA.
+  const isAuthenticated = useUserAuthStore((s) => s.isAuthenticated)
   const isScanning = status === 'scanning'
   const microItems = (home.formMicrocopy || t('public.audit_form_microcopy_default'))
     .split(/\s*[·•|]\s*/).filter(Boolean)
@@ -42,15 +50,22 @@ export default function AuditForm() {
     leadWhatsapp: z.string().optional(),
   })
 
-  const { register, handleSubmit, formState: { errors } } = useForm<AuditFormData>({
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<AuditFormData>({
     resolver: zodResolver(auditSchema),
     defaultValues: {
-      url: '',
+      url: searchParams.get('url') ?? '',
       leadName: '',
       leadEmail: '',
       leadWhatsapp: '',
     },
   })
+
+  // Permite entrar a /?url=... y tener el input pre-cargado (vienen de
+  // "Scan now" en la página del proyecto o de links externos).
+  useEffect(() => {
+    const preUrl = searchParams.get('url')
+    if (preUrl) setValue('url', preUrl)
+  }, [searchParams, setValue])
 
   const onSubmit = (data: AuditFormData) => {
     const url = data.url.startsWith('http') ? data.url : `https://${data.url}`
@@ -82,37 +97,40 @@ export default function AuditForm() {
             )}
           </div>
 
-          {/* Campos opcionales de lead */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />
-              <Input
-                {...register('leadName')}
-                placeholder={formCfg?.placeholderName || 'Tu nombre'}
-                className="pl-10"
-                disabled={isScanning}
-              />
+          {/* Campos opcionales de lead — solo para público anónimo. Los
+              usuarios logueados ya están identificados por sesión. */}
+          {!isAuthenticated && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />
+                <Input
+                  {...register('leadName')}
+                  placeholder={formCfg?.placeholderName || 'Tu nombre'}
+                  className="pl-10"
+                  disabled={isScanning}
+                />
+              </div>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />
+                <Input
+                  {...register('leadEmail')}
+                  placeholder={formCfg?.placeholderEmail || 'tu@email.com'}
+                  type="email"
+                  className="pl-10"
+                  disabled={isScanning}
+                />
+              </div>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />
+                <Input
+                  {...register('leadWhatsapp')}
+                  placeholder={formCfg?.placeholderWhatsapp || '+57...'}
+                  className="pl-10"
+                  disabled={isScanning}
+                />
+              </div>
             </div>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />
-              <Input
-                {...register('leadEmail')}
-                placeholder={formCfg?.placeholderEmail || 'tu@email.com'}
-                type="email"
-                className="pl-10"
-                disabled={isScanning}
-              />
-            </div>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />
-              <Input
-                {...register('leadWhatsapp')}
-                placeholder={formCfg?.placeholderWhatsapp || '+57...'}
-                className="pl-10"
-                disabled={isScanning}
-              />
-            </div>
-          </div>
+          )}
 
           {/* Botón submit */}
           <Button

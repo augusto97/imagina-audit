@@ -1,8 +1,20 @@
 import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuditStore } from '@/store/auditStore'
+import { useUserAuthStore } from '@/store/userAuthStore'
 import { startAudit, getScanProgress, getAuditResult } from '@/lib/api'
 import type { AuditRequest } from '@/types/audit'
+
+/**
+ * Devuelve el path al que navegar tras un audit completado. Si hay
+ * sesión de user activa, va a la vista owner (/account/audits/:id) que
+ * tiene los 4 tabs (detail, report, snapshot, waterfall). Si no, usa
+ * el /results/:id público.
+ */
+function auditViewPath(auditId: string): string {
+  const isUser = useUserAuthStore.getState().isAuthenticated
+  return isUser ? `/account/audits/${auditId}` : `/results/${auditId}`
+}
 
 const POLL_INTERVAL_MS = 1500
 // 15 min máximo — cubre el caso de cola llena (ej. 30 audits esperando con 3 slots)
@@ -36,7 +48,7 @@ export function useAudit() {
         if (progress.status === 'completed') {
           const auditResult = await getAuditResult(auditId)
           setResult(auditResult)
-          navigate(`/results/${auditId}`)
+          navigate(auditViewPath(auditId))
           return
         }
 
@@ -69,7 +81,7 @@ export function useAudit() {
       if (response.cached && response.result) {
         // Camino rápido: resultado cacheado
         setResult(response.result)
-        navigate(`/results/${response.auditId}`)
+        navigate(auditViewPath(response.auditId))
         return
       }
 
