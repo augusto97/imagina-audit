@@ -116,4 +116,9 @@ return [
     'users.email_invalid' => 'Email inválido.',
     'users.email_exists'  => 'Ya existe un usuario con ese email.',
     'users.password_too_short' => 'La contraseña debe tener al menos 10 caracteres.',
+
+    // ——— /admin/projects.php (P5.3) ——————————————————————————————
+    'projects.fetch_error'  => 'Error al cargar los proyectos.',
+    'projects.delete_error' => 'Error al eliminar el proyecto.',
+    'projects.not_found'    => 'Proyecto no encontrado.',
 ];

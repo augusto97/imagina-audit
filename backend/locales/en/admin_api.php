@@ -116,4 +116,9 @@ return [
     'users.email_invalid' => 'Invalid email address.',
     'users.email_exists'  => 'A user with that email already exists.',
     'users.password_too_short' => 'Password must be at least 10 characters.',
+
+    // ——— /admin/projects.php (P5.3) ——————————————————————————————
+    'projects.fetch_error'  => 'Failed to load projects.',
+    'projects.delete_error' => 'Failed to delete the project.',
+    'projects.not_found'    => 'Project not found.',
 ];

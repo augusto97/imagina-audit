@@ -146,6 +146,10 @@ switch ($endpoint) {
         require __DIR__ . '/admin/plans.php';
         break;
 
+    case 'admin/projects':
+        require __DIR__ . '/admin/projects.php';
+        break;
+
     case 'user/login':
         require __DIR__ . '/user/login.php';
         break;

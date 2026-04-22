@@ -20,7 +20,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'GET') {
     try {
         $rows = $db->query(
-            "SELECT p.id, p.name, p.monthly_limit, p.description, p.is_active, p.created_at,
+            "SELECT p.id, p.name, p.monthly_limit, p.max_projects, p.description, p.is_active, p.created_at,
                     COALESCE(uc.cnt, 0) AS user_count
              FROM plans p
              LEFT JOIN (SELECT plan_id, COUNT(*) AS cnt FROM users WHERE plan_id IS NOT NULL GROUP BY plan_id) uc
@@ -31,6 +31,7 @@ if ($method === 'GET') {
             'id' => (int) $r['id'],
             'name' => $r['name'],
             'monthlyLimit' => (int) $r['monthly_limit'],
+            'maxProjects' => (int) ($r['max_projects'] ?? 0),
             'description' => $r['description'],
             'isActive' => (int) $r['is_active'] === 1,
             'createdAt' => $r['created_at'],
@@ -47,20 +48,21 @@ if ($method === 'POST') {
     $body = Response::getJsonBody();
     $name = trim((string) ($body['name'] ?? ''));
     $limit = (int) ($body['monthlyLimit'] ?? 0);
+    $maxProjects = (int) ($body['maxProjects'] ?? 0);
     $description = trim((string) ($body['description'] ?? ''));
     $isActive = !empty($body['isActive']) ? 1 : 0;
 
     if ($name === '') {
         Response::error(Translator::t('admin_api.plans.name_required'), 400);
     }
-    if ($limit < 0) {
+    if ($limit < 0 || $maxProjects < 0) {
         Response::error(Translator::t('admin_api.plans.limit_invalid'), 400);
     }
 
     try {
         $db->execute(
-            "INSERT INTO plans (name, monthly_limit, description, is_active) VALUES (?, ?, ?, ?)",
-            [$name, $limit, $description !== '' ? $description : null, $isActive]
+            "INSERT INTO plans (name, monthly_limit, max_projects, description, is_active) VALUES (?, ?, ?, ?, ?)",
+            [$name, $limit, $maxProjects, $description !== '' ? $description : null, $isActive]
         );
         Response::success(['id' => (int) $db->lastInsertId()], 201);
     } catch (Throwable $e) {
@@ -76,13 +78,14 @@ if ($method === 'PUT') {
 
     $name = trim((string) ($body['name'] ?? ''));
     $limit = (int) ($body['monthlyLimit'] ?? 0);
+    $maxProjects = (int) ($body['maxProjects'] ?? 0);
     $description = trim((string) ($body['description'] ?? ''));
     $isActive = !empty($body['isActive']) ? 1 : 0;
 
     if ($name === '') {
         Response::error(Translator::t('admin_api.plans.name_required'), 400);
     }
-    if ($limit < 0) {
+    if ($limit < 0 || $maxProjects < 0) {
         Response::error(Translator::t('admin_api.plans.limit_invalid'), 400);
     }
 
@@ -91,8 +94,8 @@ if ($method === 'PUT') {
         if (!$exists) Response::error(Translator::t('admin_api.plans.not_found'), 404);
 
         $db->execute(
-            "UPDATE plans SET name = ?, monthly_limit = ?, description = ?, is_active = ? WHERE id = ?",
-            [$name, $limit, $description !== '' ? $description : null, $isActive, $id]
+            "UPDATE plans SET name = ?, monthly_limit = ?, max_projects = ?, description = ?, is_active = ? WHERE id = ?",
+            [$name, $limit, $maxProjects, $description !== '' ? $description : null, $isActive, $id]
         );
         Response::success(['ok' => true]);
     } catch (Throwable $e) {
