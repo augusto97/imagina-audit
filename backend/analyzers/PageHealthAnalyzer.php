@@ -44,14 +44,14 @@ class PageHealthAnalyzer {
 
         return [
             'id' => 'page_health',
-            'name' => 'Salud de Página',
+            'name' => Translator::t('modules.page_health.name'),
             'icon' => 'heart-pulse',
             'score' => $score,
             'level' => Scoring::getLevel($score),
             'weight' => $defaults['weight_page_health'] ?? 0.10,
             'metrics' => $metrics,
-            'summary' => "La salud técnica de la página tiene una puntuación de $score/100.",
-            'salesMessage' => $defaults['sales_page_health'] ?? 'Corregimos todos los errores técnicos de tu sitio para mejorar su rendimiento y posicionamiento.',
+            'summary' => Translator::t('page_health.summary', ['score' => $score]),
+            'salesMessage' => !empty($defaults['sales_page_health']) ? $defaults['sales_page_health'] : Translator::t('modules.sales.page_health'),
         ];
     }
 
@@ -60,22 +60,30 @@ class PageHealthAnalyzer {
         $score = $status === 200 ? 100 : ($status < 400 ? 70 : 0);
 
         return Scoring::createMetric(
-            'status_code', 'Código de estado HTTP', $status, (string)$status,
+            'status_code',
+            Translator::t('page_health.status.name'),
+            $status,
+            Translator::t('page_health.status.display', ['code' => $status]),
             $status === 200 ? null : $score, // 200 es informativo, otros sí afectan
             $status === 200
-                ? 'La página responde con código 200 (OK).'
-                : "La página responde con código $status. Se espera código 200 para una página saludable.",
-            $status !== 200 ? 'Verificar que la página principal devuelva código 200.' : '',
-            'Verificamos que todas las páginas respondan correctamente.'
+                ? Translator::t('page_health.status.desc.ok')
+                : Translator::t('page_health.status.desc.bad', ['code' => $status]),
+            $status !== 200 ? Translator::t('page_health.status.recommend') : '',
+            Translator::t('page_health.status.solution')
         );
     }
 
     private function checkMixedContent(): array {
         if (!$this->isHttps) {
             return Scoring::createMetric(
-                'mixed_content', 'Contenido mixto HTTP/HTTPS', null, 'N/A (sitio HTTP)', 70,
-                'El sitio no usa HTTPS, por lo que no aplica la verificación de contenido mixto.',
-                'Migrar el sitio a HTTPS.', 'Migramos tu sitio a HTTPS y corregimos contenido mixto.'
+                'mixed_content',
+                Translator::t('page_health.mixed.name'),
+                null,
+                Translator::t('page_health.mixed.display.na'),
+                70,
+                Translator::t('page_health.mixed.desc.na'),
+                Translator::t('page_health.mixed.recommend.na'),
+                Translator::t('page_health.mixed.solution.na')
             );
         }
 
@@ -91,13 +99,18 @@ class PageHealthAnalyzer {
 
         $score = $found === 0 ? 100 : ($found <= 3 ? 60 : 20);
         return Scoring::createMetric(
-            'mixed_content', 'Contenido mixto HTTP/HTTPS', $found, $found === 0 ? 'No detectado' : "$found recursos mixtos",
+            'mixed_content',
+            Translator::t('page_health.mixed.name'),
+            $found,
+            $found === 0
+                ? Translator::t('page_health.mixed.display.ok')
+                : Translator::t('page_health.mixed.display.bad', ['count' => $found]),
             $score,
             $found === 0
-                ? 'No se detectaron recursos cargados por HTTP en una página HTTPS. Correcto.'
-                : "Se detectaron $found recursos cargados por HTTP inseguro dentro de una página HTTPS. Esto genera advertencias de seguridad en el navegador.",
-            $found > 0 ? 'Cambiar todas las URLs de recursos de http:// a https:// o usar URLs relativas al protocolo.' : '',
-            'Corregimos todos los problemas de contenido mixto.',
+                ? Translator::t('page_health.mixed.desc.ok')
+                : Translator::t('page_health.mixed.desc.bad', ['count' => $found]),
+            $found > 0 ? Translator::t('page_health.mixed.recommend.bad') : '',
+            Translator::t('page_health.mixed.solution'),
             ['count' => $found]
         );
     }
@@ -107,13 +120,14 @@ class PageHealthAnalyzer {
         $hasRefresh = $metaRefresh !== null;
 
         return Scoring::createMetric(
-            'meta_refresh', 'Meta Refresh', $hasRefresh, $hasRefresh ? 'Detectado' : 'No',
+            'meta_refresh',
+            Translator::t('page_health.mrefresh.name'),
+            $hasRefresh,
+            $hasRefresh ? Translator::t('page_health.mrefresh.display.bad') : Translator::t('page_health.mrefresh.display.ok'),
             $hasRefresh ? 30 : 100,
-            $hasRefresh
-                ? "Se detectó <meta http-equiv=\"refresh\">. Esto redirige la página automáticamente y es malo para SEO porque los buscadores no lo manejan bien."
-                : 'No se detectó meta refresh. Correcto.',
-            $hasRefresh ? 'Reemplazar meta refresh con redirección 301 del servidor.' : '',
-            'Configuramos redirecciones correctas desde el servidor.'
+            $hasRefresh ? Translator::t('page_health.mrefresh.desc.bad') : Translator::t('page_health.mrefresh.desc.ok'),
+            $hasRefresh ? Translator::t('page_health.mrefresh.recommend') : '',
+            Translator::t('page_health.mrefresh.solution')
         );
     }
 
@@ -126,13 +140,18 @@ class PageHealthAnalyzer {
 
         $score = $isUtf8 ? 100 : ($hasCharset ? 70 : 30);
         return Scoring::createMetric(
-            'charset', 'Codificación de caracteres', $detectedCharset, $detectedCharset ?: 'No declarada',
+            'charset',
+            Translator::t('page_health.charset.name'),
+            $detectedCharset,
+            $detectedCharset ?: Translator::t('page_health.charset.display.none'),
             $score,
-            $isUtf8 ? 'Codificación UTF-8 declarada correctamente.'
-                : ($hasCharset ? "Codificación declarada como \"$detectedCharset\". Se recomienda UTF-8."
-                    : 'No se declaró la codificación de caracteres. Puede causar problemas con acentos y caracteres especiales.'),
-            !$isUtf8 ? 'Agregar <meta charset="UTF-8"> al inicio del <head>.' : '',
-            'Verificamos la codificación de caracteres en todas las páginas.'
+            $isUtf8
+                ? Translator::t('page_health.charset.desc.utf8')
+                : ($hasCharset
+                    ? Translator::t('page_health.charset.desc.other', ['charset' => $detectedCharset])
+                    : Translator::t('page_health.charset.desc.none')),
+            !$isUtf8 ? Translator::t('page_health.charset.recommend') : '',
+            Translator::t('page_health.charset.solution')
         );
     }
 
@@ -141,17 +160,29 @@ class PageHealthAnalyzer {
         $iframeCount = substr_count(strtolower($this->html), '<iframe');
 
         $score = $hasFrame ? 20 : ($iframeCount > 5 ? 60 : 100);
-        $display = $hasFrame ? 'Usa <frame> (obsoleto)' : ($iframeCount > 0 ? "$iframeCount iframes" : 'No usa frames');
+        if ($hasFrame) {
+            $display = Translator::t('page_health.frames.display.frame');
+            $desc = Translator::t('page_health.frames.desc.frame');
+        } elseif ($iframeCount > 5) {
+            $display = Translator::t('page_health.frames.display.many', ['count' => $iframeCount]);
+            $desc = Translator::t('page_health.frames.desc.many', ['count' => $iframeCount]);
+        } elseif ($iframeCount > 0) {
+            $display = Translator::t('page_health.frames.display.many', ['count' => $iframeCount]);
+            $desc = Translator::t('page_health.frames.desc.some', ['count' => $iframeCount]);
+        } else {
+            $display = Translator::t('page_health.frames.display.none');
+            $desc = Translator::t('page_health.frames.desc.none');
+        }
 
         return Scoring::createMetric(
-            'frames', 'Frames e Iframes', $iframeCount, $display,
+            'frames',
+            Translator::t('page_health.frames.name'),
+            $iframeCount,
+            $display,
             $score,
-            $hasFrame
-                ? 'El sitio usa <frame>, que es una tecnología obsoleta no soportada por los buscadores.'
-                : ($iframeCount > 5 ? "Se encontraron $iframeCount iframes. Un exceso de iframes puede afectar el rendimiento."
-                    : ($iframeCount > 0 ? "$iframeCount iframes detectados. Cantidad aceptable." : 'No se detectaron frames. Correcto.')),
-            $hasFrame ? 'Eliminar el uso de <frame> y migrar a diseño moderno.' : '',
-            'Optimizamos la estructura de la página eliminando elementos obsoletos.'
+            $desc,
+            $hasFrame ? Translator::t('page_health.frames.recommend') : '',
+            Translator::t('page_health.frames.solution')
         );
     }
 
@@ -160,14 +191,26 @@ class PageHealthAnalyzer {
         $count = count($canonicals);
 
         $score = $count === 1 ? 100 : ($count === 0 ? 50 : 20);
+        if ($count === 1) {
+            $display = Translator::t('page_health.dupcan.display.ok');
+            $desc = Translator::t('page_health.dupcan.desc.ok');
+        } elseif ($count === 0) {
+            $display = Translator::t('page_health.dupcan.display.none');
+            $desc = Translator::t('page_health.dupcan.desc.none');
+        } else {
+            $display = Translator::t('page_health.dupcan.display.dup', ['count' => $count]);
+            $desc = Translator::t('page_health.dupcan.desc.dup', ['count' => $count]);
+        }
+
         return Scoring::createMetric(
-            'duplicate_canonical', 'Canonical duplicado', $count, $count === 1 ? 'Única' : ($count === 0 ? 'No encontrada' : "$count canonicals"),
+            'duplicate_canonical',
+            Translator::t('page_health.dupcan.name'),
+            $count,
+            $display,
             $score,
-            $count === 1 ? 'Se encontró exactamente una etiqueta canonical. Correcto.'
-                : ($count === 0 ? 'No se encontró etiqueta canonical.'
-                    : "Se encontraron $count etiquetas canonical. Solo debe haber una. Los buscadores pueden confundirse con canonicals duplicados."),
-            $count > 1 ? 'Eliminar los canonicals duplicados y dejar solo uno.' : '',
-            'Verificamos y corregimos las etiquetas canonical de todas las páginas.'
+            $desc,
+            $count > 1 ? Translator::t('page_health.dupcan.recommend') : '',
+            Translator::t('page_health.dupcan.solution')
         );
     }
 
@@ -387,13 +430,14 @@ class PageHealthAnalyzer {
         $hasDoctype = (bool)preg_match('/<!DOCTYPE\s+html/i', $this->html);
 
         return Scoring::createMetric(
-            'doctype', 'Declaración DOCTYPE', $hasDoctype, $hasDoctype ? 'HTML5' : 'No encontrada',
+            'doctype',
+            Translator::t('page_health.doctype.name'),
+            $hasDoctype,
+            $hasDoctype ? Translator::t('page_health.doctype.display.ok') : Translator::t('page_health.doctype.display.none'),
             $hasDoctype ? 100 : 40,
-            $hasDoctype
-                ? 'DOCTYPE HTML5 declarado correctamente.'
-                : 'No se encontró <!DOCTYPE html>. Sin DOCTYPE, los navegadores entran en "quirks mode" y renderizan de forma inconsistente.',
-            $hasDoctype ? '' : 'Agregar <!DOCTYPE html> como primera línea del documento.',
-            'Verificamos que todas las páginas tengan la declaración DOCTYPE correcta.'
+            $hasDoctype ? Translator::t('page_health.doctype.desc.ok') : Translator::t('page_health.doctype.desc.none'),
+            $hasDoctype ? '' : Translator::t('page_health.doctype.recommend'),
+            Translator::t('page_health.doctype.solution')
         );
     }
 
