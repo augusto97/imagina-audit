@@ -151,15 +151,25 @@ if ($recentError !== null && !$forceRefresh) {
 
 // Encolar o ejecutar directo
 $auditId = AuditOrchestrator::generateUuid();
+
+// Auto-attach: si el user logged-in ya tiene un proyecto con esta URL exacta,
+// el audit queda atado al proyecto. Model A = 1 proyecto = 1 URL, el match
+// es por URL normalizada (no por dominio) — ver Project::findMatchingProject.
+$projectId = null;
+if ($authUser) {
+    $projectId = Project::findMatchingProject(Database::getInstance(), (int) $authUser['id'], $url);
+}
+
 $leadData = [
     'leadName' => $body['leadName'] ?? '',
     'leadEmail' => $body['leadEmail'] ?? '',
     'leadWhatsapp' => $body['leadWhatsapp'] ?? '',
     'leadCompany' => $body['leadCompany'] ?? '',
-    // userId se persiste en audits.user_id para que la cuenta de cuota
-    // del mes sea exacta tanto si el audit corre inline como si fue
-    // procesado por el drain worker (QueueManager::processJob).
+    // userId y projectId se persisten en audits.* para que el histórico,
+    // cuota mensual y timeline del proyecto sean exactos tanto si el audit
+    // corre inline como si fue procesado por el drain worker.
     'userId' => $authUser ? $authUser['id'] : null,
+    'projectId' => $projectId,
 ];
 
 $slot = QueueManager::enqueueOrStart($auditId, $url, $leadData, $ip);
@@ -246,7 +256,7 @@ try {
     $waterfallJson = JsonStore::encode($perfData);
 
     $db->execute(
-        "INSERT INTO audits (id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_wordpress, scan_duration_ms, result_json, waterfall_json, lang, ip_address, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO audits (id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_wordpress, scan_duration_ms, result_json, waterfall_json, lang, ip_address, user_id, project_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             $result['id'], $result['url'], $result['domain'],
             $leadData['leadName'] ?: null, $leadData['leadEmail'] ?: null,
@@ -255,6 +265,7 @@ try {
             $result['isWordPress'] ? 1 : 0, $result['scanDurationMs'],
             $resultJson, $waterfallJson, $lang, $ip,
             $leadData['userId'] ?? null,
+            $leadData['projectId'] ?? null,
         ]
     );
 } catch (Throwable $e) {

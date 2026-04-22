@@ -136,7 +136,8 @@ class UserAuth {
             $db = Database::getInstance();
             $row = $db->queryOne(
                 "SELECT u.id, u.email, u.name, u.plan_id, u.is_active,
-                        p.name AS plan_name, p.monthly_limit AS plan_limit, p.description AS plan_description
+                        p.name AS plan_name, p.monthly_limit AS plan_limit,
+                        p.max_projects AS plan_max_projects, p.description AS plan_description
                  FROM users u
                  LEFT JOIN plans p ON p.id = u.plan_id
                  WHERE u.id = ?",
@@ -158,6 +159,7 @@ class UserAuth {
                     'id' => (int) $row['plan_id'],
                     'name' => $row['plan_name'],
                     'monthlyLimit' => (int) ($row['plan_limit'] ?? 0),
+                    'maxProjects' => (int) ($row['plan_max_projects'] ?? 0),
                     'description' => $row['plan_description'],
                 ] : null,
             ];

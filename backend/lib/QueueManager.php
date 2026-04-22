@@ -383,7 +383,7 @@ class QueueManager {
             $waterfallJson = JsonStore::encode($perfData);
 
             $db->execute(
-                "INSERT INTO audits (id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_wordpress, scan_duration_ms, result_json, waterfall_json, ip_address, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO audits (id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_wordpress, scan_duration_ms, result_json, waterfall_json, ip_address, user_id, project_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     $result['id'], $result['url'], $result['domain'],
                     $leadData['leadName'] ?? null, $leadData['leadEmail'] ?? null,
@@ -392,6 +392,7 @@ class QueueManager {
                     $result['isWordPress'] ? 1 : 0, $result['scanDurationMs'],
                     $resultJson, $waterfallJson, $ip,
                     $leadData['userId'] ?? null,
+                    $leadData['projectId'] ?? null,
                 ]
             );
         } catch (Throwable $e) {
