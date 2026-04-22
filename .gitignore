@@ -1,6 +1,8 @@
 # Dependencies
 frontend/node_modules/
-frontend/dist/
+# frontend/dist/ NO se ignora — viaja con el repo para que el deploy sea un
+# simple `git pull` sin Node.js en el hosting. Se regenera tras cada cambio
+# de frontend antes del commit.
 
 # Environment
 backend/.env
