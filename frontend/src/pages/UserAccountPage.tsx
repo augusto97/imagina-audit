@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Loader2, LogOut, Plus, Gauge, ShieldCheck, ArrowRight, Globe } from 'lucide-react'
+import { Loader2, LogOut, Plus, Gauge, ShieldCheck, ArrowRight, Globe, Folder } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -98,12 +98,20 @@ export default function UserAccountPage() {
             </h1>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">{user.email}</p>
           </div>
-          <Link to="/">
-            <Button size="sm">
-              <Plus className="h-4 w-4" />
-              {t('account.new_audit')}
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/account/projects">
+              <Button variant="outline" size="sm">
+                <Folder className="h-4 w-4" />
+                {t('projects.title')}
+              </Button>
+            </Link>
+            <Link to="/">
+              <Button size="sm">
+                <Plus className="h-4 w-4" />
+                {t('account.new_audit')}
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Banner cuota crítica */}

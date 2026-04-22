@@ -29,6 +29,53 @@ interface UserAuditsPage {
   totalPages: number
 }
 
+export interface ProjectSummary {
+  id: number
+  name: string
+  url: string
+  domain: string
+  notes: string | null
+  icon: string | null
+  color: string | null
+  createdAt: string
+  sharingEnabled: boolean
+  auditCount: number
+  openChecklistCount: number
+  latestAudit: { id: string; globalScore: number; globalLevel: string; createdAt: string } | null
+}
+
+export interface ProjectsListResponse {
+  projects: ProjectSummary[]
+  total: number
+  quota: { maxProjects: number; used: number; remaining: number | null; unlimited: boolean }
+}
+
+export interface ProjectDetail {
+  project: {
+    id: number
+    name: string
+    url: string
+    domain: string
+    notes: string | null
+    icon: string | null
+    color: string | null
+    createdAt: string
+    sharing: { enabled: boolean; token: string | null }
+  }
+  audits: UserAudit[]
+  checklistSummary: { open: number; done: number; ignored: number }
+  evolution: {
+    latestAuditId: string
+    previousAuditId: string
+    scoreDelta: number
+    latestScore: number
+    previousScore: number
+    issuesDelta: { critical: number; warning: number }
+    wordpress: { previousVersion: string | null; latestVersion: string | null; changed: boolean } | null
+    plugins: { added: string[]; removed: string[]; kept: string[] }
+  } | null
+}
+
 /**
  * Hook de sesión del usuario (separado del admin). Maneja login/logout,
  * mantiene el estado en `userAuthStore`, y recarga desde /api/user/session
@@ -91,6 +138,41 @@ export function useUser() {
     }
   }, [])
 
+  // ─── Projects (P5) ──────────────────────────────────────────────
+  const fetchProjects = useCallback(async (): Promise<ProjectsListResponse | null> => {
+    try {
+      const res = await api.get<{ success: boolean; data: ProjectsListResponse }>('/user/projects.php')
+      return res.data?.data ?? null
+    } catch {
+      return null
+    }
+  }, [])
+
+  const fetchProject = useCallback(async (id: number): Promise<ProjectDetail | null> => {
+    try {
+      const res = await api.get<{ success: boolean; data: ProjectDetail }>('/user/projects.php', {
+        params: { id },
+      })
+      return res.data?.data ?? null
+    } catch {
+      return null
+    }
+  }, [])
+
+  const createProject = useCallback(async (body: Record<string, unknown>) => {
+    const res = await api.post<{ success: boolean; data: { id: number } }>('/user/projects.php', body)
+    return res.data?.data
+  }, [])
+
+  const updateProject = useCallback(async (body: Record<string, unknown>) => {
+    const res = await api.put('/user/projects.php', body)
+    return res.data?.data
+  }, [])
+
+  const deleteProject = useCallback(async (id: number) => {
+    await api.delete('/user/projects.php', { params: { id } })
+  }, [])
+
   // Check session al montar
   useEffect(() => {
     checkSession()
@@ -106,5 +188,10 @@ export function useUser() {
     logout,
     checkSession,
     fetchAudits,
+    fetchProjects,
+    fetchProject,
+    createProject,
+    updateProject,
+    deleteProject,
   }
 }

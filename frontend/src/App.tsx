@@ -11,6 +11,8 @@ import { useConfigStore } from './store/configStore'
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const UserLoginPage = lazy(() => import('./pages/UserLoginPage'))
 const UserAccountPage = lazy(() => import('./pages/UserAccountPage'))
+const UserProjectsPage = lazy(() => import('./pages/UserProjectsPage'))
+const UserProjectDetailPage = lazy(() => import('./pages/UserProjectDetailPage'))
 
 function App() {
   const reloadConfig = useConfigStore((s) => s.reload)
@@ -50,6 +52,24 @@ function App() {
             </div>
           }>
             <UserAccountPage />
+          </Suspense>
+        } />
+        <Route path="/account/projects" element={
+          <Suspense fallback={
+            <div className="flex h-screen items-center justify-center bg-[var(--bg-secondary)]">
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-primary)]" />
+            </div>
+          }>
+            <UserProjectsPage />
+          </Suspense>
+        } />
+        <Route path="/account/projects/:id" element={
+          <Suspense fallback={
+            <div className="flex h-screen items-center justify-center bg-[var(--bg-secondary)]">
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-primary)]" />
+            </div>
+          }>
+            <UserProjectDetailPage />
           </Suspense>
         } />
         <Route path="*" element={<NotFoundPage />} />
