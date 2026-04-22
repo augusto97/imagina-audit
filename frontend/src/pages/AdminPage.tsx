@@ -16,6 +16,7 @@ import SettingsMessages from '@/components/admin/SettingsMessages'
 import SettingsPlans from '@/components/admin/SettingsPlans'
 import AdminUsers from '@/components/admin/AdminUsers'
 import AdminUserPlans from '@/components/admin/AdminUserPlans'
+import AdminProjects from '@/components/admin/AdminProjects'
 import SettingsScoring from '@/components/admin/SettingsScoring'
 import SettingsQueue from '@/components/admin/SettingsQueue'
 import SettingsRetention from '@/components/admin/SettingsRetention'
@@ -65,6 +66,7 @@ export default function AdminPage() {
         <Route path="leads/:id" element={<LeadDetail />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="user-plans" element={<AdminUserPlans />} />
+        <Route path="projects" element={<AdminProjects />} />
         <Route path="leads/:id/report" element={<TechnicalReport />} />
         <Route path="leads/:id/internal" element={<SnapshotReport />} />
         <Route path="leads/:id/waterfall" element={<WaterfallPage />} />

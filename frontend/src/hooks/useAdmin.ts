@@ -309,6 +309,19 @@ export function useAdmin() {
     } catch (err) { handleError(err) }
   }, [handleError])
 
+  const fetchAdminProjects = useCallback(async (params: Record<string, string | number> = {}) => {
+    try {
+      const res = await api.get('/admin/projects.php', { params })
+      return res.data.data
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const deleteAdminProject = useCallback(async (id: number) => {
+    try {
+      await api.delete('/admin/projects.php', { params: { id } })
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
   return {
     fetchDashboard, fetchLeads, fetchLeadDetail, deleteLead, bulkLeads,
     fetchSettings, updateSettings, fetchQueueStatus,
@@ -321,5 +334,6 @@ export function useAdmin() {
     fetchTranslationsMeta, fetchTranslations, updateTranslation, deleteTranslation, aiTranslate,
     fetchUsers, createUser, updateUser, deleteUser,
     fetchUserPlans, createUserPlan, updateUserPlan, deleteUserPlan,
+    fetchAdminProjects, deleteAdminProject,
   }
 }

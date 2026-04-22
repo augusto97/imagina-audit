@@ -18,6 +18,7 @@ interface Plan {
   id: number
   name: string
   monthlyLimit: number
+  maxProjects: number
   description: string | null
   isActive: boolean
   userCount: number
@@ -28,6 +29,7 @@ interface FormValues {
   id?: number
   name: string
   monthlyLimit: number
+  maxProjects: number
   description: string
   isActive: boolean
 }
@@ -98,6 +100,7 @@ export default function AdminUserPlans() {
                   <tr>
                     <th className="px-3 py-2">{t('admin_user_plans.col_name')}</th>
                     <th className="px-3 py-2">{t('admin_user_plans.col_limit')}</th>
+                    <th className="px-3 py-2">{t('admin_user_plans.col_projects')}</th>
                     <th className="px-3 py-2 text-right">{t('admin_user_plans.col_users')}</th>
                     <th className="px-3 py-2">{t('admin_user_plans.col_status')}</th>
                     <th className="px-3 py-2 w-32"></th>
@@ -114,6 +117,11 @@ export default function AdminUserPlans() {
                         {p.monthlyLimit === 0
                           ? <Badge variant="success" className="text-[10px]">{t('admin_user_plans.limit_unlimited')}</Badge>
                           : <span className="text-xs tabular-nums">{t('admin_user_plans.limit_per_month', { count: p.monthlyLimit })}</span>}
+                      </td>
+                      <td className="px-3 py-2">
+                        {p.maxProjects === 0
+                          ? <Badge variant="success" className="text-[10px]">{t('admin_user_plans.limit_unlimited')}</Badge>
+                          : <span className="text-xs tabular-nums">{p.maxProjects}</span>}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-xs">{p.userCount}</td>
                       <td className="px-3 py-2">
@@ -184,6 +192,7 @@ function PlanModal({
       id: initial?.id,
       name: initial?.name ?? '',
       monthlyLimit: initial?.monthlyLimit ?? 10,
+      maxProjects: initial?.maxProjects ?? 0,
       description: initial?.description ?? '',
       isActive: initial?.isActive ?? true,
     },
@@ -195,6 +204,7 @@ function PlanModal({
         ...(isEdit ? { id: initial!.id } : {}),
         name: values.name,
         monthlyLimit: Number(values.monthlyLimit),
+        maxProjects: Number(values.maxProjects),
         description: values.description,
         isActive: Boolean(values.isActive),
       }
@@ -223,10 +233,17 @@ function PlanModal({
             <Label>{t('admin_user_plans.field_name')}</Label>
             <Input placeholder={t('admin_user_plans.field_name_placeholder')} {...register('name', { required: true })} />
           </div>
-          <div className="space-y-1.5">
-            <Label>{t('admin_user_plans.field_limit')}</Label>
-            <Input type="number" min={0} {...register('monthlyLimit', { valueAsNumber: true })} />
-            <p className="text-[11px] text-[var(--text-tertiary)]">{t('admin_user_plans.field_limit_hint')}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>{t('admin_user_plans.field_limit')}</Label>
+              <Input type="number" min={0} {...register('monthlyLimit', { valueAsNumber: true })} />
+              <p className="text-[11px] text-[var(--text-tertiary)]">{t('admin_user_plans.field_limit_hint')}</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t('admin_user_plans.field_max_projects')}</Label>
+              <Input type="number" min={0} {...register('maxProjects', { valueAsNumber: true })} />
+              <p className="text-[11px] text-[var(--text-tertiary)]">{t('admin_user_plans.field_max_projects_hint')}</p>
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label>{t('admin_user_plans.field_description')}</Label>
