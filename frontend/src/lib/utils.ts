@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import i18n from '@/i18n'
 
 /**
  * Combina clases CSS con soporte para Tailwind merge
@@ -59,16 +60,18 @@ export function getLevelClassName(level: string): string {
 }
 
 /**
- * Obtiene la etiqueta legible para un nivel de semáforo
+ * Obtiene la etiqueta legible para un nivel de semáforo.
+ * Usa i18next para localizar — se importa dinámicamente para evitar
+ * dependencia circular con el store de config.
  */
 export function getLevelLabel(level: string): string {
-  const labels: Record<string, string> = {
-    critical: 'Crítico',
-    warning: 'Importante',
-    good: 'Bien',
-    excellent: 'Excelente',
-    info: 'Informativo',
-    unknown: 'No disponible',
+  const keys: Record<string, string> = {
+    critical:  'common.level_critical',
+    warning:   'common.level_warning',
+    good:      'common.level_good',
+    excellent: 'common.level_excellent',
+    info:      'common.level_info',
+    unknown:   'common.level_unknown',
   }
-  return labels[level] || labels.unknown
+  return i18n.t(keys[level] || keys.unknown)
 }

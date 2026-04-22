@@ -24,7 +24,13 @@
     "none": "None",
     "all": "All",
     "page_of": "{{current}} of {{total}}",
-    "rows_per_page": "Rows per page:"
+    "rows_per_page": "Rows per page:",
+    "level_critical": "Critical",
+    "level_warning": "Important",
+    "level_good": "Good",
+    "level_excellent": "Excellent",
+    "level_info": "Informational",
+    "level_unknown": "Not available"
   },
   "languages": {
     "en": "English",

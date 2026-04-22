@@ -24,7 +24,13 @@
     "none": "Ninguno",
     "all": "Todos",
     "page_of": "{{current}} de {{total}}",
-    "rows_per_page": "Filas por página:"
+    "rows_per_page": "Filas por página:",
+    "level_critical": "Crítico",
+    "level_warning": "Importante",
+    "level_good": "Bien",
+    "level_excellent": "Excelente",
+    "level_info": "Informativo",
+    "level_unknown": "No disponible"
   },
   "languages": {
     "en": "Inglés",

@@ -188,8 +188,8 @@ class Scoring {
         $monthlyLoss = (int) round($lostConversions * $avgConversionValue);
 
         $explanation = $monthlyLoss > 0
-            ? "Tu sitio carga en {$loadTimeSeconds}s. Cada segundo extra sobre 2.5s reduce las conversiones ~7%. Estimamos una pérdida de ~\${$monthlyLoss} USD/mes basado en promedios de la industria."
-            : 'Tu sitio tiene buenos tiempos de carga. No se estima pérdida significativa por velocidad.';
+            ? Translator::t('scoring.economic.explanation.loss', ['seconds' => $loadTimeSeconds, 'loss' => $monthlyLoss])
+            : Translator::t('scoring.economic.explanation.ok');
 
         return [
             'estimatedMonthlyLoss' => $monthlyLoss,
