@@ -21,7 +21,7 @@
 require_once __DIR__ . '/bootstrap.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 set_time_limit(180); // 3 min: suficiente para 1-3 audits consecutivos
@@ -34,7 +34,7 @@ if (session_status() === PHP_SESSION_ACTIVE) {
 $body = Response::getJsonBody();
 $url = trim($body['url'] ?? '');
 if (empty($url)) {
-    Response::error('La URL es obligatoria.');
+    Response::error(Translator::t('api.audit.url_required'));
 }
 try {
     $url = UrlValidator::validate($url);
@@ -71,7 +71,7 @@ try {
             [$ip]
         );
         if ($count >= $maxPerHour) {
-            Response::error('Has alcanzado el límite de auditorías por hora. Intenta más tarde.', 429);
+            Response::error(Translator::t('api.audit.rate_limit'), 429);
         }
     }
 
@@ -197,8 +197,8 @@ try {
     exit;
 } catch (Throwable $e) {
     Logger::error('Audit background error: ' . $e->getMessage(), ['url' => $url]);
-    QueueManager::markFailed($auditId, 'Error interno');
-    AuditProgress::failed($auditId, 'Ocurrió un error al analizar el sitio. Intenta nuevamente.');
+    QueueManager::markFailed($auditId, Translator::t('api.common.internal_error'));
+    AuditProgress::failed($auditId, Translator::t('api.audit.runtime_error'));
     exit;
 }
 
@@ -234,8 +234,8 @@ try {
     );
 } catch (Throwable $e) {
     Logger::error('Error guardando auditoría: ' . $e->getMessage());
-    QueueManager::markFailed($auditId, 'Error guardando');
-    AuditProgress::failed($auditId, 'Error guardando el resultado. Intenta nuevamente.');
+    QueueManager::markFailed($auditId, Translator::t('api.audit.save_error'));
+    AuditProgress::failed($auditId, Translator::t('api.audit.save_error'));
     exit;
 }
 

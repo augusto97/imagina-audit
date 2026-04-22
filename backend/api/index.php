@@ -139,5 +139,5 @@ switch ($endpoint) {
         break;
 
     default:
-        Response::error('Endpoint no encontrado', 404);
+        Response::error(Translator::t('api.common.endpoint_not_found'), 404);
 }
