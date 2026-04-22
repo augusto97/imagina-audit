@@ -2,7 +2,7 @@
 require_once dirname(__DIR__) . '/bootstrap.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 $body = Response::getJsonBody();
@@ -12,11 +12,11 @@ $password = $body['password'] ?? '';
 $honeypot = ($body['website'] ?? '') . ($body['phone_number'] ?? '');
 if ($honeypot !== '') {
     usleep(random_int(500_000, 1_500_000));
-    Response::error('Contraseña incorrecta.', 401);
+    Response::error(Translator::t('admin_auth.login.password_incorrect'), 401);
 }
 
 if (empty($password)) {
-    Response::error('La contraseña es obligatoria.');
+    Response::error(Translator::t('admin_auth.login.password_required'));
 }
 
 $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
@@ -40,13 +40,13 @@ try {
         if ($secSinceLast < $requiredDelay) {
             $waitSec = $requiredDelay - $secSinceLast;
             header("Retry-After: $waitSec");
-            Response::error("Demasiados intentos fallidos. Espera {$waitSec}s antes de volver a intentar.", 429);
+            Response::error(Translator::t('admin_auth.login.backoff', ['seconds' => $waitSec]), 429);
         }
     }
 
     if ($attempts >= 15) {
         header('Retry-After: ' . ($windowMinutes * 60));
-        Response::error("Demasiados intentos. IP bloqueada por $windowMinutes minutos.", 429);
+        Response::error(Translator::t('admin_auth.login.ip_blocked', ['minutes' => $windowMinutes]), 429);
     }
 } catch (Throwable $e) {
     Logger::error('Login rate limit check falló: ' . $e->getMessage());
@@ -55,7 +55,7 @@ try {
 // ─── Verificación de password ────────────────────────────────────────
 if (!Auth::login($password)) {
     try { $db->execute("INSERT INTO login_attempts (ip_address) VALUES (?)", [$ip]); } catch (Throwable $e) {}
-    Response::error('Contraseña incorrecta.', 401);
+    Response::error(Translator::t('admin_auth.login.password_incorrect'), 401);
 }
 
 // Password OK. Revisar si 2FA está habilitado — si lo está, NO
