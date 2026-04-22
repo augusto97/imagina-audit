@@ -254,6 +254,61 @@ export function useAdmin() {
     } catch (err) { handleError(err) }
   }, [handleError])
 
+  // ─── Users & quota plans (P4) ─────────────────────────────────────
+  const fetchUsers = useCallback(async (params: Record<string, string | number> = {}) => {
+    try {
+      const res = await api.get('/admin/users.php', { params })
+      return res.data.data
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const createUser = useCallback(async (body: Record<string, unknown>) => {
+    try {
+      const res = await api.post('/admin/users.php', body)
+      return res.data.data
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const updateUser = useCallback(async (body: Record<string, unknown>) => {
+    try {
+      const res = await api.put('/admin/users.php', body)
+      return res.data.data
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const deleteUser = useCallback(async (id: number) => {
+    try {
+      await api.delete('/admin/users.php', { params: { id } })
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const fetchUserPlans = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/plans.php')
+      return res.data.data
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const createUserPlan = useCallback(async (body: Record<string, unknown>) => {
+    try {
+      const res = await api.post('/admin/plans.php', body)
+      return res.data.data
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const updateUserPlan = useCallback(async (body: Record<string, unknown>) => {
+    try {
+      const res = await api.put('/admin/plans.php', body)
+      return res.data.data
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const deleteUserPlan = useCallback(async (id: number) => {
+    try {
+      await api.delete('/admin/plans.php', { params: { id } })
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
   return {
     fetchDashboard, fetchLeads, fetchLeadDetail, deleteLead, bulkLeads,
     fetchSettings, updateSettings, fetchQueueStatus,
@@ -264,5 +319,7 @@ export function useAdmin() {
     fetchPluginVault, refreshPluginVault,
     fetch2faStatus, setup2fa, enable2fa, disable2fa, regenerateRecoveryCodes,
     fetchTranslationsMeta, fetchTranslations, updateTranslation, deleteTranslation, aiTranslate,
+    fetchUsers, createUser, updateUser, deleteUser,
+    fetchUserPlans, createUserPlan, updateUserPlan, deleteUserPlan,
   }
 }
