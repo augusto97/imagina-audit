@@ -403,7 +403,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
     const broken = details.broken as Array<{ url: string; type: string; status: number }>
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-red-200 p-3">
-        <p className="text-xs font-bold text-red-600 mb-1">RECURSOS ROTOS ({broken.length} de {String(details.checked)} verificados)</p>
+        <p className="text-xs font-bold text-red-600 mb-1">{t('report.md_broken_title', { count: broken.length, total: details.checked })}</p>
         {broken.map((b, i) => (
           <div key={i} className="text-xs flex items-center gap-2 py-0.5">
             <span className="text-red-600 font-mono">{b.status}</span>
@@ -419,11 +419,11 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'html_errors' && Array.isArray(details.errors) && (details.errors as string[]).length > 0) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-amber-200 p-3">
-        <p className="text-xs font-bold text-amber-700 mb-1">PROBLEMAS DETECTADOS</p>
+        <p className="text-xs font-bold text-amber-700 mb-1">{t('report.md_html_errors_title')}</p>
         <ul className="space-y-0.5">
           {(details.errors as string[]).map((e, i) => <li key={i} className="text-xs text-gray-700">- {e}</li>)}
         </ul>
-        {Number(details.inlineStyles) > 20 && <p className="text-xs text-gray-500 mt-1">{String(details.inlineStyles)} estilos inline detectados</p>}
+        {Number(details.inlineStyles) > 20 && <p className="text-xs text-gray-500 mt-1">{t('report.md_html_errors_inline', { count: details.inlineStyles })}</p>}
       </div>
     )
   }
@@ -434,7 +434,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-amber-200 p-3 text-xs space-y-1">
         {items.map((h, i) => (
-          <div key={i}><span className="font-mono font-bold text-amber-600">{h.tag}</span> <span className="text-gray-500">({h.length} car., máx {h.maxLength})</span>: <span className="text-gray-700">{h.text}</span></div>
+          <div key={i}><span className="font-mono font-bold text-amber-600">{h.tag}</span> <span className="text-gray-500">{t('report.md_oversize_heading_meta', { length: h.length, max: h.maxLength })}</span>: <span className="text-gray-700">{h.text}</span></div>
         ))}
       </div>
     )
@@ -446,7 +446,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-amber-200 p-3 text-xs space-y-1">
         {items.map((a, i) => (
-          <div key={i}><span className="font-medium text-gray-700">{a.file}</span> <span className="text-amber-600">({a.altLength} car.)</span>: <span className="text-gray-500">{a.altPreview}</span></div>
+          <div key={i}><span className="font-medium text-gray-700">{a.file}</span> <span className="text-amber-600">{t('report.md_oversize_alt_length', { length: a.altLength })}</span>: <span className="text-gray-500">{a.altPreview}</span></div>
         ))}
       </div>
     )
@@ -467,7 +467,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'dmarc' && details.value) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3">
-        <p className="text-xs font-bold text-[var(--text-tertiary)] mb-1">REGISTRO DMARC</p>
+        <p className="text-xs font-bold text-[var(--text-tertiary)] mb-1">{t('report.md_dmarc_title')}</p>
         <code className="text-[10px] text-gray-600 font-mono break-all">{String(details.value)}</code>
       </div>
     )
@@ -501,7 +501,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
         <div className="flex-1 bg-gray-100 rounded-full h-3 max-w-xs">
           <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(ratio, 100)}%`, backgroundColor: ratio >= 15 ? '#10B981' : ratio >= 10 ? '#F59E0B' : '#EF4444' }} />
         </div>
-        <span className="text-gray-500">Texto: {String(details.textSize)}B / HTML: {String(details.htmlSize)}B</span>
+        <span className="text-gray-500">{t('report.md_text_code_legend', { text: details.textSize, html: details.htmlSize })}</span>
       </div>
     )
   }
@@ -510,7 +510,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'safe_browsing' && Array.isArray(details.threatTypes) && (details.threatTypes as string[]).length > 0) {
     return (
       <div className="mt-2 rounded-lg bg-red-100 border border-red-300 p-3">
-        <p className="text-xs font-bold text-red-700 mb-1">AMENAZAS DETECTADAS POR GOOGLE</p>
+        <p className="text-xs font-bold text-red-700 mb-1">{t('report.md_safebrowsing_title')}</p>
         <div className="flex flex-wrap gap-1.5">
           {(details.threatTypes as string[]).map((t, i) => (
             <span key={i} className="text-xs px-2 py-0.5 bg-red-200 rounded text-red-800 font-medium">{t}</span>
@@ -528,9 +528,9 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
       <div className="mt-2 space-y-1.5">
         {vulns.map((v, i) => (
           <div key={i} className="rounded-lg border border-red-200 bg-red-50/50 p-2 text-xs">
-            <span className="font-medium text-gray-900">{String(v.name || v.cve || 'Vulnerabilidad')}</span>
+            <span className="font-medium text-gray-900">{String(v.name || v.cve || t('report.md_vuln_fallback_name'))}</span>
             {v.cvssScore != null && Number(v.cvssScore) > 0 && <span className="ml-2 px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] font-bold">{Number(v.cvssScore).toFixed(1)}</span>}
-            {v.fixedInVersion != null && <span className="ml-2 text-emerald-600">Fix: v{String(v.fixedInVersion)}</span>}
+            {v.fixedInVersion != null && <span className="ml-2 text-emerald-600">{t('report.md_vuln_fix', { version: v.fixedInVersion })}</span>}
           </div>
         ))}
       </div>
@@ -541,9 +541,9 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'sitemap' && (details.url || details.count)) {
     return (
       <div className="mt-2 text-xs text-gray-600 space-y-0.5">
-        {details.url != null && <div>URL: <span className="font-mono">{String(details.url)}</span></div>}
-        {details.isIndex === true && <div>Tipo: Sitemap Index</div>}
-        {Number(details.count) > 0 && <div>{details.isIndex ? 'Sub-sitemaps' : 'URLs'}: <b>{String(details.count)}</b></div>}
+        {details.url != null && <div>{t('report.md_sitemap_url')} <span className="font-mono">{String(details.url)}</span></div>}
+        {details.isIndex === true && <div>{t('report.md_sitemap_type_index')}</div>}
+        {Number(details.count) > 0 && <div>{details.isIndex ? t('report.md_sitemap_count_sub') : t('report.md_sitemap_count_urls')} <b>{String(details.count)}</b></div>}
       </div>
     )
   }
@@ -552,9 +552,9 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'robots' && (details.lineCount || details.disallowCount)) {
     return (
       <div className="mt-2 flex gap-3 text-xs">
-        <span className="px-2 py-1 rounded bg-gray-50 border border-gray-200">Directivas: <b>{String(details.lineCount)}</b></span>
-        <span className="px-2 py-1 rounded bg-gray-50 border border-gray-200">Disallow: <b>{String(details.disallowCount)}</b></span>
-        {details.hasSitemap === true && <span className="px-2 py-1 rounded bg-emerald-50 border border-emerald-200 text-emerald-700">Incluye Sitemap</span>}
+        <span className="px-2 py-1 rounded bg-gray-50 border border-gray-200">{t('report.md_robots_directives')} <b>{String(details.lineCount)}</b></span>
+        <span className="px-2 py-1 rounded bg-gray-50 border border-gray-200">{t('report.md_robots_disallow')} <b>{String(details.disallowCount)}</b></span>
+        {details.hasSitemap === true && <span className="px-2 py-1 rounded bg-emerald-50 border border-emerald-200 text-emerald-700">{t('report.md_robots_includes_sitemap')}</span>}
       </div>
     )
   }
@@ -574,7 +574,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'mixed_content' && Number(details.count) > 0) {
     return (
       <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-        {Number(details.count)} recursos cargados por HTTP inseguro. Buscar <code className="font-mono bg-amber-100 px-1 rounded">src="http://</code> en el código y cambiar a <code className="font-mono bg-amber-100 px-1 rounded">https://</code>
+        {t('report.md_mixed_content', { count: details.count })}
       </div>
     )
   }
