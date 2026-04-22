@@ -174,6 +174,14 @@ switch ($endpoint) {
         require __DIR__ . '/user/project-checklist.php';
         break;
 
+    case 'user/project-share':
+        require __DIR__ . '/user/project-share.php';
+        break;
+
+    case 'shared/project':
+        require __DIR__ . '/shared/project.php';
+        break;
+
     default:
         Response::error(Translator::t('api.common.endpoint_not_found'), 404);
 }

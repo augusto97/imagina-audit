@@ -13,11 +13,12 @@ export default function UserProjectDetailPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
-  const { isLoading, isAuthenticated, fetchProject, fetchProjectChecklist, updateChecklistItem } = useUser()
+  const { isLoading, isAuthenticated, fetchProject, fetchProjectChecklist, updateChecklistItem, enableProjectShare, disableProjectShare } = useUser()
 
   const [detail, setDetail] = useState<ProjectDetail | null>(null)
   const [checklist, setChecklist] = useState<ProjectChecklistItem[]>([])
   const [loadingDetail, setLoadingDetail] = useState(true)
+  const [shareBusy, setShareBusy] = useState(false)
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) navigate('/login', { replace: true })
@@ -38,6 +39,48 @@ export default function UserProjectDetailPage() {
   useEffect(() => {
     if (isAuthenticated && id) load()
   }, [isAuthenticated, id, load])
+
+  const handleShareEnable = useCallback(async (rotate = false) => {
+    if (!id) return
+    if (rotate && !confirm(t('projects.share_confirm_rotate'))) return
+    setShareBusy(true)
+    try {
+      const res = await enableProjectShare(Number(id), rotate)
+      setDetail((prev) => prev ? { ...prev, project: { ...prev.project, sharing: { enabled: res.enabled, token: res.token } } } : prev)
+      toast.success(t('projects.share_toggled_on'))
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } }
+      toast.error(axiosErr.response?.data?.error ?? 'Error')
+    } finally {
+      setShareBusy(false)
+    }
+  }, [id, enableProjectShare, t])
+
+  const handleShareDisable = useCallback(async () => {
+    if (!id) return
+    if (!confirm(t('projects.share_confirm_disable'))) return
+    setShareBusy(true)
+    try {
+      await disableProjectShare(Number(id))
+      setDetail((prev) => prev ? { ...prev, project: { ...prev.project, sharing: { enabled: false, token: null } } } : prev)
+      toast.success(t('projects.share_toggled_off'))
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } }
+      toast.error(axiosErr.response?.data?.error ?? 'Error')
+    } finally {
+      setShareBusy(false)
+    }
+  }, [id, disableProjectShare, t])
+
+  const copyShareUrl = useCallback(async (token: string) => {
+    const url = `${window.location.origin}/shared/${token}`
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success(t('projects.share_copied'))
+    } catch {
+      toast.error('—')
+    }
+  }, [t])
 
   const toggleItem = useCallback(async (item: ProjectChecklistItem, nextStatus: 'open' | 'done' | 'ignored') => {
     try {
@@ -242,6 +285,63 @@ export default function UserProjectDetailPage() {
                 {evolution.scoreDelta === 0 && evolution.issuesDelta.critical === 0 && evolution.issuesDelta.warning === 0 && !evolution.wordpress?.changed && evolution.plugins.added.length === 0 && evolution.plugins.removed.length === 0 && (
                   <EvolutionLine icon={<Minus className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />} tone="neutral" text={t('projects.detail_score_change_flat')} />
                 )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Share card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Share2 className="h-4 w-4 text-[var(--accent-primary)]" />
+              {t('projects.share_title')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {project.sharing.enabled && project.sharing.token ? (
+              <div className="space-y-3">
+                <p className="text-xs text-[var(--text-secondary)]">{t('projects.share_enabled_body')}</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${window.location.origin}/shared/${project.sharing.token}`}
+                    className="flex-1 rounded-md border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 font-mono text-xs"
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                  <Button size="sm" variant="outline" onClick={() => copyShareUrl(project.sharing.token!)}>
+                    {t('projects.share_copy')}
+                  </Button>
+                </div>
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    disabled={shareBusy}
+                    onClick={() => handleShareEnable(true)}
+                    className="text-[11px] text-[var(--accent-primary)] hover:underline disabled:opacity-50"
+                    title={t('projects.share_rotate_hint')}
+                  >
+                    {t('projects.share_rotate')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={shareBusy}
+                    onClick={handleShareDisable}
+                    className="text-[11px] text-red-600 hover:underline disabled:opacity-50"
+                  >
+                    {t('projects.share_disable')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-[var(--text-secondary)]">{t('projects.share_off_body')}</p>
+                <Button size="sm" disabled={shareBusy} onClick={() => handleShareEnable(false)}>
+                  {shareBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  <Share2 className="h-3.5 w-3.5" />
+                  {t('projects.share_enable')}
+                </Button>
               </div>
             )}
           </CardContent>

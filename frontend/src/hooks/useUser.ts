@@ -204,6 +204,15 @@ export function useUser() {
     await api.put('/user/project-checklist.php', { projectId, metricId, ...patch })
   }, [])
 
+  const enableProjectShare = useCallback(async (projectId: number, rotate = false): Promise<{ enabled: boolean; token: string }> => {
+    const res = await api.post<{ success: boolean; data: { enabled: boolean; token: string } }>('/user/project-share.php', { projectId, rotate })
+    return res.data.data
+  }, [])
+
+  const disableProjectShare = useCallback(async (projectId: number) => {
+    await api.delete('/user/project-share.php', { params: { project_id: projectId } })
+  }, [])
+
   // Check session al montar
   useEffect(() => {
     checkSession()
@@ -226,5 +235,7 @@ export function useUser() {
     deleteProject,
     fetchProjectChecklist,
     updateChecklistItem,
+    enableProjectShare,
+    disableProjectShare,
   }
 }
