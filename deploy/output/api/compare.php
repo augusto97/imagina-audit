@@ -5,7 +5,7 @@
 require_once __DIR__ . '/bootstrap.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 set_time_limit(240);
@@ -17,7 +17,7 @@ $url1 = trim($body['url1'] ?? '');
 $url2 = trim($body['url2'] ?? '');
 
 if (empty($url1) || empty($url2)) {
-    Response::error('Ambas URLs son obligatorias.');
+    Response::error(Translator::t('api.compare.urls_required'));
 }
 
 try {
@@ -44,7 +44,7 @@ try {
             [$ip]
         );
         if ($count >= $maxPerHour) {
-            Response::error('Has alcanzado el límite de comparaciones por hora.', 429);
+            Response::error(Translator::t('api.compare.rate_limit'), 429);
         }
     }
     $db->execute("INSERT INTO rate_limits (ip_address, endpoint) VALUES (?, 'compare')", [$ip]);
@@ -93,7 +93,7 @@ try {
     $audit1 = getOrRunAudit($url1);
     $audit2 = getOrRunAudit($url2);
 } catch (Throwable $e) {
-    Response::error('Error al analizar los sitios: ' . $e->getMessage(), 422);
+    Response::error(Translator::t('api.compare.runtime_error', ['details' => $e->getMessage()]), 422);
 }
 
 // Generar comparación

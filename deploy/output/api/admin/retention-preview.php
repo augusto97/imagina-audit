@@ -10,12 +10,12 @@ require_once dirname(__DIR__) . '/bootstrap.php';
 Auth::requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 $months = (int) ($_GET['months'] ?? 6);
 if ($months < 1 || $months > 120) {
-    Response::error('months debe estar entre 1 y 120', 400);
+    Response::error(Translator::t('admin_api.retention.months_invalid'), 400);
 }
 
 $days = $months * 30;
@@ -61,5 +61,5 @@ try {
     ]);
 } catch (Throwable $e) {
     Logger::error('retention-preview falló: ' . $e->getMessage());
-    Response::error('Error al calcular preview.', 500);
+    Response::error(Translator::t('admin_api.retention.preview_error'), 500);
 }

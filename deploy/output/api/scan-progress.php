@@ -13,17 +13,17 @@
 require_once __DIR__ . '/bootstrap.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 $id = trim($_GET['id'] ?? '');
 if (empty($id)) {
-    Response::error('id requerido', 400);
+    Response::error(Translator::t('api.progress.id_required'), 400);
 }
 
 $state = AuditProgress::get($id);
 if (!$state) {
-    Response::error('Progreso no encontrado o expirado', 404);
+    Response::error(Translator::t('api.progress.not_found'), 404);
 }
 
 // Si está en cola, recalcular posición y total en tiempo real

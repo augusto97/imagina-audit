@@ -178,10 +178,8 @@ class Mailer {
     public static function sendTest(string $to): bool {
         return self::send(
             $to,
-            'Imagina Audit — Email de prueba',
-            "Este es un email de prueba enviado desde Imagina Audit.\n\n"
-            . "Si recibes este mensaje, la configuración SMTP está correcta.\n\n"
-            . "Fecha: " . date('d/m/Y H:i:s')
+            Translator::t('email.test.subject'),
+            Translator::t('email.test.body', ['date' => date('d/m/Y H:i:s')])
         );
     }
 

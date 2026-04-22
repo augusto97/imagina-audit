@@ -32,10 +32,14 @@ class SeoMarkupChecker {
 
         if ($count === 0) {
             return Scoring::createMetric(
-                'open_graph', 'Open Graph (redes sociales)', 0, 'No configurado', 0,
-                'No se encontró ninguna etiqueta Open Graph. Cuando alguien comparte tu sitio en Facebook, LinkedIn o WhatsApp, aparecerá sin imagen, sin título personalizado y sin descripción atractiva.',
-                'Agregar las 5 etiquetas Open Graph: og:title, og:description, og:image, og:url, og:type.',
-                'Configuramos Open Graph y Twitter Cards para una presentación profesional en redes sociales.',
+                'open_graph',
+                Translator::t('seo.og.name'),
+                0,
+                Translator::t('seo.og.display.none'),
+                0,
+                Translator::t('seo.og.desc.none'),
+                Translator::t('seo.og.recommend.none'),
+                Translator::t('seo.og.solution'),
                 ['tags' => $tags]
             );
         }
@@ -45,21 +49,24 @@ class SeoMarkupChecker {
             $details[] = "$key: \"" . mb_substr($val, 0, 50) . (mb_strlen($val) > 50 ? '...' : '') . '"';
         }
 
-        $desc = "$count/$total etiquetas OG configuradas. ";
+        $desc = Translator::t('seo.og.desc.prefix', ['count' => $count, 'total' => $total]);
         if (!empty($missing)) {
-            $desc .= 'Faltan: ' . implode(', ', $missing) . '. ';
+            $desc .= Translator::t('seo.og.desc.missing_suffix', ['missing' => implode(', ', $missing)]);
             if (in_array('og:image', $missing)) {
-                $desc .= 'Sin og:image el enlace compartido no mostrará imagen preview.';
+                $desc .= Translator::t('seo.og.desc.no_image_warning');
             }
         } else {
-            $desc .= 'Configuración completa. Tu sitio se verá profesional al compartirlo en redes sociales.';
+            $desc .= Translator::t('seo.og.desc.complete');
         }
 
         return Scoring::createMetric(
-            'open_graph', 'Open Graph (redes sociales)', $count, "$count/$total tags presentes",
+            'open_graph',
+            Translator::t('seo.og.name'),
+            $count,
+            Translator::t('seo.og.display.count', ['count' => $count, 'total' => $total]),
             $score, $desc,
-            !empty($missing) ? 'Agregar las etiquetas faltantes: ' . implode(', ', $missing) . '.' : '',
-            'Configuramos Open Graph y Twitter Cards para una presentación profesional en redes sociales.',
+            !empty($missing) ? Translator::t('seo.og.recommend.missing', ['missing' => implode(', ', $missing)]) : '',
+            Translator::t('seo.og.solution'),
             ['tags' => $tags, 'missing' => $missing, 'details' => $details]
         );
     }
@@ -84,20 +91,28 @@ class SeoMarkupChecker {
 
         if ($count === 0 && $hasOgFallback) {
             return Scoring::createMetric(
-                'twitter_cards', 'Twitter Cards', 0, 'Usa Open Graph como fallback', 70,
-                'No se encontraron etiquetas Twitter Cards, pero Open Graph está configurado y Twitter/X lo usa como respaldo. Para un control más preciso, se recomienda agregar las etiquetas Twitter específicas.',
-                'Agregar twitter:card, twitter:title, twitter:description y twitter:image para control total.',
-                'Configuramos Twitter Cards para una presentación optimizada al compartir en X/Twitter.',
+                'twitter_cards',
+                Translator::t('seo.twitter.name'),
+                0,
+                Translator::t('seo.twitter.display.fallback'),
+                70,
+                Translator::t('seo.twitter.desc.fallback'),
+                Translator::t('seo.twitter.recommend.fallback'),
+                Translator::t('seo.twitter.solution'),
                 ['tags' => $tags, 'usesOgFallback' => true]
             );
         }
 
         if ($count === 0) {
             return Scoring::createMetric(
-                'twitter_cards', 'Twitter Cards', 0, 'No configuradas', 0,
-                'No se encontraron etiquetas Twitter Cards ni Open Graph como respaldo. Los enlaces compartidos en X/Twitter aparecerán sin formato especial.',
-                'Agregar twitter:card, twitter:title, twitter:description y twitter:image.',
-                'Configuramos Twitter Cards para una presentación optimizada al compartir en X/Twitter.',
+                'twitter_cards',
+                Translator::t('seo.twitter.name'),
+                0,
+                Translator::t('seo.twitter.display.none'),
+                0,
+                Translator::t('seo.twitter.desc.none'),
+                Translator::t('seo.twitter.recommend.none'),
+                Translator::t('seo.twitter.solution'),
                 ['tags' => $tags]
             );
         }
@@ -105,13 +120,16 @@ class SeoMarkupChecker {
         $score = (int) round(($count / $total) * 100);
 
         return Scoring::createMetric(
-            'twitter_cards', 'Twitter Cards', $count, "$count/$total tags presentes",
+            'twitter_cards',
+            Translator::t('seo.twitter.name'),
+            $count,
+            Translator::t('seo.twitter.display.count', ['count' => $count, 'total' => $total]),
             $score,
             $count === $total
-                ? 'Todas las etiquetas Twitter Cards están configuradas. Presentación optimizada en X/Twitter.'
-                : "$count/$total etiquetas Twitter Cards. Faltan: " . implode(', ', $missing) . '.',
-            !empty($missing) ? 'Agregar las etiquetas faltantes: ' . implode(', ', $missing) . '.' : '',
-            'Configuramos Twitter Cards para una presentación optimizada al compartir en X/Twitter.',
+                ? Translator::t('seo.twitter.desc.complete')
+                : Translator::t('seo.twitter.desc.partial', ['count' => $count, 'total' => $total, 'missing' => implode(', ', $missing)]),
+            !empty($missing) ? Translator::t('seo.twitter.recommend.missing', ['missing' => implode(', ', $missing)]) : '',
+            Translator::t('seo.twitter.solution'),
             ['tags' => $tags, 'missing' => $missing]
         );
     }
@@ -124,18 +142,26 @@ class SeoMarkupChecker {
             $hasMicrodata = $this->parser->containsPattern('/itemscope|itemtype/i');
             if ($hasMicrodata) {
                 return Scoring::createMetric(
-                    'structured_data', 'Datos estructurados (Schema.org)', true, 'Microdata detectada (no JSON-LD)', 60,
-                    'Se detectó Schema.org en formato Microdata (atributos HTML). Funciona pero JSON-LD es el formato recomendado por Google por ser más fácil de mantener y depurar.',
-                    'Migrar los datos estructurados de Microdata a formato JSON-LD para mejor mantenimiento.',
-                    'Implementamos Schema markup en formato JSON-LD recomendado por Google.'
+                    'structured_data',
+                    Translator::t('seo.schema.name'),
+                    true,
+                    Translator::t('seo.schema.display.microdata'),
+                    60,
+                    Translator::t('seo.schema.desc.microdata'),
+                    Translator::t('seo.schema.recommend.microdata'),
+                    Translator::t('seo.schema.solution')
                 );
             }
 
             return Scoring::createMetric(
-                'structured_data', 'Datos estructurados (Schema.org)', false, 'No encontrados', 0,
-                'No se encontraron datos estructurados (JSON-LD ni Microdata). Sin Schema markup, Google no puede mostrar resultados enriquecidos (estrellas, precios, FAQ, breadcrumbs, etc.) para tu sitio.',
-                'Implementar Schema.org en formato JSON-LD. Mínimo recomendado: Organization, WebSite, BreadcrumbList.',
-                'Implementamos Schema markup completo para aparecer con fragmentos enriquecidos en Google.'
+                'structured_data',
+                Translator::t('seo.schema.name'),
+                false,
+                Translator::t('seo.schema.display.none'),
+                0,
+                Translator::t('seo.schema.desc.none'),
+                Translator::t('seo.schema.recommend.none'),
+                Translator::t('seo.schema.solution')
             );
         }
 
@@ -160,21 +186,24 @@ class SeoMarkupChecker {
 
         $score = $hasValuable ? 100 : 70;
 
-        $desc = "$typeCount tipos de Schema encontrados: " . implode(', ', array_slice($types, 0, 8));
-        if ($typeCount > 8) $desc .= " y " . ($typeCount - 8) . " más";
-        $desc .= '.';
-        if ($hasValuable) {
-            $desc .= ' Incluye tipos valiosos para resultados enriquecidos en Google.';
-        } else {
-            $desc .= ' Se recomienda agregar tipos como Organization, BreadcrumbList o FAQ para resultados enriquecidos.';
-        }
+        $listForDesc = implode(', ', array_slice($types, 0, 8));
+        $descMore = $typeCount > 8 ? Translator::t('seo.schema.desc.suffix_more', ['count' => $typeCount - 8]) : '';
+        $desc = Translator::t('seo.schema.desc.prefix', ['count' => $typeCount, 'list' => $listForDesc, 'ellipsis' => $descMore]);
+        $desc .= $hasValuable
+            ? Translator::t('seo.schema.desc.valuable')
+            : Translator::t('seo.schema.desc.not_valuable');
+
+        $listForDisplay = implode(', ', array_slice($types, 0, 4));
+        $displayEllipsis = $typeCount > 4 ? '...' : '';
 
         return Scoring::createMetric(
-            'structured_data', 'Datos estructurados (Schema.org)', true,
-            "$typeCount tipos: " . implode(', ', array_slice($types, 0, 4)) . ($typeCount > 4 ? '...' : ''),
+            'structured_data',
+            Translator::t('seo.schema.name'),
+            true,
+            Translator::t('seo.schema.display.found', ['count' => $typeCount, 'list' => $listForDisplay, 'ellipsis' => $displayEllipsis]),
             $score, $desc,
-            !$hasValuable ? 'Agregar tipos de Schema valiosos: Organization, BreadcrumbList, FAQ, Product según el contenido.' : '',
-            'Implementamos Schema markup completo para aparecer con fragmentos enriquecidos en Google.',
+            !$hasValuable ? Translator::t('seo.schema.recommend.partial') : '',
+            Translator::t('seo.schema.solution'),
             ['types' => $types, 'schemaCount' => count($schemas)]
         );
     }
@@ -190,15 +219,20 @@ class SeoMarkupChecker {
         }
 
         $count = count($feeds);
+        $feedList = implode(', ', array_map(fn($f) => $f['type'] . ': ' . basename($f['url']), $feeds));
         return Scoring::createMetric(
-            'rss_feeds', 'Web Feeds (RSS/Atom)', $count,
-            $count === 0 ? 'No detectados' : "$count feed(s) detectados",
+            'rss_feeds',
+            Translator::t('seo.rss.name'),
+            $count,
+            $count === 0
+                ? Translator::t('seo.rss.display.none')
+                : Translator::t('seo.rss.display.found', ['count' => $count]),
             null, // Informativo — no afecta score
             $count > 0
-                ? "Se detectaron $count feeds: " . implode(', ', array_map(fn($f) => $f['type'] . ': ' . basename($f['url']), $feeds)) . '. Los feeds permiten a los usuarios suscribirse a las actualizaciones del sitio.'
-                : 'No se detectaron feeds RSS o Atom. Los feeds permiten que los usuarios se suscriban a tu contenido.',
-            $count === 0 ? 'Agregar un feed RSS para que los usuarios y agregadores puedan seguir tu contenido.' : '',
-            'Configuramos feeds RSS optimizados para distribución de contenido.',
+                ? Translator::t('seo.rss.desc.found', ['count' => $count, 'list' => $feedList])
+                : Translator::t('seo.rss.desc.none'),
+            $count === 0 ? Translator::t('seo.rss.recommend') : '',
+            Translator::t('seo.rss.solution'),
             ['feeds' => $feeds]
         );
     }

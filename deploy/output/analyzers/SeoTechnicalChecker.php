@@ -58,25 +58,46 @@ class SeoTechnicalChecker {
 
         if (!$sitemapUrl) {
             return Scoring::createMetric(
-                'sitemap', 'Sitemap XML', false, 'No encontrado', 0,
-                'No se encontró sitemap XML en /sitemap.xml, /sitemap_index.xml ni referenciado en robots.txt. Sin sitemap, Google descubre páginas solo mediante enlaces internos, lo que puede dejar páginas sin indexar.',
-                'Generar un sitemap XML con un plugin SEO (Yoast, Rank Math) y registrarlo en Google Search Console.',
-                'Generamos sitemaps automáticos optimizados y los registramos en Google Search Console.'
+                'sitemap',
+                Translator::t('seo.sitemap.name'),
+                false,
+                Translator::t('seo.sitemap.display.none'),
+                0,
+                Translator::t('seo.sitemap.desc.none'),
+                Translator::t('seo.sitemap.recommend'),
+                Translator::t('seo.sitemap.solution')
             );
         }
 
-        $desc = "Sitemap encontrado en $sitemapUrl. ";
+        // Build description
         if ($isIndex) {
-            $desc .= "Es un sitemap index" . ($urlCount > 0 ? " con $urlCount sub-sitemaps" : '') . '. Estructura profesional.';
+            $sub = $urlCount > 0
+                ? Translator::t('seo.sitemap.desc.found_index_sub', ['count' => $urlCount])
+                : '';
+            $desc = Translator::t('seo.sitemap.desc.found_index', ['path' => $sitemapUrl, 'suffix' => $sub]);
         } else {
-            $desc .= ($urlCount > 0 ? "Contiene $urlCount URLs indexadas." : 'Accesible correctamente.');
+            $desc = $urlCount > 0
+                ? Translator::t('seo.sitemap.desc.found_urls', ['path' => $sitemapUrl, 'count' => $urlCount])
+                : Translator::t('seo.sitemap.desc.found_ok', ['path' => $sitemapUrl]);
         }
 
+        // Build display
+        if ($urlCount > 0) {
+            $suffix = $isIndex
+                ? Translator::t('seo.sitemap.display.count_sitemaps', ['count' => $urlCount])
+                : Translator::t('seo.sitemap.display.count_urls', ['count' => $urlCount]);
+        } else {
+            $suffix = '';
+        }
+        $display = Translator::t('seo.sitemap.display.found', ['path' => $sitemapUrl, 'suffix' => $suffix]);
+
         return Scoring::createMetric(
-            'sitemap', 'Sitemap XML', true,
-            $sitemapUrl . ($urlCount > 0 ? " ($urlCount " . ($isIndex ? 'sitemaps' : 'URLs') . ')' : ''),
+            'sitemap',
+            Translator::t('seo.sitemap.name'),
+            true,
+            $display,
             100, $desc, '',
-            'Configuramos sitemaps optimizados y los registramos en Google Search Console.',
+            Translator::t('seo.sitemap.solution'),
             ['url' => $sitemapUrl, 'isIndex' => $isIndex, 'count' => $urlCount]
         );
     }
@@ -86,10 +107,14 @@ class SeoTechnicalChecker {
 
         if ($response['statusCode'] !== 200) {
             return Scoring::createMetric(
-                'robots', 'Robots.txt', false, 'No encontrado', 30,
-                'No se encontró archivo robots.txt. Aunque no es obligatorio, es una buena práctica tenerlo para indicar a los buscadores qué secciones no deben rastrear y dónde está el sitemap.',
-                'Crear un archivo robots.txt con directivas adecuadas y referencia al sitemap.',
-                'Configuramos robots.txt optimizado para el SEO de tu sitio.'
+                'robots',
+                Translator::t('seo.robots.name'),
+                false,
+                Translator::t('seo.robots.display.none'),
+                30,
+                Translator::t('seo.robots.desc.none'),
+                Translator::t('seo.robots.recommend.none'),
+                Translator::t('seo.robots.solution.none')
             );
         }
 
@@ -106,10 +131,14 @@ class SeoTechnicalChecker {
 
         if ($blocksAll) {
             return Scoring::createMetric(
-                'robots', 'Robots.txt', true, 'BLOQUEA TODO EL SITIO', 5,
-                'El robots.txt contiene "Disallow: /" que bloquea TODO el sitio para los buscadores. Google NO puede indexar ninguna página. Esto es un problema crítico a menos que sea intencional (sitio en desarrollo).',
-                'Cambiar "Disallow: /" por directivas específicas que solo bloqueen las secciones privadas.',
-                'Configuramos robots.txt optimizado que protege áreas privadas sin bloquear el contenido público.',
+                'robots',
+                Translator::t('seo.robots.name'),
+                true,
+                Translator::t('seo.robots.display.blocks'),
+                5,
+                Translator::t('seo.robots.desc.blocks'),
+                Translator::t('seo.robots.recommend.blocks'),
+                Translator::t('seo.robots.solution.blocks'),
                 ['blocksAll' => true, 'content' => mb_substr($body, 0, 500)]
             );
         }
@@ -117,27 +146,33 @@ class SeoTechnicalChecker {
         $score = 100;
         $notes = [];
         if (!$hasSitemap) {
-            $notes[] = 'No referencia al sitemap (agregar "Sitemap: URL").';
+            $notes[] = Translator::t('seo.robots.note.no_sitemap');
             $score -= 10;
         }
         if ($hasCrawlDelay) {
-            $notes[] = 'Usa Crawl-delay (Google lo ignora pero otros buscadores podrían rastrear más lento).';
+            $notes[] = Translator::t('seo.robots.note.crawl_delay');
         }
 
-        $desc = "Robots.txt presente con $lineCount directivas activas y $disallowCount reglas Disallow. ";
-        if ($hasSitemap) $desc .= 'Incluye referencia al sitemap. ';
-        if (empty($notes)) {
-            $desc .= 'Configuración correcta.';
-        } else {
-            $desc .= implode(' ', $notes);
-        }
+        $desc = Translator::t('seo.robots.desc.prefix', ['lines' => $lineCount, 'disallow' => $disallowCount]);
+        if ($hasSitemap) $desc .= Translator::t('seo.robots.desc.with_sitemap');
+        $desc .= empty($notes) ? Translator::t('seo.robots.desc.ok') : implode(' ', $notes);
+
+        $sitemapSuffix = $hasSitemap ? Translator::t('seo.robots.display.sitemap_suffix') : '';
+        $display = Translator::t('seo.robots.display.found', [
+            'lines' => $lineCount,
+            'disallow' => $disallowCount,
+            'sitemapSuffix' => $sitemapSuffix,
+        ]);
 
         return Scoring::createMetric(
-            'robots', 'Robots.txt', true,
-            "$lineCount directivas · $disallowCount Disallow" . ($hasSitemap ? ' · Sitemap' : ''),
-            Scoring::clamp($score), $desc,
-            !$hasSitemap ? 'Agregar la directiva "Sitemap: https://tusitio.com/sitemap.xml" al robots.txt.' : '',
-            'Configuramos robots.txt optimizado para el SEO de tu sitio.',
+            'robots',
+            Translator::t('seo.robots.name'),
+            true,
+            $display,
+            Scoring::clamp($score),
+            $desc,
+            !$hasSitemap ? Translator::t('seo.robots.recommend.sitemap') : '',
+            Translator::t('seo.robots.solution.none'),
             ['lineCount' => $lineCount, 'disallowCount' => $disallowCount, 'hasSitemap' => $hasSitemap]
         );
     }
@@ -147,10 +182,14 @@ class SeoTechnicalChecker {
 
         if (!$canonical) {
             return Scoring::createMetric(
-                'canonical', 'Canonical URL', null, 'No encontrada', 40,
-                'No se encontró la etiqueta <link rel="canonical">. Sin canonical, si tu página es accesible por múltiples URLs (con/sin www, con/sin trailing slash, con parámetros), Google podría indexar versiones duplicadas y dividir la autoridad SEO.',
-                'Agregar <link rel="canonical" href="URL-preferida"> en cada página.',
-                'Configuramos canonicals correctos en todas las páginas para evitar contenido duplicado.'
+                'canonical',
+                Translator::t('seo.canonical.name'),
+                null,
+                Translator::t('seo.canonical.display.none'),
+                40,
+                Translator::t('seo.canonical.desc.none'),
+                Translator::t('seo.canonical.recommend.none'),
+                Translator::t('seo.canonical.solution')
             );
         }
 
@@ -158,20 +197,24 @@ class SeoTechnicalChecker {
         $urlNorm = rtrim(strtolower($this->url), '/');
         $isSelfReferencing = $canonicalNorm === $urlNorm;
 
-        $desc = "Canonical configurada: $canonical. ";
-        $score = 100;
         if ($isSelfReferencing) {
-            $desc .= 'Apunta a sí misma (autoreferencial). Correcto.';
+            $desc = Translator::t('seo.canonical.desc.self', ['canonical' => $canonical]);
+            $score = 100;
         } else {
-            $desc .= 'Apunta a una URL diferente a la actual. Verificar que esto sea intencional.';
+            $desc = Translator::t('seo.canonical.desc.diff', ['canonical' => $canonical]);
             $score = 80;
         }
 
         return Scoring::createMetric(
-            'canonical', 'Canonical URL', $canonical, $isSelfReferencing ? 'Autoreferencial' : mb_substr($canonical, 0, 50),
+            'canonical',
+            Translator::t('seo.canonical.name'),
+            $canonical,
+            $isSelfReferencing
+                ? Translator::t('seo.canonical.display.self')
+                : Translator::t('seo.canonical.display.diff', ['canonical' => mb_substr($canonical, 0, 50)]),
             $score, $desc,
-            !$isSelfReferencing ? 'Verificar que el canonical apunte a la URL correcta. Un canonical diferente indica que esta página es una variante.' : '',
-            'Configuramos canonicals correctos en todas las páginas para evitar contenido duplicado.',
+            !$isSelfReferencing ? Translator::t('seo.canonical.recommend.diff') : '',
+            Translator::t('seo.canonical.solution'),
             ['canonical' => $canonical, 'isSelfReferencing' => $isSelfReferencing]
         );
     }
@@ -187,9 +230,14 @@ class SeoTechnicalChecker {
 
         if (empty($hreflangFound)) {
             return Scoring::createMetric(
-                'hreflang', 'Hreflang (multi-idioma)', false, 'No configurado', 70,
-                'No se encontraron etiquetas hreflang. Si tu sitio solo tiene un idioma, esto es normal. Si tienes versiones en otros idiomas, necesitas hreflang para evitar que Google las trate como contenido duplicado.',
-                '', 'Configuramos hreflang para sitios multi-idioma y multi-región.'
+                'hreflang',
+                Translator::t('seo.hreflang.name'),
+                false,
+                Translator::t('seo.hreflang.display.none'),
+                70,
+                Translator::t('seo.hreflang.desc.none'),
+                '',
+                Translator::t('seo.hreflang.solution')
             );
         }
 
@@ -197,18 +245,24 @@ class SeoTechnicalChecker {
         $langs = implode(', ', array_slice($hreflangFound, 0, 6));
         $hasXDefault = in_array('x-default', $hreflangFound);
 
-        $desc = "$count idiomas/regiones configurados: $langs.";
-        if ($hasXDefault) {
-            $desc .= ' Incluye x-default (página por defecto). Configuración correcta.';
-        } else {
-            $desc .= ' Falta x-default (recomendado para indicar la versión por defecto).';
-        }
+        $xDefaultNote = $hasXDefault
+            ? Translator::t('seo.hreflang.desc.with_xdefault')
+            : Translator::t('seo.hreflang.desc.without_xdefault');
+        $desc = Translator::t('seo.hreflang.desc.found', [
+            'count' => $count,
+            'list' => $langs,
+            'xDefaultNote' => $xDefaultNote,
+        ]);
 
         return Scoring::createMetric(
-            'hreflang', 'Hreflang (multi-idioma)', true, "$count idiomas: $langs",
-            $hasXDefault ? 100 : 80, $desc,
-            !$hasXDefault ? 'Agregar hreflang="x-default" apuntando a la versión principal del sitio.' : '',
-            'Configuramos hreflang para sitios multi-idioma y multi-región.',
+            'hreflang',
+            Translator::t('seo.hreflang.name'),
+            true,
+            Translator::t('seo.hreflang.display.found', ['count' => $count, 'list' => $langs]),
+            $hasXDefault ? 100 : 80,
+            $desc,
+            !$hasXDefault ? Translator::t('seo.hreflang.recommend') : '',
+            Translator::t('seo.hreflang.solution'),
             ['languages' => $hreflangFound, 'hasXDefault' => $hasXDefault]
         );
     }
@@ -221,7 +275,7 @@ class SeoTechnicalChecker {
 
         $isHttps = ($parsedUrl['scheme'] ?? '') === 'https';
         if (!$isHttps) {
-            $issues[] = 'No usa HTTPS. Google da prioridad a sitios seguros.';
+            $issues[] = Translator::t('seo.url.issue.no_https');
             $score -= 20;
         }
 
@@ -231,32 +285,36 @@ class SeoTechnicalChecker {
         if (!empty($query)) {
             $paramCount = count(explode('&', $query));
             if ($paramCount > 3) {
-                $issues[] = "URL con $paramCount parámetros. Las URLs limpias son mejores para SEO.";
+                $issues[] = Translator::t('seo.url.issue.params', ['count' => $paramCount]);
                 $score -= 10;
             }
         }
 
         $urlLength = strlen($this->url);
         if ($urlLength > 100) {
-            $issues[] = "URL larga ($urlLength caracteres). Se recomiendan URLs cortas y descriptivas.";
+            $issues[] = Translator::t('seo.url.issue.long', ['length' => $urlLength]);
             $score -= 5;
         }
 
-        $desc = "URL: {$this->url}. ";
-        $desc .= $isHttps ? 'HTTPS activo. ' : 'HTTP sin cifrar. ';
-        $desc .= $hasWww ? 'Usa www. ' : 'Sin www. ';
-        if (empty($issues)) {
-            $desc .= 'Estructura de URL limpia y amigable para SEO.';
-        } else {
-            $desc .= implode(' ', $issues);
-        }
+        $desc = Translator::t('seo.url.desc.prefix', ['url' => $this->url]);
+        $desc .= $isHttps ? Translator::t('seo.url.desc.https') : Translator::t('seo.url.desc.http');
+        $desc .= $hasWww ? Translator::t('seo.url.desc.with_www') : Translator::t('seo.url.desc.no_www');
+        $desc .= empty($issues) ? Translator::t('seo.url.desc.clean') : implode(' ', $issues);
+
+        $display = Translator::t('seo.url.display', [
+            'scheme' => $isHttps ? Translator::t('seo.url.display.https') : Translator::t('seo.url.display.http'),
+            'www' => $hasWww ? Translator::t('seo.url.display.www') : Translator::t('seo.url.display.no_www'),
+            'length' => $urlLength,
+        ]);
 
         return Scoring::createMetric(
-            'url_structure', 'Estructura de URL', true,
-            ($isHttps ? 'HTTPS' : 'HTTP') . ' · ' . ($hasWww ? 'www' : 'sin www') . " · $urlLength car.",
+            'url_structure',
+            Translator::t('seo.url.name'),
+            true,
+            $display,
             Scoring::clamp($score), $desc,
-            !empty($issues) ? implode(' ', array_map(fn($i) => str_replace('.', ',', $i), $issues)) : '',
-            'Optimizamos las URLs para que sean cortas, descriptivas y amigables para SEO.',
+            !empty($issues) ? implode(' ', $issues) : '',
+            Translator::t('seo.url.solution'),
             ['isHttps' => $isHttps, 'hasWww' => $hasWww, 'urlLength' => $urlLength]
         );
     }

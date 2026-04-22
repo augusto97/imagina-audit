@@ -50,7 +50,7 @@ if ($method === 'GET') {
             'totalPages' => $totalPages,
         ]);
     } catch (Throwable $e) {
-        Response::error('Error al obtener vulnerabilidades.', 500);
+        Response::error(Translator::t('admin_api.vulns.fetch_error'), 500);
     }
 }
 
@@ -71,14 +71,14 @@ if ($method === 'POST') {
         );
         Response::success(['id' => (int) $db->lastInsertId()], 201);
     } catch (Throwable $e) {
-        Response::error('Error al crear vulnerabilidad.', 500);
+        Response::error(Translator::t('admin_api.vulns.create_error'), 500);
     }
 }
 
 if ($method === 'PUT') {
     $body = Response::getJsonBody();
     $id = $body['id'] ?? 0;
-    if (!$id) Response::error('El id es obligatorio.');
+    if (!$id) Response::error(Translator::t('admin_api.common.id_required'));
 
     try {
         $db->execute(
@@ -96,20 +96,20 @@ if ($method === 'PUT') {
         );
         Response::success();
     } catch (Throwable $e) {
-        Response::error('Error al actualizar vulnerabilidad.', 500);
+        Response::error(Translator::t('admin_api.vulns.update_error'), 500);
     }
 }
 
 if ($method === 'DELETE') {
     $id = $_GET['id'] ?? 0;
-    if (!$id) Response::error('El parámetro id es obligatorio.');
+    if (!$id) Response::error(Translator::t('admin_api.common.id_required'));
 
     try {
         $db->execute("DELETE FROM vulnerabilities WHERE id = ?", [(int) $id]);
         Response::success();
     } catch (Throwable $e) {
-        Response::error('Error al eliminar vulnerabilidad.', 500);
+        Response::error(Translator::t('admin_api.vulns.delete_error'), 500);
     }
 }
 
-Response::error('Método no permitido', 405);
+Response::error(Translator::t('api.common.method_not_allowed'), 405);

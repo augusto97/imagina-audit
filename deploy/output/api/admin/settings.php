@@ -99,6 +99,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
             'systemTotalRamMb' => (int) ($dbSettings['system_total_ram_mb'] ?? 0),
             'googlePagespeedApiKey' => $dbSettings['google_pagespeed_api_key'] ?? '',
+            'defaultAiProvider'      => $dbSettings['default_ai_provider']       ?? 'claude',
+            'openaiApiKey'           => !empty($dbSettings['openai_api_key']) ? '••••••••' : '',
+            'openaiModel'            => $dbSettings['openai_model']              ?? 'gpt-4o-mini',
+            'anthropicApiKey'        => !empty($dbSettings['anthropic_api_key']) ? '••••••••' : '',
+            'anthropicModel'         => $dbSettings['anthropic_model']           ?? 'claude-sonnet-4-5',
+            'googleTranslateApiKey'  => !empty($dbSettings['google_translate_api_key']) ? '••••••••' : '',
             'leadNotificationEmail' => $dbSettings['lead_notification_email'] ?? '',
             'smtpHost' => $dbSettings['smtp_host'] ?? '',
             'smtpPort' => (int) ($dbSettings['smtp_port'] ?? 587),
@@ -129,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         Response::success($config);
     } catch (Throwable $e) {
         Logger::error('Error en settings GET: ' . $e->getMessage());
-        Response::error('Error al obtener configuración.', 500);
+        Response::error(Translator::t('admin_api.settings.fetch_error'), 500);
     }
 }
 
@@ -140,6 +146,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         foreach ($body as $key => $value) {
             // No sobreescribir contraseña SMTP con el placeholder
             if ($key === 'smtpPassword' && ($value === '••••••••' || $value === '')) {
+                continue;
+            }
+            // Tampoco pisar las API keys con el placeholder de bullets
+            if (in_array($key, ['openaiApiKey', 'anthropicApiKey', 'googleTranslateApiKey'], true)
+                && ($value === '••••••••' || $value === '')) {
                 continue;
             }
 
@@ -183,8 +194,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         Response::success();
     } catch (Throwable $e) {
         Logger::error('Error en settings PUT: ' . $e->getMessage());
-        Response::error('Error al guardar configuración.', 500);
+        Response::error(Translator::t('admin_api.settings.save_error'), 500);
     }
 }
 
-Response::error('Método no permitido', 405);
+Response::error(Translator::t('api.common.method_not_allowed'), 405);

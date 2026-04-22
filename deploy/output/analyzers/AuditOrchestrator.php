@@ -221,16 +221,25 @@ class AuditOrchestrator {
         $defaults = require dirname(__DIR__) . '/config/defaults.php';
         $weightKey = "weight_$id";
 
+        // Nombre localizado si existe en el bundle — si no, el que pasó el caller.
+        $localName = Translator::has("modules.$id.name") ? Translator::t("modules.$id.name") : $name;
+        $summary = Translator::has('modules.failed.summary')
+            ? Translator::t('modules.failed.summary')
+            : 'No fue posible analizar este módulo.';
+        $salesMessage = Translator::has("modules.sales.$id")
+            ? Translator::t("modules.sales.$id")
+            : ($defaults["sales_$id"] ?? '');
+
         return [
             'id' => $id,
-            'name' => $name,
+            'name' => $localName,
             'icon' => $icon,
             'score' => null,
             'level' => 'unknown',
             'weight' => $defaults[$weightKey] ?? 0.05,
             'metrics' => [],
-            'summary' => "No fue posible analizar este módulo.",
-            'salesMessage' => $defaults["sales_$id"] ?? '',
+            'summary' => $summary,
+            'salesMessage' => $salesMessage,
         ];
     }
 

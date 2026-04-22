@@ -33,14 +33,14 @@ if ($method === 'POST') {
     $force = (bool) ($body['force'] ?? false);
 
     if (!isset(PluginVault::catalog()[$slug])) {
-        Response::error('Plugin desconocido', 400);
+        Response::error(Translator::t('admin_api.plugin_vault.unknown_plugin'), 400);
     }
 
     $status = PluginVault::refresh($slug, $force);
     if ($status === null) {
-        Response::error('No se pudo descargar la última versión desde GitHub. Revisa los logs.', 500);
+        Response::error(Translator::t('admin_api.plugin_vault.github_error'), 500);
     }
     Response::success(['plugin' => $status]);
 }
 
-Response::error('Método no permitido', 405);
+Response::error(Translator::t('api.common.method_not_allowed'), 405);

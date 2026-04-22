@@ -36,23 +36,23 @@ class WordPressDetector {
             $defaults = require dirname(__DIR__) . '/config/defaults.php';
             return [
                 'id' => 'wordpress',
-                'name' => 'WordPress',
+                'name' => Translator::t('modules.wordpress.name'),
                 'icon' => 'blocks',
                 'score' => null,
                 'level' => 'info',
                 'weight' => $defaults['weight_wordpress'],
                 'metrics' => [Scoring::createMetric(
                     'wp_detected',
-                    'Detección de WordPress',
+                    Translator::t('wordpress.not_wp.name'),
                     false,
-                    'No es WordPress',
+                    Translator::t('wordpress.not_wp.display'),
                     null,
-                    'No se detectó WordPress en este sitio. Este módulo no aplica y no afecta la puntuación global.',
+                    Translator::t('wordpress.not_wp.description'),
                     '',
-                    'Somos especialistas exclusivos en WordPress con más de 15 años de experiencia.'
+                    Translator::t('wordpress.not_wp.solution')
                 )],
-                'summary' => 'Este sitio no está construido con WordPress. Este módulo no aplica.',
-                'salesMessage' => $defaults['sales_wordpress'],
+                'summary' => Translator::t('wordpress.not_wp.module_summary'),
+                'salesMessage' => $defaults['sales_wordpress'] !== '' ? $defaults['sales_wordpress'] : Translator::t('modules.sales.wordpress'),
             ];
         }
 
@@ -72,15 +72,17 @@ class WordPressDetector {
 
         $metrics[] = Scoring::createMetric(
             'wp_version',
-            'Versión de WordPress',
+            Translator::t('wordpress.version.name'),
             $wpVersion,
-            $wpVersion ? "WordPress $wpVersion" : 'No detectada',
+            $wpVersion ? "WordPress $wpVersion" : Translator::t('wordpress.version.display.none'),
             $versionScore,
             $wpVersion
-                ? ($isCurrent ? 'WordPress está actualizado.' : "WordPress $wpVersion está desactualizado. La última versión es $latestVersion.")
-                : 'No fue posible detectar la versión de WordPress.',
-            $isCurrent ? '' : 'Actualizar WordPress a la última versión para corregir vulnerabilidades y mejorar rendimiento.',
-            'Actualizamos WordPress semanalmente con testing previo de compatibilidad.'
+                ? ($isCurrent
+                    ? Translator::t('wordpress.version.desc.current')
+                    : Translator::t('wordpress.version.desc.outdated', ['version' => $wpVersion, 'latest' => $latestVersion]))
+                : Translator::t('wordpress.version.desc.unknown'),
+            $isCurrent ? '' : Translator::t('wordpress.version.recommendation'),
+            Translator::t('wordpress.version.solution')
         );
 
         // Tema
@@ -91,21 +93,21 @@ class WordPressDetector {
             'version' => $themeInfo['version'],
             'childTheme' => $themeInfo['childTheme'],
         ];
-        $themeName = $themeInfo['name'] ?: 'No detectado';
+        $themeName = $themeInfo['name'] ?: Translator::t('wordpress.theme.display.none');
         $themeVersion = $themeInfo['version'] ?? null;
         $themeDisplay = $themeName . ($themeVersion ? " v$themeVersion" : '');
 
         $metrics[] = Scoring::createMetric(
             'wp_theme',
-            'Tema de WordPress',
+            Translator::t('wordpress.theme.name'),
             $themeInfo['name'],
             $themeDisplay,
             $themeInfo['name'] ? 100 : 50,
             $themeInfo['name']
-                ? "Tema activo: $themeDisplay."
-                : 'No se pudo detectar el tema activo.',
+                ? Translator::t('wordpress.theme.desc.found', ['display' => $themeDisplay])
+                : Translator::t('wordpress.theme.desc.missing'),
             '',
-            'Mantenemos tu tema actualizado y optimizado.',
+            Translator::t('wordpress.theme.solution'),
             ['themeName' => $themeInfo['name'], 'themeVersion' => $themeVersion, 'childTheme' => $themeInfo['childTheme']]
         );
 
@@ -122,17 +124,21 @@ class WordPressDetector {
         }
 
         $pluginsScore = Scoring::clamp(100 - ($outdatedCount * 5));
+        $pluginCount = count($plugins);
+        $outdatedSuffix = $outdatedCount > 0
+            ? ' ' . Translator::t('wordpress.plugins.desc.outdated_suffix', ['count' => $outdatedCount])
+            : ' ' . Translator::t('wordpress.plugins.desc.all_up_suffix');
         $metrics[] = Scoring::createMetric(
             'wp_plugins',
-            'Plugins detectados',
-            count($plugins),
-            count($plugins) . ' plugins (' . $outdatedCount . ' desactualizados)',
+            Translator::t('wordpress.plugins.name'),
+            $pluginCount,
+            Translator::t('wordpress.plugins.display', ['count' => $pluginCount, 'outdated' => $outdatedCount]),
             $pluginsScore,
-            count($plugins) > 0
-                ? 'Se detectaron ' . count($plugins) . ' plugins.' . ($outdatedCount > 0 ? " $outdatedCount necesitan actualización." : ' Todos parecen estar al día.')
-                : 'No se detectaron plugins (pueden estar ocultos).',
-            $outdatedCount > 0 ? 'Actualizar los plugins desactualizados para corregir vulnerabilidades.' : '',
-            'Actualizamos todos tus plugins semanalmente con testing de compatibilidad.',
+            $pluginCount > 0
+                ? Translator::t('wordpress.plugins.desc.found', ['count' => $pluginCount, 'outdatedSuffix' => trim($outdatedSuffix)])
+                : Translator::t('wordpress.plugins.desc.none'),
+            $outdatedCount > 0 ? Translator::t('wordpress.plugins.recommendation') : '',
+            Translator::t('wordpress.plugins.solution'),
             ['plugins' => $pluginsList]
         );
 
@@ -145,15 +151,13 @@ class WordPressDetector {
         $restScore = $restApiExposed ? 0 : 100;
         $metrics[] = Scoring::createMetric(
             'rest_api_exposed',
-            'REST API de usuarios',
+            Translator::t('wordpress.rest_api.name'),
             $restApiExposed,
-            $restApiExposed ? 'Expuesta - usuarios visibles' : 'Protegida',
+            $restApiExposed ? Translator::t('wordpress.rest_api.display.exposed') : Translator::t('wordpress.rest_api.display.safe'),
             $restScore,
-            $restApiExposed
-                ? 'La REST API expone los nombres de usuario del sitio. Esto facilita ataques de fuerza bruta.'
-                : 'La REST API de usuarios está protegida o no accesible.',
-            $restApiExposed ? 'Desactivar o restringir el acceso al endpoint /wp-json/wp/v2/users.' : '',
-            'Protegemos la REST API y bloqueamos la enumeración de usuarios.'
+            $restApiExposed ? Translator::t('wordpress.rest_api.desc.exposed') : Translator::t('wordpress.rest_api.desc.safe'),
+            $restApiExposed ? Translator::t('wordpress.rest_api.recommendation') : '',
+            Translator::t('wordpress.rest_api.solution')
         );
 
         // XML-RPC
@@ -161,15 +165,13 @@ class WordPressDetector {
         $xmlrpcScore = $xmlrpcActive ? 50 : 100;
         $metrics[] = Scoring::createMetric(
             'xmlrpc_active',
-            'XML-RPC',
+            Translator::t('wordpress.xmlrpc.name'),
             $xmlrpcActive,
-            $xmlrpcActive ? 'Activo' : 'Desactivado o no accesible',
+            $xmlrpcActive ? Translator::t('wordpress.xmlrpc.display.active') : Translator::t('wordpress.xmlrpc.display.inactive'),
             $xmlrpcScore,
-            $xmlrpcActive
-                ? 'XML-RPC está activo. Puede ser usado para ataques de fuerza bruta y DDoS amplificado.'
-                : 'XML-RPC no está accesible.',
-            $xmlrpcActive ? 'Desactivar XML-RPC si no se usa para aplicaciones externas.' : '',
-            'Desactivamos XML-RPC y protegemos contra ataques de fuerza bruta.'
+            $xmlrpcActive ? Translator::t('wordpress.xmlrpc.desc.active') : Translator::t('wordpress.xmlrpc.desc.inactive'),
+            $xmlrpcActive ? Translator::t('wordpress.xmlrpc.recommendation') : '',
+            Translator::t('wordpress.xmlrpc.solution')
         );
 
         // Debug mode
@@ -177,31 +179,32 @@ class WordPressDetector {
         $debugScore = $debugMode ? 0 : 100;
         $metrics[] = Scoring::createMetric(
             'debug_mode',
-            'Modo debug',
+            Translator::t('wordpress.debug.name'),
             $debugMode,
-            $debugMode ? 'Errores PHP visibles' : 'Desactivado',
+            $debugMode ? Translator::t('wordpress.debug.display.visible') : Translator::t('wordpress.debug.display.hidden'),
             $debugScore,
-            $debugMode
-                ? 'Se detectaron errores PHP visibles en la página. Esto expone información del servidor.'
-                : 'No se detectaron errores PHP visibles.',
-            $debugMode ? 'Desactivar WP_DEBUG en producción y ocultar mensajes de error.' : '',
-            'Configuramos el modo debug correctamente y ocultamos errores en producción.'
+            $debugMode ? Translator::t('wordpress.debug.desc.visible') : Translator::t('wordpress.debug.desc.hidden'),
+            $debugMode ? Translator::t('wordpress.debug.recommendation') : '',
+            Translator::t('wordpress.debug.solution')
         );
 
         // Archivos sensibles
         $sensitiveFiles = $this->checkSensitiveFiles();
         $sensitiveScore = Scoring::clamp(100 - (count($sensitiveFiles) * 30));
+        $sensitiveCount = count($sensitiveFiles);
         $metrics[] = Scoring::createMetric(
             'sensitive_files',
-            'Archivos sensibles expuestos',
-            count($sensitiveFiles),
-            count($sensitiveFiles) > 0 ? count($sensitiveFiles) . ' archivos expuestos' : 'Ninguno detectado',
+            Translator::t('wordpress.sensitive.name'),
+            $sensitiveCount,
+            $sensitiveCount > 0
+                ? Translator::t('wordpress.sensitive.display.exposed', ['count' => $sensitiveCount])
+                : Translator::t('wordpress.sensitive.display.none'),
             $sensitiveScore,
-            count($sensitiveFiles) > 0
-                ? 'Se encontraron archivos sensibles accesibles públicamente: ' . implode(', ', $sensitiveFiles)
-                : 'No se detectaron archivos sensibles expuestos.',
-            count($sensitiveFiles) > 0 ? 'Eliminar o proteger inmediatamente los archivos sensibles expuestos.' : '',
-            'Protegemos todos los archivos sensibles y configuramos reglas de acceso.',
+            $sensitiveCount > 0
+                ? Translator::t('wordpress.sensitive.desc.exposed', ['list' => implode(', ', $sensitiveFiles)])
+                : Translator::t('wordpress.sensitive.desc.none'),
+            $sensitiveCount > 0 ? Translator::t('wordpress.sensitive.recommendation') : '',
+            Translator::t('wordpress.sensitive.solution'),
             ['files' => $sensitiveFiles]
         );
 
@@ -438,15 +441,19 @@ class WordPressDetector {
         $score = $exposed ? 30 : 100;
         return Scoring::createMetric(
             'user_enumeration',
-            'Enumeración de usuarios',
+            Translator::t('wordpress.user_enum.name'),
             $exposed,
-            $exposed ? "Expuesto" . ($username ? " ($username)" : '') : 'Protegido',
+            $exposed
+                ? ($username
+                    ? Translator::t('wordpress.user_enum.display.exposed_with_user', ['username' => $username])
+                    : Translator::t('wordpress.user_enum.display.exposed'))
+                : Translator::t('wordpress.user_enum.display.safe'),
             $score,
             $exposed
-                ? 'La enumeración de usuarios está activa. Se detectó el username "' . ($username ?? '?') . '" vía /?author=1. Los atacantes pueden usar estos nombres de usuario para ataques de fuerza bruta.'
-                : 'La enumeración de usuarios vía /?author=1 está protegida o deshabilitada.',
-            $exposed ? 'Bloquear la enumeración de usuarios con un plugin de seguridad o regla en .htaccess.' : '',
-            'Bloqueamos la enumeración de usuarios y protegemos contra ataques de fuerza bruta.'
+                ? Translator::t('wordpress.user_enum.desc.exposed', ['username' => $username ?? '?'])
+                : Translator::t('wordpress.user_enum.desc.safe'),
+            $exposed ? Translator::t('wordpress.user_enum.recommendation') : '',
+            Translator::t('wordpress.user_enum.solution')
         );
     }
 
@@ -485,16 +492,16 @@ class WordPressDetector {
 
         return [
             'id' => 'wordpress',
-            'name' => 'WordPress',
+            'name' => Translator::t('modules.wordpress.name'),
             'icon' => 'blocks',
             'score' => $score,
             'level' => Scoring::getLevel($score),
             'weight' => $defaults['weight_wordpress'],
             'metrics' => $metrics,
             'summary' => $this->isWordPress
-                ? "Tu instalación de WordPress tiene una puntuación de $score/100."
-                : 'Este sitio no parece estar construido con WordPress.',
-            'salesMessage' => $defaults['sales_wordpress'],
+                ? Translator::t('wordpress.summary.wp', ['score' => $score])
+                : Translator::t('wordpress.summary.not_wp'),
+            'salesMessage' => $defaults['sales_wordpress'] !== '' ? $defaults['sales_wordpress'] : Translator::t('modules.sales.wordpress'),
         ];
     }
 

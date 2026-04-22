@@ -16,7 +16,7 @@
 require_once dirname(__DIR__) . '/bootstrap.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 // Ensurar session está iniciada (debe estarlo desde login.php)
@@ -26,21 +26,21 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // ─── Validar estado pending ─────────────────────────────────────────
 if (empty($_SESSION['pending_2fa']) || $_SESSION['pending_2fa'] !== true) {
-    Response::error('No hay login pendiente de 2FA. Ingresa tu contraseña primero.', 401);
+    Response::error(Translator::t('admin_auth.login2fa.no_pending'), 401);
 }
 
 $pendingAt = (int) ($_SESSION['pending_2fa_at'] ?? 0);
 $maxAgeSec = 180; // 3 minutos para introducir el código
 if ($pendingAt === 0 || (time() - $pendingAt) > $maxAgeSec) {
     unset($_SESSION['pending_2fa'], $_SESSION['pending_2fa_at'], $_SESSION['pending_2fa_attempts']);
-    Response::error('La sesión 2FA expiró. Vuelve a ingresar tu contraseña.', 401);
+    Response::error(Translator::t('admin_auth.login2fa.session_expired'), 401);
 }
 
 // ─── Rate limit por sesión ──────────────────────────────────────────
 $attempts = (int) ($_SESSION['pending_2fa_attempts'] ?? 0);
 if ($attempts >= 5) {
     unset($_SESSION['pending_2fa'], $_SESSION['pending_2fa_at'], $_SESSION['pending_2fa_attempts']);
-    Response::error('Demasiados códigos incorrectos. Vuelve a ingresar tu contraseña.', 401);
+    Response::error(Translator::t('admin_auth.login2fa.too_many'), 401);
 }
 
 // ─── Verificar código ───────────────────────────────────────────────
@@ -48,7 +48,7 @@ $body = Response::getJsonBody();
 $code = trim((string) ($body['code'] ?? ''));
 
 if ($code === '') {
-    Response::error('Código requerido', 400);
+    Response::error(Translator::t('admin_auth.login2fa.code_required'), 400);
 }
 
 $db = Database::getInstance();
@@ -87,7 +87,7 @@ if (!$totpValid) {
 
 if (!$totpValid && !$recoveryValid) {
     $_SESSION['pending_2fa_attempts'] = $attempts + 1;
-    Response::error('Código inválido. Revisa la hora de tu dispositivo o usa un recovery code.', 401);
+    Response::error(Translator::t('admin_auth.login2fa.invalid_code'), 401);
 }
 
 // ─── Éxito — completar login ────────────────────────────────────────
