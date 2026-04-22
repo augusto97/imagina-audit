@@ -4,51 +4,59 @@ import { ArrowLeft, FileText, BarChart3, Database, FileText as DetailIcon } from
 import { Button } from '@/components/ui/button'
 
 /**
- * Cabecera + navegación entre las vistas de un lead.
- * Se usa en LeadDetail, TechnicalReport, WaterfallPage y SnapshotReport
- * para que el operador pueda saltar entre las cuatro vistas sin volver atrás.
- *
- * El botón de la vista activa queda resaltado (sólido + accent) y los
- * demás quedan como outline.
+ * Cabecera + navegación entre las vistas de un audit.
+ * Agnóstico al modo: con basePath='/admin/leads' se comporta como antes,
+ * con basePath='/account/audits' sirve a la vista de usuario dueño.
  */
 
 interface Props {
   auditId: string
-  domain?: string         // si no se pasa, se omite el título
-  showBackToList?: boolean // botón "Volver" a la lista de leads
+  domain?: string
+  /** Ruta raíz del detalle sin slash final. Default: /admin/leads */
+  basePath?: string
+  /** Ruta del botón "volver". Null oculta el botón. */
+  backTo?: string | null
+  backLabelKey?: string
 }
 
-export default function LeadReportNav({ auditId, domain, showBackToList = true }: Props) {
+export default function LeadReportNav({
+  auditId,
+  domain,
+  basePath = '/admin/leads',
+  backTo = '/admin/leads',
+  backLabelKey = 'settings.leadnav_back',
+}: Props) {
   const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
   const path = location.pathname
 
+  const base = `${basePath}/${auditId}`
   const tabs = [
-    { to: `/admin/leads/${auditId}`,           label: t('settings.leadnav_lead'),      icon: DetailIcon, exact: true },
-    { to: `/admin/leads/${auditId}/report`,    label: t('settings.leadnav_report'),    icon: FileText },
-    { to: `/admin/leads/${auditId}/waterfall`, label: t('settings.leadnav_waterfall'), icon: BarChart3 },
-    { to: `/admin/leads/${auditId}/internal`,  label: t('settings.leadnav_internal'),  icon: Database },
+    { to: base,                label: t('settings.leadnav_lead'),      icon: DetailIcon, exact: true },
+    { to: `${base}/report`,    label: t('settings.leadnav_report'),    icon: FileText },
+    { to: `${base}/waterfall`, label: t('settings.leadnav_waterfall'), icon: BarChart3 },
+    { to: `${base}/internal`,  label: t('settings.leadnav_internal'),  icon: Database },
   ]
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      {showBackToList && (
-        <Button variant="ghost" size="sm" onClick={() => navigate('/admin/leads')}>
-          <ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> {t('settings.leadnav_back')}
+      {backTo !== null && (
+        <Button variant="ghost" size="sm" onClick={() => navigate(backTo)}>
+          <ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> {t(backLabelKey)}
         </Button>
       )}
       {domain && (
         <h1 className="truncate text-xl font-bold text-[var(--text-primary)]">{domain}</h1>
       )}
       <nav className="ml-auto flex flex-wrap gap-1.5">
-        {tabs.map((t) => {
-          const isActive = t.exact ? path === t.to : path.startsWith(t.to)
-          const Icon = t.icon
+        {tabs.map((tab) => {
+          const isActive = tab.exact ? path === tab.to : path.startsWith(tab.to)
+          const Icon = tab.icon
           return (
             <Link
-              key={t.to}
-              to={t.to}
+              key={tab.to}
+              to={tab.to}
               className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                 isActive
                   ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white'
@@ -56,7 +64,7 @@ export default function LeadReportNav({ auditId, domain, showBackToList = true }
               }`}
             >
               <Icon className="h-3.5 w-3.5" strokeWidth={1.5} />
-              {t.label}
+              {tab.label}
             </Link>
           )
         })}

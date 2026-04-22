@@ -29,10 +29,24 @@ import { getAllMetricsByLevel, type ChecklistState } from './report/helpers'
  * operador puede compartir links a un tab específico (se implementa en
  * fase E; por ahora se mantiene solo en state local).
  */
-function TechnicalReport() {
+interface TechnicalReportProps {
+  /** Override del fetcher del detalle. Default: useAdmin().fetchLeadDetail */
+  fetcher?: (id: string) => Promise<AuditResult | null>
+  /** Base de las rutas de los tabs. Default: /admin/leads */
+  basePath?: string
+  /** Ruta del botón "volver". null = oculto. */
+  backTo?: string | null
+  /** Si true, el checklist no es editable (PUT admin-only). */
+  readOnlyChecklist?: boolean
+  /** Si true, esconde controles admin-only (pin, etc.). */
+  hideAdminControls?: boolean
+}
+
+function TechnicalReport({ fetcher, basePath, backTo, readOnlyChecklist = false, hideAdminControls = false }: TechnicalReportProps = {}) {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
-  const { fetchLeadDetail, pinAudit } = useAdmin()
+  const { fetchLeadDetail: adminFetch, pinAudit } = useAdmin()
+  const fetchLeadDetail = fetcher ?? adminFetch
   const [result, setResult] = useState<AuditResult | null>(null)
   const [checklist, setChecklist] = useState<ChecklistState>({})
   const [loading, setLoading] = useState(true)
@@ -89,6 +103,7 @@ function TechnicalReport() {
 
   const toggleCheck = useCallback((metricId: string) => {
     if (!id) return
+    if (readOnlyChecklist) return
     let previousCompleted = false
     setChecklist(prev => {
       previousCompleted = prev[metricId]?.completed ?? false
@@ -122,8 +137,12 @@ function TechnicalReport() {
 
   return (
     <div className="space-y-5">
-      {id && <LeadReportNav auditId={id} domain={result.domain} />}
-      <ReportHeader result={result} isPinned={isPinned} onTogglePin={handleTogglePin} />
+      {id && <LeadReportNav auditId={id} domain={result.domain} basePath={basePath} backTo={backTo} />}
+      <ReportHeader
+        result={result}
+        isPinned={isPinned}
+        onTogglePin={hideAdminControls ? undefined : handleTogglePin}
+      />
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
         <TabsList>

@@ -1,11 +1,14 @@
 <?php
 require_once dirname(__DIR__) . '/bootstrap.php';
-Auth::requireAuth();
 
 $id = $_GET['id'] ?? '';
 if (empty($id)) {
     Response::error(Translator::t('admin_api.common.id_required'));
 }
+
+// Admin o dueño del audit (P5.10). Los users consumen este mismo endpoint
+// desde /account/audits/:id para ver el detalle completo de sus audits.
+AuditAccess::require((string) $id);
 
 try {
     $db = Database::getInstance();

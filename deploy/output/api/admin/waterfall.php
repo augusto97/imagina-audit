@@ -5,12 +5,12 @@
  */
 
 require_once __DIR__ . '/../bootstrap.php';
-Auth::requireAuth();
 
 $auditId = $_GET['id'] ?? '';
 if (empty($auditId)) {
     Response::error(Translator::t('admin_api.waterfall.id_required'), 400);
 }
+AuditAccess::require((string) $auditId);
 
 $db = Database::getInstance();
 $row = $db->queryOne("SELECT waterfall_json FROM audits WHERE id = ?", [$auditId]);

@@ -19,10 +19,19 @@
  */
 
 require_once __DIR__ . '/../bootstrap.php';
-Auth::requireAuth();
 
 $db = Database::getInstance();
 $method = $_SERVER['REQUEST_METHOD'];
+
+// POST / DELETE son operaciones admin (subir o quitar snapshot). GET es
+// de lectura — lo abrimos al dueño del audit también (P5.10).
+if ($method === 'GET') {
+    $auditId = $_GET['audit_id'] ?? '';
+    if (empty($auditId)) Response::error(Translator::t('admin_api.common.audit_id_required'), 400);
+    AuditAccess::require((string) $auditId);
+} else {
+    Auth::requireAuth();
+}
 
 // Auto-migration
 try {

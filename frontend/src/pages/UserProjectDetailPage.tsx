@@ -383,7 +383,7 @@ export default function UserProjectDetailPage() {
                           {new Date(a.createdAt).toLocaleString(i18n.language || 'en', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <Link to={`/results/${a.id}`} className="text-xs text-[var(--accent-primary)] hover:underline">
+                          <Link to={`/account/audits/${a.id}`} className="text-xs text-[var(--accent-primary)] hover:underline">
                             {t('account.history_view')}
                           </Link>
                         </td>

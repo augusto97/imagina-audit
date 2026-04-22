@@ -213,6 +213,38 @@ export function useUser() {
     await api.delete('/user/project-share.php', { params: { project_id: projectId } })
   }, [])
 
+  // ─── Audit detail views (P5.10) ─────────────────────────────────
+  // Hit los mismos endpoints admin; el backend valida ownership via
+  // AuditAccess::require cuando no hay sesión admin. Silenciamos el
+  // throw en error — el caller se encarga del estado.
+  const fetchAuditDetail = useCallback(async (id: string) => {
+    try {
+      const res = await api.get('/admin/lead-detail.php', { params: { id } })
+      return res.data?.data ?? null
+    } catch { return null }
+  }, [])
+
+  const fetchAuditSnapshotReport = useCallback(async (auditId: string) => {
+    try {
+      const res = await api.get('/admin/snapshot-report.php', { params: { audit_id: auditId } })
+      return res.data?.data ?? null
+    } catch { return null }
+  }, [])
+
+  const fetchAuditWaterfall = useCallback(async (id: string) => {
+    try {
+      const res = await api.get('/admin/waterfall.php', { params: { id } })
+      return res.data?.data ?? null
+    } catch { return null }
+  }, [])
+
+  const fetchAuditChecklist = useCallback(async (auditId: string) => {
+    try {
+      const res = await api.get('/admin/checklist.php', { params: { audit_id: auditId } })
+      return res.data?.data ?? null
+    } catch { return null }
+  }, [])
+
   // Check session al montar
   useEffect(() => {
     checkSession()
@@ -237,5 +269,9 @@ export function useUser() {
     updateChecklistItem,
     enableProjectShare,
     disableProjectShare,
+    fetchAuditDetail,
+    fetchAuditSnapshotReport,
+    fetchAuditWaterfall,
+    fetchAuditChecklist,
   }
 }

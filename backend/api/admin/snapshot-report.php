@@ -12,7 +12,6 @@
  */
 
 require_once __DIR__ . '/../bootstrap.php';
-Auth::requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     Response::error(Translator::t('api.common.method_not_allowed'), 405);
@@ -20,6 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 $auditId = $_GET['audit_id'] ?? '';
 if (empty($auditId)) Response::error(Translator::t('admin_api.common.audit_id_required'), 400);
+AuditAccess::require((string) $auditId);
 
 $db = Database::getInstance();
 $row = $db->queryOne("SELECT source, source_url, snapshot_json, created_at FROM wp_snapshots WHERE audit_id = ?", [$auditId]);

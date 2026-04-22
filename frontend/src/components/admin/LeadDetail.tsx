@@ -13,17 +13,27 @@ import SolutionMapping from '@/components/audit/SolutionMapping'
 import { useAdmin } from '@/hooks/useAdmin'
 import type { AuditResult } from '@/types/audit'
 
-export default function LeadDetail() {
+interface Props {
+  /** Override del fetcher. Default: useAdmin().fetchLeadDetail */
+  fetcher?: (id: string) => Promise<AuditResult | null>
+  /** Ruta base para LeadReportNav. Default: /admin/leads */
+  basePath?: string
+  /** Ruta del "volver". null = oculto. */
+  backTo?: string | null
+}
+
+export default function LeadDetail({ fetcher, basePath, backTo }: Props = {}) {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
-  const { fetchLeadDetail } = useAdmin()
+  const { fetchLeadDetail: adminFetch } = useAdmin()
+  const fetchLeadDetail = fetcher ?? adminFetch
   const [result, setResult] = useState<(AuditResult & { leadName?: string; leadEmail?: string; leadWhatsapp?: string; leadCompany?: string }) | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!id) return
-    fetchLeadDetail(id).then((data: AuditResult) => {
-      setResult(data)
+    Promise.resolve(fetchLeadDetail(id)).then((data) => {
+      if (data) setResult(data as AuditResult)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [id, fetchLeadDetail])
@@ -39,7 +49,7 @@ export default function LeadDetail() {
   return (
     <div className="space-y-6">
       {/* Header con navegación entre vistas del lead */}
-      {id && <LeadReportNav auditId={id} domain={result.domain} />}
+      {id && <LeadReportNav auditId={id} domain={result.domain} basePath={basePath} backTo={backTo} />}
 
       {/* Datos del lead */}
       <Card>

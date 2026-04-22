@@ -29,10 +29,20 @@ import type { SnapshotReportResponse } from '@/types/snapshotReport'
  * Si hay snapshot, muestra el dashboard con todas las secciones.
  */
 
-export default function SnapshotReport() {
+interface SnapshotReportProps {
+  /** Override del fetcher. Default: useAdmin().fetchSnapshotReport */
+  fetcher?: (auditId: string) => Promise<SnapshotReportResponse | null>
+  basePath?: string
+  backTo?: string | null
+  /** Si true, oculta el uploader (admin-only) cuando no hay snapshot. */
+  hideUploader?: boolean
+}
+
+export default function SnapshotReport({ fetcher, basePath, backTo, hideUploader = false }: SnapshotReportProps = {}) {
   const { t, i18n } = useTranslation()
   const { id } = useParams<{ id: string }>()
-  const { fetchSnapshotReport } = useAdmin()
+  const { fetchSnapshotReport: adminFetch } = useAdmin()
+  const fetchSnapshotReport = fetcher ?? adminFetch
   const [data, setData] = useState<SnapshotReportResponse | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -54,11 +64,11 @@ export default function SnapshotReport() {
     )
   }
 
-  // Sin snapshot → mostrar upload zone
+  // Sin snapshot → mostrar upload zone (o mensaje vacío para user)
   if (!data && id) {
     return (
       <div className="space-y-4">
-        <LeadReportNav auditId={id} />
+        <LeadReportNav auditId={id} basePath={basePath} backTo={backTo} />
         <div>
           <h2 className="text-lg font-semibold text-[var(--text-primary)]">{t('settings.snapshot_title')}</h2>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
@@ -68,7 +78,7 @@ export default function SnapshotReport() {
             </a>{t('settings.snapshot_intro_suffix')}
           </p>
         </div>
-        <SnapshotUploader auditId={id} onChange={load} />
+        {!hideUploader && <SnapshotUploader auditId={id} onChange={load} />}
         <Card>
           <CardContent className="py-6 text-sm text-[var(--text-secondary)]">
             <p className="font-medium text-[var(--text-primary)] mb-2">{t('settings.snapshot_how_title')}</p>
@@ -90,7 +100,7 @@ export default function SnapshotReport() {
 
   return (
     <div className="space-y-5">
-      <LeadReportNav auditId={id} domain={meta.siteName || meta.siteUrl} />
+      <LeadReportNav auditId={id} domain={meta.siteName || meta.siteUrl} basePath={basePath} backTo={backTo} />
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
