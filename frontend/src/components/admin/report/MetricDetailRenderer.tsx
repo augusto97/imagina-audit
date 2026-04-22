@@ -1,3 +1,4 @@
+import i18n from '@/i18n'
 import type { MetricResult } from '@/types/audit'
 
 /**
@@ -10,7 +11,13 @@ import type { MetricResult } from '@/types/audit'
  *
  * El chain de `if` se mantiene plano (en vez de un registry) para que
  * cada rama sea fácil de buscar por el string del `metricId`.
+ *
+ * Como la función no es un componente (no puede usar hooks con early
+ * return), llamamos directamente a `i18n.t()` — el caller re-renderiza
+ * al cambiar el idioma y eso vuelve a evaluar estas strings.
  */
+const t = (key: string, params?: Record<string, unknown>) => i18n.t(key, params)
+
 export function renderTechnicalDetails(metricId: string, details: Record<string, unknown>, metric?: MetricResult) {
   if (!details || Object.keys(details).length === 0) return null
 
@@ -18,10 +25,10 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'ssl_valid' && (details.issuer || details.validTo)) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3 text-xs space-y-1">
-        {details.issuer != null && <div><span className="font-semibold">Emisor:</span> {String(details.issuer)}</div>}
-        {details.protocol != null && <div><span className="font-semibold">Protocolo:</span> {String(details.protocol)}</div>}
-        {details.validFrom != null && <div><span className="font-semibold">Válido desde:</span> {String(details.validFrom)}</div>}
-        {details.validTo != null && <div><span className="font-semibold">Expira:</span> <span className={Number(details.daysRemaining) < 30 ? 'text-red-600 font-bold' : ''}>{String(details.validTo)} ({String(details.daysRemaining)} días restantes)</span></div>}
+        {details.issuer != null && <div><span className="font-semibold">{t('report.md_ssl_issuer')}</span> {String(details.issuer)}</div>}
+        {details.protocol != null && <div><span className="font-semibold">{t('report.md_ssl_protocol')}</span> {String(details.protocol)}</div>}
+        {details.validFrom != null && <div><span className="font-semibold">{t('report.md_ssl_valid_from')}</span> {String(details.validFrom)}</div>}
+        {details.validTo != null && <div><span className="font-semibold">{t('report.md_ssl_expires')}</span> <span className={Number(details.daysRemaining) < 30 ? 'text-red-600 font-bold' : ''}>{String(details.validTo)} {t('report.md_ssl_days_remaining', { days: details.daysRemaining })}</span></div>}
       </div>
     )
   }
@@ -30,14 +37,14 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'exposed_headers' && Array.isArray(details.exposed) && (details.exposed as string[]).length > 0) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-amber-200 p-3">
-        <p className="text-xs font-bold text-amber-700 mb-1">HEADERS QUE EXPONEN INFORMACIÓN DEL SERVIDOR</p>
+        <p className="text-xs font-bold text-amber-700 mb-1">{t('report.md_exposed_headers_title')}</p>
         <div className="space-y-1 text-xs">
           {(details.exposed as string[]).map((h, i) => (
             <div key={i} className="font-mono text-amber-800">{h}</div>
           ))}
         </div>
         <p className="text-xs text-[var(--text-secondary)] mt-2">
-          En .htaccess agregar: <code className="font-mono bg-gray-100 px-1 rounded">Header unset X-Powered-By</code> y <code className="font-mono bg-gray-100 px-1 rounded">ServerTokens Prod</code> en la config de Apache.
+          {t('report.md_exposed_headers_note_prefix')}<code className="font-mono bg-gray-100 px-1 rounded">Header unset X-Powered-By</code>{t('report.md_exposed_headers_note_and')}<code className="font-mono bg-gray-100 px-1 rounded">ServerTokens Prod</code>{t('report.md_exposed_headers_note_suffix')}
         </p>
       </div>
     )
@@ -47,9 +54,9 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'wp_version' && details.latestVersion) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3 text-xs">
-        <span className="font-semibold">Versión instalada:</span> {String(metric?.value || '?')} →{' '}
-        <span className="font-semibold text-emerald-600">Actualizar a: {String(details.latestVersion)}</span>
-        <p className="text-[var(--text-tertiary)] mt-1">Actualizar desde Dashboard → Actualizaciones. Hacer backup previo.</p>
+        <span className="font-semibold">{t('report.md_wp_version_installed')}</span> {String(metric?.value || '?')} →{' '}
+        <span className="font-semibold text-emerald-600">{t('report.md_wp_version_update_to')} {String(details.latestVersion)}</span>
+        <p className="text-[var(--text-tertiary)] mt-1">{t('report.md_wp_version_note')}</p>
       </div>
     )
   }
@@ -58,9 +65,9 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'wp_theme' && (details.themeName || details.childTheme !== undefined)) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3 text-xs space-y-1">
-        {details.themeName != null && <div><span className="font-semibold">Tema:</span> {String(details.themeName)}</div>}
-        {details.themeVersion != null && <div><span className="font-semibold">Versión:</span> {String(details.themeVersion)}</div>}
-        <div><span className="font-semibold">Child theme:</span> {details.childTheme ? <span className="text-emerald-600">Sí</span> : <span className="text-amber-600">No — Las personalizaciones se perderán al actualizar el tema</span>}</div>
+        {details.themeName != null && <div><span className="font-semibold">{t('report.md_theme_theme')}</span> {String(details.themeName)}</div>}
+        {details.themeVersion != null && <div><span className="font-semibold">{t('report.md_theme_version')}</span> {String(details.themeVersion)}</div>}
+        <div><span className="font-semibold">{t('report.md_theme_child_label')}</span> {details.childTheme ? <span className="text-emerald-600">{t('report.md_theme_child_yes')}</span> : <span className="text-amber-600">{t('report.md_theme_child_no')}</span>}</div>
       </div>
     )
   }
