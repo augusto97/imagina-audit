@@ -23,14 +23,16 @@ class SecurityReputationChecker {
         $count = count($realEmails);
 
         return Scoring::createMetric(
-            'exposed_email', 'Email expuesto en texto plano', $count,
-            $count === 0 ? 'No detectado' : "$count email(s) expuesto(s)",
+            'exposed_email',
+            Translator::t('security.email.name'),
+            $count,
+            $count === 0 ? Translator::t('security.email.display.ok') : Translator::t('security.email.display.exposed', ['count' => $count]),
             $count === 0 ? 100 : 50,
             $count === 0
-                ? 'No se detectaron direcciones de email en texto plano. Correcto.'
-                : "Se encontraron $count email(s) en texto plano: " . implode(', ', array_slice($realEmails, 0, 3)) . '. Los bots de spam rastrean la web buscando emails expuestos.',
-            $count > 0 ? 'Ocultar los emails usando formularios de contacto o codificación JavaScript.' : '',
-            'Protegemos los emails de contacto contra bots de spam.',
+                ? Translator::t('security.email.desc.ok')
+                : Translator::t('security.email.desc.exposed', ['count' => $count, 'list' => implode(', ', array_slice($realEmails, 0, 3))]),
+            $count > 0 ? Translator::t('security.email.recommend') : '',
+            Translator::t('security.email.solution'),
             ['emails' => array_slice($realEmails, 0, 5)]
         );
     }
@@ -51,15 +53,23 @@ class SecurityReputationChecker {
             }
         }
 
+        // Extraer policy (p=) del registro DMARC para mostrarlo en el display
+        $policy = 'none';
+        if ($hasDmarc && preg_match('/p=([a-z]+)/i', $dmarcValue, $pm)) {
+            $policy = strtolower($pm[1]);
+        }
+
         return Scoring::createMetric(
-            'dmarc', 'Registro DMARC', $hasDmarc,
-            $hasDmarc ? 'Configurado' : 'No encontrado',
+            'dmarc',
+            Translator::t('security.dmarc.name'),
+            $hasDmarc,
+            $hasDmarc ? Translator::t('security.dmarc.display.ok', ['policy' => $policy]) : Translator::t('security.dmarc.display.none'),
             $hasDmarc ? 100 : 40,
             $hasDmarc
-                ? 'DMARC está configurado para este dominio. Protege contra suplantación de identidad por email.'
-                : 'No se encontró registro DMARC. Sin DMARC, cualquiera puede enviar emails suplantando tu dominio (phishing/spoofing).',
-            $hasDmarc ? '' : 'Configurar un registro DMARC en el DNS del dominio para proteger contra suplantación de email.',
-            'Configuramos DMARC, SPF y DKIM para proteger tu dominio contra phishing.',
+                ? Translator::t('security.dmarc.desc.ok', ['policy' => $policy])
+                : Translator::t('security.dmarc.desc.none'),
+            $hasDmarc ? '' : Translator::t('security.dmarc.recommend'),
+            Translator::t('security.dmarc.solution'),
             ['value' => $dmarcValue]
         );
     }
@@ -81,14 +91,14 @@ class SecurityReputationChecker {
         }
 
         return Scoring::createMetric(
-            'spf', 'Registro SPF', $hasSpf,
-            $hasSpf ? 'Configurado' : 'No encontrado',
+            'spf',
+            Translator::t('security.spf.name'),
+            $hasSpf,
+            $hasSpf ? Translator::t('security.spf.display.ok') : Translator::t('security.spf.display.none'),
             $hasSpf ? 100 : 50,
-            $hasSpf
-                ? 'SPF configurado. Especifica qué servidores pueden enviar email en nombre del dominio.'
-                : 'No se encontró SPF. Cualquiera puede enviar email suplantando tu dominio.',
-            $hasSpf ? '' : 'Configurar un registro SPF (TXT) que liste los servidores autorizados a enviar email.',
-            'Configuramos SPF, DKIM y DMARC para proteger tu dominio.',
+            $hasSpf ? Translator::t('security.spf.desc.ok') : Translator::t('security.spf.desc.none'),
+            $hasSpf ? '' : Translator::t('security.spf.recommend'),
+            Translator::t('security.spf.solution'),
             ['value' => $spfValue]
         );
     }
@@ -106,10 +116,14 @@ class SecurityReputationChecker {
 
         if (empty($apiKey)) {
             return Scoring::createMetric(
-                'safe_browsing', 'Google Safe Browsing', null, 'Sin API key',
+                'safe_browsing',
+                Translator::t('security.sb.name'),
                 null,
-                'No se pudo verificar Google Safe Browsing (requiere API key de Google). La misma key de PageSpeed funciona.',
-                '', 'Monitoreamos que tu sitio no aparezca en listas negras de Google.'
+                Translator::t('security.sb.display.na'),
+                null,
+                Translator::t('security.sb.desc.na'),
+                '',
+                Translator::t('security.sb.solution')
             );
         }
 
@@ -129,10 +143,14 @@ class SecurityReputationChecker {
 
             if ($response['statusCode'] !== 200) {
                 return Scoring::createMetric(
-                    'safe_browsing', 'Google Safe Browsing', null, 'Error en API',
+                    'safe_browsing',
+                    Translator::t('security.sb.name'),
                     null,
-                    'No se pudo consultar Google Safe Browsing (error ' . $response['statusCode'] . ').',
-                    '', 'Monitoreamos que tu sitio no aparezca en listas negras.'
+                    Translator::t('security.sb.display.na'),
+                    null,
+                    Translator::t('security.sb.desc.na'),
+                    '',
+                    Translator::t('security.sb.solution')
                 );
             }
 
@@ -142,37 +160,40 @@ class SecurityReputationChecker {
 
             if ($isSafe) {
                 return Scoring::createMetric(
-                    'safe_browsing', 'Google Safe Browsing', true, 'Sitio seguro',
+                    'safe_browsing',
+                    Translator::t('security.sb.name'),
+                    true,
+                    Translator::t('security.sb.display.ok'),
                     100,
-                    'El sitio NO aparece en la lista negra de Google Safe Browsing. No se detectó malware, phishing ni software no deseado.',
-                    '', 'Monitoreamos continuamente que tu sitio no sea marcado como peligroso.'
+                    Translator::t('security.sb.desc.ok'),
+                    '',
+                    Translator::t('security.sb.solution')
                 );
             }
 
             $threatTypes = array_map(fn($t) => $t['threatType'] ?? 'Unknown', $threats);
-            $threatLabels = [
-                'MALWARE' => 'Malware',
-                'SOCIAL_ENGINEERING' => 'Phishing/Ingeniería social',
-                'UNWANTED_SOFTWARE' => 'Software no deseado',
-                'POTENTIALLY_HARMFUL_APPLICATION' => 'Aplicación peligrosa',
-            ];
-            $labels = array_map(fn($t) => $threatLabels[$t] ?? $t, $threatTypes);
 
             return Scoring::createMetric(
-                'safe_browsing', 'Google Safe Browsing', false,
-                'EN LISTA NEGRA',
+                'safe_browsing',
+                Translator::t('security.sb.name'),
+                false,
+                Translator::t('security.sb.display.bad'),
                 0,
-                'ALERTA: El sitio está marcado como peligroso por Google: ' . implode(', ', $labels) . '. Google muestra una advertencia roja a los usuarios que intentan visitarlo.',
-                'Limpiar el sitio de malware/contenido malicioso y solicitar una revisión en Google Search Console.',
-                'Limpiamos sitios infectados y solicitamos la remoción de la lista negra de Google.',
+                Translator::t('security.sb.desc.bad'),
+                Translator::t('security.sb.recommend'),
+                Translator::t('security.sb.solution'),
                 ['threats' => $threats, 'threatTypes' => $threatTypes]
             );
         } catch (Throwable $e) {
             return Scoring::createMetric(
-                'safe_browsing', 'Google Safe Browsing', null, 'Error',
+                'safe_browsing',
+                Translator::t('security.sb.name'),
                 null,
-                'No se pudo verificar: ' . $e->getMessage(),
-                '', 'Monitoreamos que tu sitio no aparezca en listas negras.'
+                Translator::t('security.sb.display.na'),
+                null,
+                Translator::t('security.sb.desc.na'),
+                '',
+                Translator::t('security.sb.solution')
             );
         }
     }

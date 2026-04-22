@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Plus, Pencil, Trash2, UserCog, Search } from 'lucide-react'
@@ -248,7 +248,9 @@ function UserModal({
       id: initial?.id,
       email: initial?.email ?? '',
       name: initial?.name ?? '',
-      planId: initial?.planId !== null && initial?.planId !== undefined ? String(initial.planId) : '',
+      // Radix Select prohíbe value="" en SelectItem, usamos 'none' como
+      // sentinel y lo mapeamos a null al enviar.
+      planId: initial?.planId !== null && initial?.planId !== undefined ? String(initial.planId) : 'none',
       password: '',
       isActive: initial?.isActive ?? true,
     },
@@ -264,7 +266,7 @@ function UserModal({
         ...(isEdit ? { id: initial!.id } : {}),
         email: values.email,
         name: values.name,
-        planId: values.planId === '' ? null : Number(values.planId),
+        planId: values.planId === '' || values.planId === 'none' ? null : Number(values.planId),
         isActive: Boolean(values.isActive),
       }
       if (values.password && values.password !== '') body.password = values.password
@@ -306,7 +308,7 @@ function UserModal({
             <Select value={planId} onValueChange={(v) => setValue('planId', v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">{t('admin_users.no_plan_label')}</SelectItem>
+                <SelectItem value="none">{t('admin_users.no_plan_label')}</SelectItem>
                 {plans.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -327,7 +329,7 @@ function UserModal({
 
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <Switch id="userActive" checked={isActive} onCheckedChange={(v) => setValue('isActive', v)} />
+              <Switch id="userActive" checked={isActive} onCheckedChange={(v: boolean) => setValue('isActive', v)} />
               <Label htmlFor="userActive">{t('admin_users.field_active')}</Label>
             </div>
             <p className="text-[11px] text-[var(--text-tertiary)]">{t('admin_users.field_active_hint')}</p>

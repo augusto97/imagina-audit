@@ -92,14 +92,14 @@ class SecurityAnalyzer {
 
         return [
             'id' => 'security',
-            'name' => 'Seguridad',
+            'name' => Translator::t('modules.security.name'),
             'icon' => 'shield',
             'score' => $score,
             'level' => Scoring::getLevel($score),
             'weight' => $defaults['weight_security'],
             'metrics' => $metrics,
-            'summary' => "Tu sitio tiene una puntuación de seguridad de $score/100.",
-            'salesMessage' => $defaults['sales_security'],
+            'summary' => Translator::t('security.summary', ['score' => $score]),
+            'salesMessage' => $defaults['sales_security'] !== '' ? $defaults['sales_security'] : Translator::t('modules.sales.security'),
         ];
     }
 }

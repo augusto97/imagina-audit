@@ -14,6 +14,7 @@ const UserAccountPage = lazy(() => import('./pages/UserAccountPage'))
 const UserProjectsPage = lazy(() => import('./pages/UserProjectsPage'))
 const UserProjectDetailPage = lazy(() => import('./pages/UserProjectDetailPage'))
 const SharedProjectPage = lazy(() => import('./pages/SharedProjectPage'))
+const UserAuditViewPage = lazy(() => import('./pages/UserAuditViewPage'))
 
 function App() {
   const reloadConfig = useConfigStore((s) => s.reload)
@@ -71,6 +72,42 @@ function App() {
             </div>
           }>
             <UserProjectDetailPage />
+          </Suspense>
+        } />
+        <Route path="/account/audits/:id" element={
+          <Suspense fallback={
+            <div className="flex h-screen items-center justify-center bg-[var(--bg-secondary)]">
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-primary)]" />
+            </div>
+          }>
+            <UserAuditViewPage view="detail" />
+          </Suspense>
+        } />
+        <Route path="/account/audits/:id/report" element={
+          <Suspense fallback={
+            <div className="flex h-screen items-center justify-center bg-[var(--bg-secondary)]">
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-primary)]" />
+            </div>
+          }>
+            <UserAuditViewPage view="report" />
+          </Suspense>
+        } />
+        <Route path="/account/audits/:id/internal" element={
+          <Suspense fallback={
+            <div className="flex h-screen items-center justify-center bg-[var(--bg-secondary)]">
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-primary)]" />
+            </div>
+          }>
+            <UserAuditViewPage view="internal" />
+          </Suspense>
+        } />
+        <Route path="/account/audits/:id/waterfall" element={
+          <Suspense fallback={
+            <div className="flex h-screen items-center justify-center bg-[var(--bg-secondary)]">
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-primary)]" />
+            </div>
+          }>
+            <UserAuditViewPage view="waterfall" />
           </Suspense>
         } />
         <Route path="/shared/:token" element={

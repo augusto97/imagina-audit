@@ -44,17 +44,20 @@ class SecurityHeadersChecker {
 
         $score = min(100, $score);
 
+        $missingList = implode(', ', $missing);
         return Scoring::createMetric(
             'security_headers',
-            'Headers de seguridad HTTP',
+            Translator::t('security.headers.name'),
             count($present),
-            count($present) . '/' . count($headersToCheck) . ' headers presentes',
+            Translator::t('security.headers.display', ['present' => count($present)]),
             $score,
-            count($present) === count($headersToCheck)
-                ? 'Todos los headers de seguridad están configurados correctamente.'
-                : 'Faltan headers de seguridad: ' . implode(', ', $missing) . '.',
-            empty($missing) ? '' : 'Agregar los headers de seguridad faltantes en la configuración del servidor.',
-            'Configuramos todos los headers de seguridad HTTP recomendados.',
+            empty($present)
+                ? Translator::t('security.headers.desc.none')
+                : (empty($missing)
+                    ? Translator::t('security.headers.desc.ok')
+                    : Translator::t('security.headers.desc.partial', ['missing' => $missingList])),
+            empty($missing) ? '' : Translator::t('security.headers.recommend', ['list' => $missingList]),
+            Translator::t('security.headers.solution'),
             ['present' => $present, 'missing' => $missing]
         );
     }
@@ -78,17 +81,18 @@ class SecurityHeadersChecker {
 
         $score = max(0, $score);
 
+        $exposedList = implode(', ', $exposed);
         return Scoring::createMetric(
             'exposed_headers',
-            'Headers de servidor expuestos',
+            Translator::t('security.exposed.name'),
             count($exposed),
-            count($exposed) > 0 ? implode(', ', $exposed) : 'No expuestos',
+            count($exposed) > 0 ? Translator::t('security.exposed.display.exposed', ['list' => $exposedList]) : Translator::t('security.exposed.display.ok'),
             $score,
             count($exposed) > 0
-                ? 'Se detectaron headers que exponen información del servidor: ' . implode('; ', $exposed)
-                : 'No se detectaron headers que expongan información del servidor.',
-            count($exposed) > 0 ? 'Ocultar la versión del servidor y el header X-Powered-By.' : '',
-            'Ocultamos información del servidor para reducir la superficie de ataque.'
+                ? Translator::t('security.exposed.desc.exposed', ['list' => implode('; ', $exposed)])
+                : Translator::t('security.exposed.desc.ok'),
+            count($exposed) > 0 ? Translator::t('security.exposed.recommend') : '',
+            Translator::t('security.exposed.solution')
         );
     }
 
@@ -108,19 +112,27 @@ class SecurityHeadersChecker {
 
         if ($external === 0) {
             return Scoring::createMetric(
-                'sri', 'Subresource Integrity (SRI)', null, 'Sin scripts externos', null,
-                'No se detectaron scripts externos. SRI no aplica.',
-                '', 'Configuramos SRI en scripts de CDN para protección contra CDN comprometido.'
+                'sri',
+                Translator::t('security.sri.name'),
+                null,
+                Translator::t('security.sri.display', ['withSri' => 0, 'total' => 0]),
+                null,
+                Translator::t('security.sri.desc.none'),
+                '',
+                Translator::t('security.sri.solution')
             );
         }
 
         $pct = (int) round(($withIntegrity / $external) * 100);
         return Scoring::createMetric(
-            'sri', 'Subresource Integrity (SRI)', $pct, "$withIntegrity/$external con SRI",
+            'sri',
+            Translator::t('security.sri.name'),
+            $pct,
+            Translator::t('security.sri.display', ['withSri' => $withIntegrity, 'total' => $external]),
             $pct >= 80 ? 100 : ($pct >= 50 ? 70 : 40),
-            "De $external scripts externos, $withIntegrity tienen atributo integrity ($pct%). SRI protege contra CDNs comprometidos.",
-            $pct < 80 ? 'Agregar atributo integrity="sha384-..." a todos los scripts cargados desde CDN externo.' : '',
-            'Implementamos SRI en todos los recursos externos.',
+            Translator::t('security.sri.desc.ok', ['count' => $external - $withIntegrity]),
+            $pct < 80 ? Translator::t('security.sri.recommend') : '',
+            Translator::t('security.sri.solution'),
             ['external' => $external, 'withIntegrity' => $withIntegrity, 'withoutIntegrity' => array_slice($withoutIntegrity, 0, 5)]
         );
     }

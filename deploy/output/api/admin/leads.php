@@ -7,11 +7,11 @@ $db = Database::getInstance();
 // ─── DELETE ──────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     $id = $_GET['id'] ?? '';
-    if (empty($id)) Response::error('El parámetro id es obligatorio.');
+    if (empty($id)) Response::error(Translator::t('admin_api.common.id_required'));
 
     $row = $db->queryOne("SELECT is_pinned FROM audits WHERE id = ?", [$id]);
     if ($row && (int) $row['is_pinned'] === 1) {
-        Response::error('Este informe está protegido. Desprotégelo antes de eliminarlo.', 409);
+        Response::error(Translator::t('admin_api.leads.protected_report'), 409);
     }
 
     $db->execute("DELETE FROM audits WHERE id = ?", [$id]);
@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 // ─── GET — filtros, paginación, búsqueda, summary ────────────────────
@@ -158,5 +158,5 @@ try {
     ]);
 } catch (Throwable $e) {
     Logger::error('Error en leads: ' . $e->getMessage());
-    Response::error('Error al obtener leads.', 500);
+    Response::error(Translator::t('admin_api.leads.fetch_error'), 500);
 }

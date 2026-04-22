@@ -33,10 +33,18 @@ import { PerformanceDetails } from './waterfall/PerformanceDetails'
  * Orquestador: carga los datos, compone filtros + tabla + secciones.
  * Toda la presentación por sección está en `waterfall/`.
  */
-export default function WaterfallPage() {
+interface WaterfallPageProps {
+  /** Override del fetcher del detalle. Default: useAdmin().fetchLeadDetail */
+  fetcher?: (id: string) => Promise<AuditResult | null>
+  basePath?: string
+  backTo?: string | null
+}
+
+export default function WaterfallPage({ fetcher, basePath, backTo }: WaterfallPageProps = {}) {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
-  const { fetchLeadDetail } = useAdmin()
+  const { fetchLeadDetail: adminFetch } = useAdmin()
+  const fetchLeadDetail = fetcher ?? adminFetch
   const [result, setResult] = useState<AuditResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [filterType, setFilterType] = useState('All')
@@ -180,7 +188,7 @@ export default function WaterfallPage() {
   if (!result || requests.length === 0) {
     return (
       <div className="space-y-4">
-        {id && <LeadReportNav auditId={id} domain={result?.domain} />}
+        {id && <LeadReportNav auditId={id} domain={result?.domain} basePath={basePath} backTo={backTo} />}
         <div className="text-center py-16 text-gray-500">
           <p className="text-lg font-medium">{t('settings.waterfall_empty_title')}</p>
           <p className="text-sm mt-1">{t('settings.waterfall_empty_hint')}</p>
@@ -191,7 +199,7 @@ export default function WaterfallPage() {
 
   return (
     <div className="space-y-4">
-      {id && <LeadReportNav auditId={id} domain={result.domain} />}
+      {id && <LeadReportNav auditId={id} domain={result.domain} basePath={basePath} backTo={backTo} />}
       <div>
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">{t('settings.waterfall_title')}</h2>
         <div className="flex items-center gap-2 text-sm text-[var(--text-tertiary)] mt-0.5">

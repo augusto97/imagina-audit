@@ -35,14 +35,14 @@ class ConversionAnalyzer {
 
         return [
             'id' => 'conversion',
-            'name' => 'Conversión y Marketing',
+            'name' => Translator::t('modules.conversion.name'),
             'icon' => 'bar-chart-3',
             'score' => $score,
             'level' => Scoring::getLevel($score),
             'weight' => $defaults['weight_conversion'],
             'metrics' => $metrics,
-            'summary' => "Tu sitio tiene una puntuación de conversión de $score/100.",
-            'salesMessage' => $defaults['sales_conversion'],
+            'summary' => Translator::t('conversion.summary', ['score' => $score]),
+            'salesMessage' => $defaults['sales_conversion'] !== '' ? $defaults['sales_conversion'] : Translator::t('modules.sales.conversion'),
         ];
     }
 
@@ -57,24 +57,26 @@ class ConversionAnalyzer {
         foreach ($patterns as $pattern) {
             if (str_contains($this->html, $pattern)) {
                 $found = true;
-                if (str_contains($pattern, 'G-')) $type = 'GA4';
-                elseif (str_contains($pattern, 'UA-')) $type = 'Universal Analytics';
-                else $type = 'Google Analytics';
+                if (str_contains($pattern, 'G-')) $type = Translator::t('conversion.analytics.type.ga4');
+                elseif (str_contains($pattern, 'UA-')) $type = Translator::t('conversion.analytics.type.ua');
+                else $type = Translator::t('conversion.analytics.type.generic');
                 break;
             }
         }
 
         return Scoring::createMetric(
             'analytics',
-            'Google Analytics',
+            Translator::t('conversion.analytics.name'),
             $found,
-            $found ? "Instalado ($type)" : 'No detectado',
+            $found
+                ? Translator::t('conversion.analytics.display.ok', ['type' => $type])
+                : Translator::t('conversion.analytics.display.none'),
             $found ? 100 : 0,
             $found
-                ? "Google Analytics está instalado ($type). Puedes medir el tráfico y comportamiento."
-                : 'No se detectó Google Analytics. No puedes medir el rendimiento de tu sitio.',
-            !$found ? 'Instalar Google Analytics 4 para medir tráfico y conversiones.' : '',
-            'Instalamos y configuramos Google Analytics 4 con seguimiento de conversiones.'
+                ? Translator::t('conversion.analytics.desc.ok', ['type' => $type])
+                : Translator::t('conversion.analytics.desc.none'),
+            !$found ? Translator::t('conversion.analytics.recommend') : '',
+            Translator::t('conversion.analytics.solution')
         );
     }
 
@@ -88,15 +90,13 @@ class ConversionAnalyzer {
 
         return Scoring::createMetric(
             'tag_manager',
-            'Google Tag Manager',
+            Translator::t('conversion.gtm.name'),
             $found,
-            $found ? 'Instalado' : 'No detectado',
+            $found ? Translator::t('conversion.gtm.display.ok') : Translator::t('conversion.gtm.display.none'),
             $found ? 100 : 40,
-            $found
-                ? 'Google Tag Manager está instalado. Facilita la gestión de scripts de marketing.'
-                : 'No se detectó Google Tag Manager.',
-            !$found ? 'Considerar implementar GTM para gestionar tags de marketing sin modificar código.' : '',
-            'Configuramos GTM para gestionar todos los scripts de marketing de forma centralizada.'
+            $found ? Translator::t('conversion.gtm.desc.ok') : Translator::t('conversion.gtm.desc.none'),
+            !$found ? Translator::t('conversion.gtm.recommend') : '',
+            Translator::t('conversion.gtm.solution')
         );
     }
 
@@ -127,17 +127,18 @@ class ConversionAnalyzer {
 
         $found = !empty($detected);
 
+        $list = implode(', ', $detected);
         return Scoring::createMetric(
             'chat',
-            'Chat en vivo / WhatsApp',
+            Translator::t('conversion.chat.name'),
             $found,
-            $found ? implode(', ', $detected) : 'No detectado',
+            $found ? Translator::t('conversion.chat.display.ok', ['list' => $list]) : Translator::t('conversion.chat.display.none'),
             $found ? 100 : 0,
             $found
-                ? 'Chat o contacto rápido detectado: ' . implode(', ', $detected) . '.'
-                : 'No se detectó chat en vivo ni botón de WhatsApp. Pierdes conversiones.',
-            !$found ? 'Agregar un chat en vivo o botón de WhatsApp para captar leads.' : '',
-            'Instalamos chat de WhatsApp y herramientas de atención instantánea.'
+                ? Translator::t('conversion.chat.desc.ok', ['list' => $list])
+                : Translator::t('conversion.chat.desc.none'),
+            !$found ? Translator::t('conversion.chat.recommend') : '',
+            Translator::t('conversion.chat.solution')
         );
     }
 
@@ -167,17 +168,29 @@ class ConversionAnalyzer {
 
         $found = !empty($detected) || $hasGenericForms;
 
+        if ($found) {
+            if (!empty($detected)) {
+                $list = implode(', ', $detected);
+                $display = Translator::t('conversion.forms.display.ok_named', ['list' => $list]);
+                $desc = Translator::t('conversion.forms.desc.ok_named', ['list' => $list]);
+            } else {
+                $display = Translator::t('conversion.forms.display.ok_generic', ['count' => count($forms)]);
+                $desc = Translator::t('conversion.forms.desc.ok_generic');
+            }
+        } else {
+            $display = Translator::t('conversion.forms.display.none');
+            $desc = Translator::t('conversion.forms.desc.none');
+        }
+
         return Scoring::createMetric(
             'forms',
-            'Formularios de contacto',
+            Translator::t('conversion.forms.name'),
             $found,
-            $found ? (!empty($detected) ? implode(', ', $detected) : count($forms) . ' formularios') : 'No detectados',
+            $display,
             $found ? 100 : 0,
-            $found
-                ? 'Se detectaron formularios de contacto' . (!empty($detected) ? ': ' . implode(', ', $detected) : '') . '.'
-                : 'No se detectaron formularios de contacto. Los visitantes no pueden contactarte fácilmente.',
-            !$found ? 'Agregar un formulario de contacto visible y accesible.' : '',
-            'Configuramos formularios optimizados para captar leads.'
+            $desc,
+            !$found ? Translator::t('conversion.forms.recommend') : '',
+            Translator::t('conversion.forms.solution')
         );
     }
 
@@ -208,17 +221,20 @@ class ConversionAnalyzer {
         $count = count($detected);
         $score = $count >= 3 ? 100 : ($count >= 1 ? 60 : 0);
 
+        $list = implode(', ', $detected);
         return Scoring::createMetric(
             'social_media',
-            'Redes Sociales',
+            Translator::t('conversion.social.name'),
             $count,
-            $count > 0 ? implode(', ', $detected) : 'No detectadas',
+            $count > 0
+                ? Translator::t('conversion.social.display.ok', ['list' => $list])
+                : Translator::t('conversion.social.display.none'),
             $score,
             $count > 0
-                ? "Se detectaron enlaces a $count redes sociales: " . implode(', ', $detected) . '.'
-                : 'No se detectaron enlaces a redes sociales.',
-            $count < 2 ? 'Agregar enlaces a las redes sociales de la empresa.' : '',
-            'Integramos las redes sociales y configuramos sharing buttons.'
+                ? Translator::t('conversion.social.desc.ok', ['count' => $count, 'list' => $list])
+                : Translator::t('conversion.social.desc.none'),
+            $count < 2 ? Translator::t('conversion.social.recommend') : '',
+            Translator::t('conversion.social.solution')
         );
     }
 
@@ -256,17 +272,26 @@ class ConversionAnalyzer {
 
         $found = $detected !== null || $hasLegal;
 
+        if ($found) {
+            $display = $detected
+                ? Translator::t('conversion.cookies.display.tool', ['name' => $detected])
+                : Translator::t('conversion.cookies.display.legal');
+            $desc = Translator::t('conversion.cookies.desc.ok_prefix')
+                . ($detected ? Translator::t('conversion.cookies.desc.ok_tool', ['name' => $detected]) : '');
+        } else {
+            $display = Translator::t('conversion.cookies.display.none');
+            $desc = Translator::t('conversion.cookies.desc.none');
+        }
+
         return Scoring::createMetric(
             'cookies_legal',
-            'Cookies y Cumplimiento Legal',
+            Translator::t('conversion.cookies.name'),
             $found,
-            $found ? ($detected ? "$detected detectado" : 'Páginas legales encontradas') : 'No detectado',
+            $display,
             $found ? 100 : 20,
-            $found
-                ? 'Se detectó cumplimiento de cookies/legal.' . ($detected ? " Herramienta: $detected." : '')
-                : 'No se detectó aviso de cookies ni páginas legales. Posible incumplimiento de GDPR.',
-            !$found ? 'Implementar un aviso de cookies y crear páginas de política de privacidad.' : '',
-            'Implementamos aviso de cookies y creamos las páginas legales necesarias.'
+            $desc,
+            !$found ? Translator::t('conversion.cookies.recommend') : '',
+            Translator::t('conversion.cookies.solution')
         );
     }
 
@@ -280,15 +305,13 @@ class ConversionAnalyzer {
 
         return Scoring::createMetric(
             'facebook_pixel',
-            'Facebook Pixel',
+            Translator::t('conversion.fb.name'),
             $found,
-            $found ? 'Instalado' : 'No detectado',
+            $found ? Translator::t('conversion.fb.display.ok') : Translator::t('conversion.fb.display.none'),
             $found ? 100 : 50,
-            $found
-                ? 'Facebook Pixel está instalado. Puedes crear audiencias y medir campañas.'
-                : 'No se detectó Facebook Pixel. No puedes hacer remarketing en Facebook/Instagram.',
-            !$found ? 'Instalar Facebook Pixel si haces publicidad en Facebook o Instagram.' : '',
-            'Configuramos Facebook Pixel con eventos de conversión personalizados.'
+            $found ? Translator::t('conversion.fb.desc.ok') : Translator::t('conversion.fb.desc.none'),
+            !$found ? Translator::t('conversion.fb.recommend') : '',
+            Translator::t('conversion.fb.solution')
         );
     }
 
@@ -322,17 +345,27 @@ class ConversionAnalyzer {
 
         $found = $detected !== null;
 
+        if ($found) {
+            $display = Translator::t('conversion.push.display.ok', ['name' => $detected]);
+            $desc = Translator::t('conversion.push.desc.ok', ['name' => $detected]);
+        } else {
+            $display = $hasServiceWorker
+                ? Translator::t('conversion.push.display.sw_only')
+                : Translator::t('conversion.push.display.none');
+            $desc = $hasServiceWorker
+                ? Translator::t('conversion.push.desc.none_sw')
+                : Translator::t('conversion.push.desc.none');
+        }
+
         return Scoring::createMetric(
             'push_notifications',
-            'Notificaciones Push',
+            Translator::t('conversion.push.name'),
             $found,
-            $found ? "$detected detectado" : ($hasServiceWorker ? 'Service Worker sin push' : 'No detectadas'),
+            $display,
             $found ? 100 : 60,
-            $found
-                ? "Notificaciones push configuradas con $detected. Permite re-enganchar visitantes que abandonan el sitio."
-                : 'No se detectaron notificaciones push.' . ($hasServiceWorker ? ' Se detectó un Service Worker que podría soportar push.' : ' Las push notifications permiten recuperar hasta un 10% de visitantes perdidos.'),
-            !$found ? 'Considerar implementar notificaciones push con OneSignal o similar para re-enganchar visitantes.' : '',
-            'Implementamos notificaciones push para recuperar visitantes y aumentar conversiones.'
+            $desc,
+            !$found ? Translator::t('conversion.push.recommend') : '',
+            Translator::t('conversion.push.solution')
         );
     }
 
@@ -374,19 +407,32 @@ class ConversionAnalyzer {
 
         $found = !empty($detected) || $hasSubscriptionForm;
 
-        $displayValue = !empty($detected) ? implode(', ', $detected) : ($hasSubscriptionForm ? 'Formulario de suscripción' : 'No detectado');
+        $list = implode(', ', $detected);
+        if (!empty($detected)) {
+            $display = Translator::t('conversion.email.display.named', ['list' => $list]);
+        } elseif ($hasSubscriptionForm) {
+            $display = Translator::t('conversion.email.display.generic');
+        } else {
+            $display = Translator::t('conversion.email.display.none');
+        }
+
+        if ($found) {
+            $desc = Translator::t('conversion.email.desc.ok_prefix')
+                . (!empty($detected) ? Translator::t('conversion.email.desc.ok_named', ['list' => $list]) : '')
+                . Translator::t('conversion.email.desc.ok_suffix');
+        } else {
+            $desc = Translator::t('conversion.email.desc.none');
+        }
 
         return Scoring::createMetric(
             'email_marketing',
-            'Email Marketing',
+            Translator::t('conversion.email.name'),
             $found,
-            $displayValue,
+            $display,
             $found ? 100 : 40,
-            $found
-                ? 'Se detectó integración de email marketing' . (!empty($detected) ? ': ' . implode(', ', $detected) : '') . '. El email marketing tiene el mejor ROI de todos los canales digitales.'
-                : 'No se detectó herramienta de email marketing ni formulario de suscripción. El email marketing genera un ROI promedio de $42 por cada $1 invertido.',
-            !$found ? 'Implementar un formulario de suscripción con Mailchimp, Brevo u otra herramienta de email marketing.' : '',
-            'Integramos herramientas de email marketing con formularios de captura optimizados.',
+            $desc,
+            !$found ? Translator::t('conversion.email.recommend') : '',
+            Translator::t('conversion.email.solution'),
             ['detected' => $detected, 'hasSubscriptionForm' => $hasSubscriptionForm]
         );
     }
@@ -405,15 +451,13 @@ class ConversionAnalyzer {
 
         return Scoring::createMetric(
             'google_ads',
-            'Google Ads',
+            Translator::t('conversion.ads.name'),
             $found,
-            $found ? 'Detectado' : 'No detectado',
+            $found ? Translator::t('conversion.ads.display.ok') : Translator::t('conversion.ads.display.none'),
             $found ? 100 : 60,
-            $found
-                ? 'Se detectó integración con Google Ads. Permite medir conversiones de campañas de publicidad.'
-                : 'No se detectó Google Ads. Si realizas campañas de publicidad en Google, necesitas el tag de conversión.',
-            !$found ? 'Si haces publicidad en Google, instalar el tag de Google Ads para medir conversiones.' : '',
-            'Configuramos Google Ads con seguimiento de conversiones y remarketing.'
+            $found ? Translator::t('conversion.ads.desc.ok') : Translator::t('conversion.ads.desc.none'),
+            !$found ? Translator::t('conversion.ads.recommend') : '',
+            Translator::t('conversion.ads.solution')
         );
     }
 }

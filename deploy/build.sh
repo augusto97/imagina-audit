@@ -37,6 +37,7 @@ cp -r "$PROJECT_DIR/backend/analyzers" "$DEPLOY_DIR/analyzers"
 cp -r "$PROJECT_DIR/backend/config" "$DEPLOY_DIR/config"
 cp -r "$PROJECT_DIR/backend/data" "$DEPLOY_DIR/data"
 cp -r "$PROJECT_DIR/backend/database" "$DEPLOY_DIR/database"
+cp -r "$PROJECT_DIR/backend/locales" "$DEPLOY_DIR/locales"
 # NUNCA incluir archivos .db en el artefacto — al subir por FTP sobrescribirían
 # la DB real del servidor. Solo el schema se distribuye, el .db se crea al arrancar.
 find "$DEPLOY_DIR/database" -name "*.db" -delete 2>/dev/null || true

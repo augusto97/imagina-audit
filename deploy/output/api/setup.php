@@ -36,15 +36,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 // A partir de aquí, POST: intento de configurar password inicial
 if (hasAdminConfigured()) {
-    Response::error(
-        'El setup ya se completó. Para cambiar la password, entra al admin y ve a Configuración → General.',
-        403
-    );
+    Response::error(Translator::t('admin_auth.setup.already_done'), 403);
 }
 
 $body = Response::getJsonBody();
@@ -52,10 +49,10 @@ $password = (string) ($body['password'] ?? '');
 $confirm = (string) ($body['confirm'] ?? '');
 
 if (strlen($password) < 10) {
-    Response::error('La password debe tener al menos 10 caracteres.', 400);
+    Response::error(Translator::t('admin_auth.setup.password_too_short'), 400);
 }
 if ($password !== $confirm) {
-    Response::error('Las passwords no coinciden.', 400);
+    Response::error(Translator::t('admin_auth.setup.passwords_mismatch'), 400);
 }
 
 try {
@@ -69,5 +66,5 @@ try {
     Response::success(['ok' => true]);
 } catch (Throwable $e) {
     Logger::error('Setup falló: ' . $e->getMessage());
-    Response::error('Error al guardar la configuración.', 500);
+    Response::error(Translator::t('admin_auth.setup.save_error'), 500);
 }

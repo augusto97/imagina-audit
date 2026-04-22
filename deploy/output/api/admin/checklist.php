@@ -7,16 +7,19 @@
  */
 
 require_once __DIR__ . '/../bootstrap.php';
-Auth::requireAuth();
 
 $db = Database::getInstance();
 $method = $_SERVER['REQUEST_METHOD'];
 
+// GET lo pueden ejecutar admin o dueño del audit (P5.10). Las mutaciones
+// quedan admin-only porque los users administran el checklist vivo vía
+// /api/user/project-checklist.php (es un concepto distinto).
 if ($method === 'GET') {
     $auditId = $_GET['audit_id'] ?? '';
     if (empty($auditId)) {
-        Response::error('audit_id requerido', 400);
+        Response::error(Translator::t('admin_api.common.audit_id_required'), 400);
     }
+    AuditAccess::require((string) $auditId);
 
     $items = $db->query(
         "SELECT metric_id, completed, notes, completed_at FROM checklist_items WHERE audit_id = ? ORDER BY created_at",
@@ -26,6 +29,9 @@ if ($method === 'GET') {
     Response::success($items);
 }
 
+// A partir de acá, mutaciones — admin-only
+Auth::requireAuth();
+
 if ($method === 'PUT') {
     $body = Response::getJsonBody();
     $auditId = $body['auditId'] ?? '';
@@ -34,7 +40,7 @@ if ($method === 'PUT') {
     $notes = $body['notes'] ?? null;
 
     if (empty($auditId) || empty($metricId)) {
-        Response::error('auditId y metricId requeridos', 400);
+        Response::error(Translator::t('admin_api.checklist.audit_and_metric_required'), 400);
     }
 
     // Upsert: insertar o actualizar
@@ -61,7 +67,7 @@ if ($method === 'PUT') {
 if ($method === 'DELETE') {
     $auditId = $_GET['audit_id'] ?? '';
     if (empty($auditId)) {
-        Response::error('audit_id requerido', 400);
+        Response::error(Translator::t('admin_api.common.audit_id_required'), 400);
     }
 
     $db->execute("DELETE FROM checklist_items WHERE audit_id = ?", [$auditId]);

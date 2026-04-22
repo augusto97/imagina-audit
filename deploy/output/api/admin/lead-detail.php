@@ -1,18 +1,21 @@
 <?php
 require_once dirname(__DIR__) . '/bootstrap.php';
-Auth::requireAuth();
 
 $id = $_GET['id'] ?? '';
 if (empty($id)) {
-    Response::error('El parámetro id es obligatorio.');
+    Response::error(Translator::t('admin_api.common.id_required'));
 }
+
+// Admin o dueño del audit (P5.10). Los users consumen este mismo endpoint
+// desde /account/audits/:id para ver el detalle completo de sus audits.
+AuditAccess::require((string) $id);
 
 try {
     $db = Database::getInstance();
     $audit = $db->queryOne("SELECT result_json, lead_name, lead_email, lead_whatsapp, lead_company, is_pinned, created_at FROM audits WHERE id = ?", [$id]);
 
     if (!$audit) {
-        Response::error('Auditoría no encontrada.', 404);
+        Response::error(Translator::t('admin_api.lead_detail.not_found'), 404);
     }
 
     $result = JsonStore::decode($audit['result_json']) ?? [];
@@ -27,5 +30,5 @@ try {
     Response::success($result);
 } catch (Throwable $e) {
     Logger::error('Error en lead-detail: ' . $e->getMessage());
-    Response::error('Error al obtener el detalle.', 500);
+    Response::error(Translator::t('admin_api.lead_detail.fetch_error'), 500);
 }

@@ -7,16 +7,19 @@
  */
 
 require_once __DIR__ . '/../bootstrap.php';
-Auth::requireAuth();
 
 $db = Database::getInstance();
 $method = $_SERVER['REQUEST_METHOD'];
 
+// GET lo pueden ejecutar admin o dueño del audit (P5.10). Las mutaciones
+// quedan admin-only porque los users administran el checklist vivo vía
+// /api/user/project-checklist.php (es un concepto distinto).
 if ($method === 'GET') {
     $auditId = $_GET['audit_id'] ?? '';
     if (empty($auditId)) {
         Response::error(Translator::t('admin_api.common.audit_id_required'), 400);
     }
+    AuditAccess::require((string) $auditId);
 
     $items = $db->query(
         "SELECT metric_id, completed, notes, completed_at FROM checklist_items WHERE audit_id = ? ORDER BY created_at",
@@ -25,6 +28,9 @@ if ($method === 'GET') {
 
     Response::success($items);
 }
+
+// A partir de acá, mutaciones — admin-only
+Auth::requireAuth();
 
 if ($method === 'PUT') {
     $body = Response::getJsonBody();

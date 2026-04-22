@@ -21,13 +21,13 @@ class SecurityTransportChecker {
         if (!$ssl['valid']) {
             return Scoring::createMetric(
                 'ssl_valid',
-                'Certificado SSL',
+                Translator::t('security.ssl.name'),
                 false,
-                'No válido o no presente',
+                Translator::t('security.ssl.display.invalid'),
                 0,
-                'El sitio no tiene un certificado SSL válido. Los visitantes verán advertencias de seguridad.',
-                'Instalar un certificado SSL (Let\'s Encrypt es gratuito).',
-                'Instalamos y configuramos SSL gratuito con Let\'s Encrypt en tu hosting.'
+                Translator::t('security.ssl.desc.invalid'),
+                Translator::t('security.ssl.recommend.install'),
+                Translator::t('security.ssl.solution')
             );
         }
 
@@ -36,15 +36,15 @@ class SecurityTransportChecker {
 
         return Scoring::createMetric(
             'ssl_valid',
-            'Certificado SSL',
+            Translator::t('security.ssl.name'),
             true,
-            "Válido hasta {$ssl['validTo']} ({$days} días)",
+            Translator::t('security.ssl.display.valid', ['validTo' => $ssl['validTo'], 'days' => $days]),
             $score,
             $days > 30
-                ? "Certificado SSL válido emitido por {$ssl['issuer']}. Expira el {$ssl['validTo']}."
-                : "Certificado SSL próximo a expirar ({$days} días). Emitido por {$ssl['issuer']}.",
-            $days <= 30 ? 'Renovar el certificado SSL antes de que expire.' : '',
-            'Monitoreamos la expiración del SSL y lo renovamos automáticamente.',
+                ? Translator::t('security.ssl.desc.valid', ['issuer' => $ssl['issuer'], 'validTo' => $ssl['validTo']])
+                : Translator::t('security.ssl.desc.expiring', ['days' => $days, 'issuer' => $ssl['issuer']]),
+            $days <= 30 ? Translator::t('security.ssl.recommend.renew') : '',
+            Translator::t('security.ssl.solution'),
             ['issuer' => $ssl['issuer'], 'validFrom' => $ssl['validFrom'], 'validTo' => $ssl['validTo']]
         );
     }
@@ -63,15 +63,13 @@ class SecurityTransportChecker {
 
         return Scoring::createMetric(
             'https_redirect',
-            'Redirección HTTP → HTTPS',
+            Translator::t('security.redirect.name'),
             $redirectsToHttps,
-            $redirectsToHttps ? 'Configurada correctamente' : 'No configurada',
+            $redirectsToHttps ? Translator::t('security.redirect.display.ok') : Translator::t('security.redirect.display.missing'),
             $redirectsToHttps ? 100 : 30,
-            $redirectsToHttps
-                ? 'HTTP redirige correctamente a HTTPS.'
-                : 'HTTP no redirige a HTTPS. Los visitantes podrían acceder a la versión no segura.',
-            $redirectsToHttps ? '' : 'Configurar redirección 301 de HTTP a HTTPS.',
-            'Configuramos la redirección HTTPS y forzamos conexiones seguras.'
+            $redirectsToHttps ? Translator::t('security.redirect.desc.ok') : Translator::t('security.redirect.desc.missing'),
+            $redirectsToHttps ? '' : Translator::t('security.redirect.recommend'),
+            Translator::t('security.redirect.solution')
         );
     }
 
@@ -89,17 +87,18 @@ class SecurityTransportChecker {
         $preloadReady = $hasHsts && $hasPreload && $hasIncludeSubDomains && $maxAge >= 31536000;
 
         return Scoring::createMetric(
-            'hsts_preload', 'HSTS Preload',
+            'hsts_preload',
+            Translator::t('security.hsts.name'),
             $preloadReady ? 'ready' : ($hasHsts ? 'partial' : 'none'),
-            $preloadReady ? 'Listo para preload' : ($hasHsts ? 'HSTS sin preload' : 'Sin HSTS'),
+            $preloadReady
+                ? Translator::t('security.hsts.display.ready')
+                : ($hasHsts ? Translator::t('security.hsts.display.partial') : Translator::t('security.hsts.display.none')),
             $preloadReady ? 100 : ($hasHsts ? 70 : 40),
             $preloadReady
-                ? 'HSTS completamente configurado con preload, includeSubDomains y max-age >= 1 año. Listo para enviar a hstspreload.org.'
-                : ($hasHsts
-                    ? 'HSTS presente pero falta preload/includeSubDomains/max-age suficiente para calificar al preload list de Chrome.'
-                    : 'Sin HSTS. Configurar para forzar HTTPS y poder solicitar inclusión en el preload list.'),
-            !$preloadReady ? 'Configurar: Strict-Transport-Security: max-age=31536000; includeSubDomains; preload. Luego registrar en hstspreload.org' : '',
-            'Configuramos HSTS con preload para máxima protección HTTPS.',
+                ? Translator::t('security.hsts.desc.ready')
+                : ($hasHsts ? Translator::t('security.hsts.desc.partial') : Translator::t('security.hsts.desc.none')),
+            !$preloadReady ? Translator::t('security.hsts.recommend') : '',
+            Translator::t('security.hsts.solution'),
             ['value' => $hsts, 'maxAge' => $maxAge, 'hasPreload' => $hasPreload, 'hasIncludeSubDomains' => $hasIncludeSubDomains]
         );
     }
@@ -128,15 +127,18 @@ class SecurityTransportChecker {
         }
 
         $count = count($weakFound);
+        $weakList = implode(', ', $weakFound);
         return Scoring::createMetric(
-            'weak_tls', 'Versiones TLS débiles', $count,
-            $count === 0 ? 'Solo TLS 1.2+' : implode(', ', $weakFound) . ' habilitado',
+            'weak_tls',
+            Translator::t('security.tls.name'),
+            $count,
+            $count === 0 ? Translator::t('security.tls.display.ok') : Translator::t('security.tls.display.weak', ['list' => $weakList]),
             $count === 0 ? 100 : ($count === 1 ? 50 : 20),
             $count === 0
-                ? 'El servidor solo acepta TLS 1.2 y superior. Correcto.'
-                : 'El servidor acepta versiones TLS débiles: ' . implode(', ', $weakFound) . '. Son vulnerables a ataques como POODLE y BEAST.',
-            $count > 0 ? 'Desactivar TLS 1.0 y 1.1 en la configuración del servidor. Solo habilitar TLS 1.2 y TLS 1.3.' : '',
-            'Configuramos el servidor para aceptar solo versiones modernas de TLS.',
+                ? Translator::t('security.tls.desc.ok')
+                : Translator::t('security.tls.desc.weak', ['list' => $weakList]),
+            $count > 0 ? Translator::t('security.tls.recommend') : '',
+            Translator::t('security.tls.solution'),
             ['weakVersions' => $weakFound]
         );
     }
@@ -144,7 +146,16 @@ class SecurityTransportChecker {
     public function checkDnssec(): array {
         $parts = explode('.', $this->host);
         if (count($parts) < 2) {
-            return Scoring::createMetric('dnssec', 'DNSSEC', null, 'N/A', null, 'Dominio inválido.', '', '');
+            return Scoring::createMetric(
+                'dnssec',
+                Translator::t('security.dnssec.name'),
+                null,
+                Translator::t('security.dnssec.display.invalid'),
+                null,
+                Translator::t('security.dnssec.desc.invalid'),
+                '',
+                ''
+            );
         }
         $domain = count($parts) >= 2 ? implode('.', array_slice($parts, -2)) : $this->host;
 
@@ -160,14 +171,14 @@ class SecurityTransportChecker {
         }
 
         return Scoring::createMetric(
-            'dnssec', 'DNSSEC', $hasDnssec,
-            $hasDnssec ? 'Habilitado' : 'No habilitado',
+            'dnssec',
+            Translator::t('security.dnssec.name'),
+            $hasDnssec,
+            $hasDnssec ? Translator::t('security.dnssec.display.enabled') : Translator::t('security.dnssec.display.disabled'),
             $hasDnssec ? 100 : 60,
-            $hasDnssec
-                ? 'DNSSEC habilitado. Protege contra envenenamiento de caché DNS y redirecciones maliciosas.'
-                : 'DNSSEC no habilitado. Sin firma DNS, es posible suplantar los registros DNS del dominio.',
-            !$hasDnssec ? 'Habilitar DNSSEC en tu registrador o proveedor DNS (Cloudflare lo hace con 1 click).' : '',
-            'Configuramos DNSSEC para proteger contra ataques de DNS.'
+            $hasDnssec ? Translator::t('security.dnssec.desc.enabled') : Translator::t('security.dnssec.desc.disabled'),
+            !$hasDnssec ? Translator::t('security.dnssec.recommend') : '',
+            Translator::t('security.dnssec.solution')
         );
     }
 
@@ -183,14 +194,16 @@ class SecurityTransportChecker {
         }
         $count = count($found);
         return Scoring::createMetric(
-            'source_code_exposure', 'Exposición de código fuente', $count,
-            $count === 0 ? 'Protegido' : "$count archivos expuestos",
+            'source_code_exposure',
+            Translator::t('security.source.name'),
+            $count,
+            $count === 0 ? Translator::t('security.source.display.safe') : Translator::t('security.source.display.exposed', ['count' => $count]),
             $count === 0 ? 100 : 0,
             $count === 0
-                ? 'No se detectaron archivos de control de versiones expuestos (.git, .svn). Correcto.'
-                : 'CRÍTICO: Archivos de control de versiones accesibles: ' . implode(', ', $found) . '. Un atacante puede descargar todo el código fuente incluyendo credenciales.',
-            $count > 0 ? 'Bloquear acceso a /.git/, /.svn/, etc. en .htaccess o eliminar estos directorios del servidor web.' : '',
-            'Protegemos contra fugas de código fuente y archivos de sistema.',
+                ? Translator::t('security.source.desc.safe')
+                : Translator::t('security.source.desc.exposed', ['list' => implode(', ', $found)]),
+            $count > 0 ? Translator::t('security.source.recommend') : '',
+            Translator::t('security.source.solution'),
             ['files' => $found]
         );
     }

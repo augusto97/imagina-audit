@@ -19,36 +19,36 @@ class CronHealth {
     public static function catalog(): array {
         return [
             'drain-queue' => [
-                'label'            => 'Cola de auditorías (drain)',
-                'description'      => 'Saca jobs pendientes de la cola y los procesa. Debe correr cada minuto.',
+                'label'            => Translator::t('cron.drain_queue.label'),
+                'description'      => Translator::t('cron.drain_queue.description'),
                 'interval_seconds' => 60,
                 'grace_factor'     => 10,       // puede tardar más si no hay jobs
                 'critical_factor'  => 60,       // 1 hora sin correr = crítico
             ],
             'cleanup' => [
-                'label'            => 'Limpieza diaria',
-                'description'      => 'Purga rate-limits expirados, cache viejo y (si está activada) informes antiguos.',
+                'label'            => Translator::t('cron.cleanup.label'),
+                'description'      => Translator::t('cron.cleanup.description'),
                 'interval_seconds' => 86400,
                 'grace_factor'     => 1.5,      // ok hasta 36h
                 'critical_factor'  => 3,        // 3 días sin correr = crítico
             ],
             'vacuum' => [
-                'label'            => 'Vacuum de SQLite',
-                'description'      => 'Compacta la DB y optimiza índices. Semanal.',
+                'label'            => Translator::t('cron.vacuum.label'),
+                'description'      => Translator::t('cron.vacuum.description'),
                 'interval_seconds' => 604800,   // 7 días
                 'grace_factor'     => 1.5,
                 'critical_factor'  => 3,
             ],
             'update-vulnerabilities' => [
-                'label'            => 'Actualización de vulnerabilidades',
-                'description'      => 'Sincroniza la base local de CVEs. Diario recomendado.',
+                'label'            => Translator::t('cron.update_vulnerabilities.label'),
+                'description'      => Translator::t('cron.update_vulnerabilities.description'),
                 'interval_seconds' => 86400,
                 'grace_factor'     => 2,
                 'critical_factor'  => 7,
             ],
             'refresh-plugin-vault' => [
-                'label'            => 'Refresh del Plugin Vault',
-                'description'      => 'Busca nuevas versiones de wp-snapshot en GitHub. Mensual.',
+                'label'            => Translator::t('cron.refresh_plugin_vault.label'),
+                'description'      => Translator::t('cron.refresh_plugin_vault.description'),
                 'interval_seconds' => 2592000,  // 30 días
                 'grace_factor'     => 1.5,
                 'critical_factor'  => 3,
@@ -92,7 +92,7 @@ class CronHealth {
             $last = self::getLastRun($name);
             $status = 'never';
             $ageSec = null;
-            $message = 'Nunca se ha ejecutado';
+            $message = Translator::t('cron.msg.never');
 
             if ($last !== null && !empty($last['at'])) {
                 $lastTs = strtotime($last['at']);
@@ -104,13 +104,13 @@ class CronHealth {
 
                     if ($ageSec <= $graceThreshold) {
                         $status = 'ok';
-                        $message = 'Corriendo a tiempo';
+                        $message = Translator::t('cron.msg.ok');
                     } elseif ($ageSec <= $criticalThreshold) {
                         $status = 'warning';
-                        $message = 'Atrasado (posiblemente el cron del sistema no está configurado)';
+                        $message = Translator::t('cron.msg.warning');
                     } else {
                         $status = 'critical';
-                        $message = 'No ha corrido en mucho tiempo — el cron del sistema no está funcionando';
+                        $message = Translator::t('cron.msg.critical');
                     }
                 }
             }
@@ -141,10 +141,10 @@ class CronHealth {
     }
 
     private static function humanInterval(int $sec): string {
-        if ($sec < 60) return "{$sec}s";
-        if ($sec < 3600) return round($sec / 60) . ' min';
-        if ($sec < 86400) return round($sec / 3600, 1) . ' h';
-        if ($sec < 604800) return round($sec / 86400, 1) . ' días';
-        return round($sec / 604800, 1) . ' sem';
+        if ($sec < 60)     return Translator::t('cron.unit.seconds', ['count' => $sec]);
+        if ($sec < 3600)   return Translator::t('cron.unit.minutes', ['count' => round($sec / 60)]);
+        if ($sec < 86400)  return Translator::t('cron.unit.hours',   ['count' => round($sec / 3600, 1)]);
+        if ($sec < 604800) return Translator::t('cron.unit.days',    ['count' => round($sec / 86400, 1)]);
+        return Translator::t('cron.unit.weeks', ['count' => round($sec / 604800, 1)]);
     }
 }

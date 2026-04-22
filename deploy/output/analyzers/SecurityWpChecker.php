@@ -30,17 +30,18 @@ class SecurityWpChecker {
 
         $score = empty($listings) ? 100 : max(0, 100 - (count($listings) * 30));
 
+        $listingCount = count($listings);
         return Scoring::createMetric(
             'directory_listing',
-            'Listado de directorios',
-            count($listings),
-            count($listings) > 0 ? 'Activo en ' . count($listings) . ' directorios' : 'Desactivado',
+            Translator::t('security.dir.name'),
+            $listingCount,
+            $listingCount > 0 ? Translator::t('security.dir.display.exposed', ['count' => $listingCount]) : Translator::t('security.dir.display.ok'),
             $score,
-            count($listings) > 0
-                ? 'El listado de directorios está activo en: ' . implode(', ', $listings) . '. Cualquiera puede ver los archivos.'
-                : 'El listado de directorios está desactivado.',
-            count($listings) > 0 ? 'Desactivar directory listing con "Options -Indexes" en .htaccess.' : '',
-            'Desactivamos el listado de directorios y protegemos la estructura del sitio.'
+            $listingCount > 0
+                ? Translator::t('security.dir.desc.exposed', ['list' => implode(', ', $listings)])
+                : Translator::t('security.dir.desc.ok'),
+            $listingCount > 0 ? Translator::t('security.dir.recommend') : '',
+            Translator::t('security.dir.solution')
         );
     }
 
@@ -57,14 +58,16 @@ class SecurityWpChecker {
         $count = count($exposed);
 
         return Scoring::createMetric(
-            'wp_info_files', 'Archivos de información de WordPress', $count,
-            $count === 0 ? 'Protegidos' : "$count archivos expuestos",
+            'wp_info_files',
+            Translator::t('security.wpinfo.name'),
+            $count,
+            $count === 0 ? Translator::t('security.wpinfo.display.ok') : Translator::t('security.wpinfo.display.exposed', ['count' => $count]),
             $count === 0 ? 100 : 50,
             $count === 0
-                ? 'Los archivos informativos de WordPress (readme.html, license.txt) están protegidos. Correcto.'
-                : 'Archivos expuestos: ' . implode(', ', $exposed) . '. readme.html revela la versión exacta de WordPress facilitando ataques dirigidos.',
-            $count > 0 ? 'Eliminar o bloquear acceso a estos archivos en .htaccess.' : '',
-            'Eliminamos archivos informativos que revelan la versión de WordPress.',
+                ? Translator::t('security.wpinfo.desc.ok')
+                : Translator::t('security.wpinfo.desc.exposed', ['list' => implode(', ', $exposed)]),
+            $count > 0 ? Translator::t('security.wpinfo.recommend') : '',
+            Translator::t('security.wpinfo.solution'),
             ['files' => $exposed]
         );
     }
@@ -82,14 +85,16 @@ class SecurityWpChecker {
         $count = count($exposed);
 
         return Scoring::createMetric(
-            'wp_install_files', 'Archivos de instalación WordPress', $count,
-            $count === 0 ? 'Protegidos' : "$count accesibles",
+            'wp_install_files',
+            Translator::t('security.wpinstall.name'),
+            $count,
+            $count === 0 ? Translator::t('security.wpinstall.display.ok') : Translator::t('security.wpinstall.display.exposed', ['count' => $count]),
             $count === 0 ? 100 : 30,
             $count === 0
-                ? 'Los archivos de instalación de WordPress están protegidos.'
-                : 'Archivos de instalación accesibles: ' . implode(', ', $exposed) . '. Pueden ser explotados en ciertos escenarios.',
-            $count > 0 ? 'Bloquear acceso a /wp-admin/install.php, /wp-admin/upgrade.php vía .htaccess después de la instalación.' : '',
-            'Bloqueamos archivos de instalación después del setup inicial.',
+                ? Translator::t('security.wpinstall.desc.ok')
+                : Translator::t('security.wpinstall.desc.exposed', ['list' => implode(', ', $exposed)]),
+            $count > 0 ? Translator::t('security.wpinstall.recommend') : '',
+            Translator::t('security.wpinstall.solution'),
             ['files' => $exposed]
         );
     }
@@ -107,14 +112,14 @@ class SecurityWpChecker {
 
         $count = count($foundPhp);
         return Scoring::createMetric(
-            'php_in_uploads', 'Archivos PHP en uploads', $count,
-            $count === 0 ? 'Ninguno detectado' : "$count archivos PHP",
+            'php_in_uploads',
+            Translator::t('security.phpup.name'),
+            $count,
+            $count === 0 ? Translator::t('security.phpup.display.ok') : Translator::t('security.phpup.display.exposed'),
             $count === 0 ? 100 : 0,
-            $count === 0
-                ? 'No se detectaron archivos PHP en /wp-content/uploads/. Correcto.'
-                : 'CRÍTICO: Se detectaron ' . $count . ' archivos PHP en /wp-content/uploads/. Esto es un fuerte indicador de malware o backdoor instalado por un atacante.',
-            $count > 0 ? 'Revisar cada archivo PHP en uploads, escanear el sitio con un plugin de seguridad, cambiar todas las contraseñas, y agregar regla en .htaccess para bloquear ejecución de PHP en uploads.' : '',
-            'Escaneamos y limpiamos malware de los directorios de uploads.',
+            $count === 0 ? Translator::t('security.phpup.desc.ok') : Translator::t('security.phpup.desc.exposed'),
+            $count > 0 ? Translator::t('security.phpup.recommend') : '',
+            Translator::t('security.phpup.solution'),
             ['phpFiles' => array_slice($foundPhp, 0, 10)]
         );
     }
@@ -142,15 +147,18 @@ class SecurityWpChecker {
         }
 
         $count = count($exposed);
+        $exposedList = implode(', ', array_map(fn($e) => $e['endpoint'], $exposed));
         return Scoring::createMetric(
-            'rest_api_enumeration', 'REST API — Enumeración', $count,
-            $count === 0 ? 'Protegida' : count($exposed) . ' endpoints exponen datos',
+            'rest_api_enumeration',
+            Translator::t('security.restextra.name'),
+            $count,
+            $count === 0 ? Translator::t('security.restextra.display.ok') : Translator::t('security.restextra.display.exposed', ['count' => $count]),
             $count === 0 ? 100 : ($count >= 3 ? 30 : 50),
             $count === 0
-                ? 'La REST API no expone datos públicamente. Correcto.'
-                : 'La REST API expone datos en: ' . implode(', ', array_map(fn($e) => $e['endpoint'], $exposed)) . '. Facilita recolectar información del sitio.',
-            $count > 0 ? 'Restringir acceso a endpoints REST API para usuarios no autenticados usando plugin de seguridad o código personalizado.' : '',
-            'Protegemos la REST API de WordPress contra enumeración de datos.',
+                ? Translator::t('security.restextra.desc.ok')
+                : Translator::t('security.restextra.desc.exposed', ['list' => $exposedList]),
+            $count > 0 ? Translator::t('security.restextra.recommend') : '',
+            Translator::t('security.restextra.solution'),
             ['endpoints' => $exposed]
         );
     }
@@ -192,14 +200,14 @@ class SecurityWpChecker {
 
         $count = count(array_unique($detectedUsers));
         return Scoring::createMetric(
-            'default_admin_user', 'Usuario admin por defecto', $count,
-            $count === 0 ? 'Ninguno' : implode(', ', array_unique($detectedUsers)),
+            'default_admin_user',
+            Translator::t('security.admin.name'),
+            $count,
+            $count === 0 ? Translator::t('security.admin.display.ok') : Translator::t('security.admin.display.bad'),
             $count === 0 ? 100 : 20,
-            $count === 0
-                ? 'No se detectaron nombres de usuario por defecto (admin, administrator, etc.).'
-                : 'Usuarios con nombre predecible detectados: ' . implode(', ', array_unique($detectedUsers)) . '. Los atacantes apuntan a estos nombres para ataques de fuerza bruta.',
-            $count > 0 ? 'Crear un nuevo usuario admin con nombre personalizado y eliminar el usuario por defecto.' : '',
-            'Renombramos usuarios admin por defecto para prevenir ataques de fuerza bruta.',
+            $count === 0 ? Translator::t('security.admin.desc.ok') : Translator::t('security.admin.desc.bad'),
+            $count > 0 ? Translator::t('security.admin.recommend') : '',
+            Translator::t('security.admin.solution'),
             ['detected' => array_values(array_unique($detectedUsers))]
         );
     }
@@ -303,19 +311,19 @@ class SecurityWpChecker {
 
         $detectedList = array_keys($detected);
         $count = count($detectedList);
-        $displayDetail = $count > 0
-            ? implode(', ', array_map(fn($n) => "$n ({$signals[$n]})", $detectedList))
-            : 'No detectado';
+        $detectedName = $count > 0 ? implode(', ', $detectedList) : '';
 
         return Scoring::createMetric(
-            'security_plugin', 'Plugin de seguridad', $count,
-            $count === 0 ? 'No detectado' : implode(', ', $detectedList),
+            'security_plugin',
+            Translator::t('security.splugin.name'),
+            $count,
+            $count === 0 ? Translator::t('security.splugin.display.none') : Translator::t('security.splugin.display.ok', ['name' => $detectedName]),
             $count > 0 ? 100 : 60,
             $count > 0
-                ? 'Se detectó: ' . $displayDetail . '. Ayuda a proteger contra malware, brute force y vulnerabilidades.'
-                : 'No se detectó ningún plugin de seguridad (búsqueda en HTML, cookies, headers y readme.txt). Puede haber uno instalado que no sea detectable externamente; para confirmar, revisa dentro del admin de WordPress.',
-            $count === 0 ? 'Instalar un plugin de seguridad como Wordfence o Solid Security para protección adicional.' : '',
-            'Instalamos y configuramos plugins de seguridad para protección en múltiples capas.',
+                ? Translator::t('security.splugin.desc.ok', ['name' => $detectedName])
+                : Translator::t('security.splugin.desc.none'),
+            $count === 0 ? Translator::t('security.splugin.recommend') : '',
+            Translator::t('security.splugin.solution'),
             ['detected' => $detectedList, 'signals' => $signals]
         );
     }

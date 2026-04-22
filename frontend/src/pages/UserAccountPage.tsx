@@ -254,7 +254,7 @@ export default function UserAccountPage() {
                             })}
                           </td>
                           <td className="px-3 py-2 text-right">
-                            <Link to={`/results/${a.id}`} className="text-xs text-[var(--accent-primary)] hover:underline inline-flex items-center gap-0.5">
+                            <Link to={`/account/audits/${a.id}`} className="text-xs text-[var(--accent-primary)] hover:underline inline-flex items-center gap-0.5">
                               {t('account.history_view')} <ArrowRight className="h-3 w-3" />
                             </Link>
                           </td>

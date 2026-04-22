@@ -12,14 +12,14 @@
  */
 
 require_once __DIR__ . '/../bootstrap.php';
-Auth::requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 $auditId = $_GET['audit_id'] ?? '';
-if (empty($auditId)) Response::error('audit_id requerido', 400);
+if (empty($auditId)) Response::error(Translator::t('admin_api.common.audit_id_required'), 400);
+AuditAccess::require((string) $auditId);
 
 $db = Database::getInstance();
 $row = $db->queryOne("SELECT source, source_url, snapshot_json, created_at FROM wp_snapshots WHERE audit_id = ?", [$auditId]);
@@ -27,14 +27,14 @@ if (!$row) Response::success(null);
 
 $snapshot = JsonStore::decode($row['snapshot_json']);
 if (!is_array($snapshot) || empty($snapshot['sections'])) {
-    Response::error('Snapshot corrupto en DB.', 500);
+    Response::error(Translator::t('admin_api.snapshot_report.corrupt'), 500);
 }
 
 try {
     $report = (new SnapshotReportBuilder($snapshot))->build();
 } catch (Throwable $e) {
     Logger::error('SnapshotReportBuilder falló: ' . $e->getMessage());
-    Response::error('Error construyendo el reporte: ' . $e->getMessage(), 500);
+    Response::error(Translator::t('admin_api.snapshot_report.build_error', ['details' => $e->getMessage()]), 500);
 }
 
 Response::success([

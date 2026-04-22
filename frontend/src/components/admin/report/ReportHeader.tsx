@@ -18,7 +18,8 @@ export const ReportHeader = memo(function ReportHeader({
 }: {
   result: AuditResult
   isPinned: boolean
-  onTogglePin: () => void
+  /** Omitir esta prop oculta el botón de pin (uso admin-only). */
+  onTogglePin?: () => void
 }) {
   const { t, i18n } = useTranslation()
   return (
@@ -42,16 +43,18 @@ export const ReportHeader = memo(function ReportHeader({
         </div>
       </div>
       <div className="flex gap-2">
-        <Button
-          variant={isPinned ? 'default' : 'outline'}
-          size="sm"
-          onClick={onTogglePin}
-          className={isPinned ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''}
-        >
-          {isPinned
-            ? <><PinOff className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('report.header_unprotect')}</>
-            : <><Pin className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('report.header_protect')}</>}
-        </Button>
+        {onTogglePin && (
+          <Button
+            variant={isPinned ? 'default' : 'outline'}
+            size="sm"
+            onClick={onTogglePin}
+            className={isPinned ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''}
+          >
+            {isPinned
+              ? <><PinOff className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('report.header_unprotect')}</>
+              : <><Pin className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('report.header_protect')}</>}
+          </Button>
+        )}
         <Button variant="outline" size="sm" onClick={() => window.print()}>
           <Printer className="h-4 w-4 mr-1" strokeWidth={1.5} /> {t('report.header_print')}
         </Button>

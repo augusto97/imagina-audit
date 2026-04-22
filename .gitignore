@@ -1,5 +1,7 @@
 # Dependencies
 frontend/node_modules/
+# `frontend/dist/` es un intermedio del build — el deploy real es
+# `deploy/output/` (armado por `deploy/build.sh`, viaja en el repo).
 frontend/dist/
 
 # Environment

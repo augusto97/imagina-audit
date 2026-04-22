@@ -83,20 +83,20 @@ class WpSnapshotAnalyzer {
         $siteName = $this->snapshot['site_name'] ?? '';
         $generatedAt = $this->snapshot['generated_at'] ?? '';
 
-        $summary = "Análisis interno del sitio: $score/100";
-        if ($outdatedPlugins > 0) $summary .= " · $outdatedPlugins de $totalPlugins plugins con actualización pendiente";
-        if ($siteName) $summary .= ". Sitio: $siteName";
+        $summary = Translator::t('wp_snapshot.summary.prefix', ['score' => $score]);
+        if ($outdatedPlugins > 0) $summary .= Translator::t('wp_snapshot.summary.outdated', ['outdated' => $outdatedPlugins, 'total' => $totalPlugins]);
+        if ($siteName) $summary .= Translator::t('wp_snapshot.summary.site', ['name' => $siteName]);
 
         return [
             'id' => 'wp_internal',
-            'name' => 'Análisis Interno (WordPress)',
+            'name' => Translator::t('modules.wp_internal.name'),
             'icon' => 'database',
             'score' => $score,
             'level' => Scoring::getLevel($score),
             'weight' => $defaults['weight_wp_internal'] ?? 0.10,
             'metrics' => $metrics,
             'summary' => $summary,
-            'salesMessage' => $defaults['sales_wp_internal'] ?? '',
+            'salesMessage' => !empty($defaults['sales_wp_internal']) ? $defaults['sales_wp_internal'] : Translator::t('modules.sales.wp_internal'),
             'snapshotMeta' => [
                 'siteName' => $siteName,
                 'generatedAt' => $generatedAt,

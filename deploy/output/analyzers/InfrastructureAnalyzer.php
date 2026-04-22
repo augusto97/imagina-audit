@@ -42,14 +42,14 @@ class InfrastructureAnalyzer {
 
         return [
             'id' => 'infrastructure',
-            'name' => 'Infraestructura',
+            'name' => Translator::t('modules.infrastructure.name'),
             'icon' => 'server',
             'score' => $score,
             'level' => Scoring::getLevel($score),
             'weight' => $defaults['weight_infrastructure'],
             'metrics' => $metrics,
-            'summary' => "Tu infraestructura tiene una puntuación de $score/100.",
-            'salesMessage' => $defaults['sales_infrastructure'],
+            'summary' => Translator::t('infrastructure.summary', ['score' => $score]),
+            'salesMessage' => $defaults['sales_infrastructure'] !== '' ? $defaults['sales_infrastructure'] : Translator::t('modules.sales.infrastructure'),
         ];
     }
 
@@ -57,25 +57,25 @@ class InfrastructureAnalyzer {
      * Identifica el servidor web
      */
     private function checkServer(): array {
-        $server = $this->headers['server'] ?? 'No detectado';
-        $serverName = 'Desconocido';
-
-        if (stripos($server, 'nginx') !== false) $serverName = 'Nginx';
-        elseif (stripos($server, 'apache') !== false) $serverName = 'Apache';
-        elseif (stripos($server, 'litespeed') !== false) $serverName = 'LiteSpeed';
+        $server = $this->headers['server'] ?? '';
+        if ($server === '')              $serverName = Translator::t('infrastructure.server.display.none');
+        elseif (stripos($server, 'nginx') !== false)      $serverName = 'Nginx';
+        elseif (stripos($server, 'apache') !== false)     $serverName = 'Apache';
+        elseif (stripos($server, 'litespeed') !== false)  $serverName = 'LiteSpeed';
         elseif (stripos($server, 'cloudflare') !== false) $serverName = 'Cloudflare';
-        elseif (stripos($server, 'iis') !== false) $serverName = 'IIS';
+        elseif (stripos($server, 'iis') !== false)        $serverName = 'IIS';
+        else                                              $serverName = Translator::t('infrastructure.server.display.unknown');
 
         // No penalizar por el tipo de servidor, solo informativo
         return Scoring::createMetric(
             'server',
-            'Servidor Web',
+            Translator::t('infrastructure.server.name'),
             $serverName,
             $serverName,
             null, // Informativo
-            "Servidor web detectado: $serverName.",
+            Translator::t('infrastructure.server.desc', ['name' => $serverName]),
             '',
-            'Recomendamos LiteSpeed o Nginx para máximo rendimiento con WordPress.'
+            Translator::t('infrastructure.server.solution')
         );
     }
 
@@ -89,15 +89,15 @@ class InfrastructureAnalyzer {
 
         return Scoring::createMetric(
             'http_protocol',
-            'Protocolo HTTP',
+            Translator::t('infrastructure.proto.name'),
             $version,
-            "HTTP/$version",
+            Translator::t('infrastructure.proto.display', ['version' => $version]),
             $score,
             $isHttp2Plus
-                ? "El sitio usa HTTP/$version. Protocolo moderno con multiplexación y mejor rendimiento."
-                : "El sitio usa HTTP/$version. HTTP/2 ofrece mejor rendimiento con carga en paralelo.",
-            !$isHttp2Plus ? 'Habilitar HTTP/2 en el servidor para mejorar la velocidad de carga.' : '',
-            'Configuramos HTTP/2 o HTTP/3 para máximo rendimiento.'
+                ? Translator::t('infrastructure.proto.desc.modern', ['version' => $version])
+                : Translator::t('infrastructure.proto.desc.old', ['version' => $version]),
+            !$isHttp2Plus ? Translator::t('infrastructure.proto.recommend') : '',
+            Translator::t('infrastructure.proto.solution')
         );
     }
 
@@ -110,14 +110,14 @@ class InfrastructureAnalyzer {
 
         return Scoring::createMetric(
             'ttfb',
-            'Tiempo de Respuesta (TTFB)',
+            Translator::t('infrastructure.ttfb.name'),
             $this->ttfb,
-            "{$ttfb}ms",
+            Translator::t('infrastructure.ttfb.display', ['ms' => $ttfb]),
             $score,
-            "El servidor responde en {$ttfb}ms. " .
-            ($ttfb <= 500 ? 'Buen tiempo de respuesta.' : 'Se recomienda menos de 500ms.'),
-            $ttfb > 500 ? 'Considerar un hosting más rápido o configurar cache de servidor.' : '',
-            'Migramos tu sitio a hosting optimizado con cache de servidor avanzado.'
+            Translator::t('infrastructure.ttfb.desc.prefix', ['ms' => $ttfb])
+                . ($ttfb <= 500 ? Translator::t('infrastructure.ttfb.desc.good') : Translator::t('infrastructure.ttfb.desc.bad')),
+            $ttfb > 500 ? Translator::t('infrastructure.ttfb.recommend') : '',
+            Translator::t('infrastructure.ttfb.solution')
         );
     }
 
@@ -127,27 +127,29 @@ class InfrastructureAnalyzer {
     private function checkCdn(): array {
         $cdnDetected = null;
 
-        if (isset($this->headers['cf-ray'])) $cdnDetected = 'Cloudflare';
-        elseif (isset($this->headers['x-cdn'])) $cdnDetected = $this->headers['x-cdn'];
-        elseif (isset($this->headers['x-cache']) && str_contains($this->headers['x-cache'], 'HIT')) $cdnDetected = 'CDN (cache activo)';
-        elseif (isset($this->headers['x-served-by'])) $cdnDetected = 'CDN detectado';
+        if (isset($this->headers['cf-ray']))                                                       $cdnDetected = 'Cloudflare';
+        elseif (isset($this->headers['x-cdn']))                                                    $cdnDetected = $this->headers['x-cdn'];
+        elseif (isset($this->headers['x-cache']) && str_contains($this->headers['x-cache'], 'HIT')) $cdnDetected = Translator::t('infrastructure.cdn.detected.cache');
+        elseif (isset($this->headers['x-served-by']))                                              $cdnDetected = Translator::t('infrastructure.cdn.detected.generic');
         elseif (isset($this->headers['via']) && preg_match('/cloudfront|akamai|fastly|varnish/i', $this->headers['via'])) {
-            $cdnDetected = 'CDN detectado';
+            $cdnDetected = Translator::t('infrastructure.cdn.detected.generic');
         }
 
         $hasCdn = $cdnDetected !== null;
 
         return Scoring::createMetric(
             'cdn',
-            'CDN (Red de distribución)',
+            Translator::t('infrastructure.cdn.name'),
             $hasCdn,
-            $hasCdn ? $cdnDetected : 'No detectado',
+            $hasCdn
+                ? Translator::t('infrastructure.cdn.display.ok', ['name' => $cdnDetected])
+                : Translator::t('infrastructure.cdn.display.none'),
             $hasCdn ? 100 : 30,
             $hasCdn
-                ? "Se detectó CDN: $cdnDetected. El contenido se sirve desde servidores cercanos al usuario."
-                : 'No se detectó un CDN. El contenido se sirve desde un solo servidor.',
-            !$hasCdn ? 'Implementar un CDN como Cloudflare para mejorar velocidad y disponibilidad.' : '',
-            'Configuramos Cloudflare CDN para que tu sitio cargue rápido en todo el mundo.'
+                ? Translator::t('infrastructure.cdn.desc.ok', ['name' => $cdnDetected])
+                : Translator::t('infrastructure.cdn.desc.none'),
+            !$hasCdn ? Translator::t('infrastructure.cdn.recommend') : '',
+            Translator::t('infrastructure.cdn.solution')
         );
     }
 
@@ -160,15 +162,17 @@ class InfrastructureAnalyzer {
 
         return Scoring::createMetric(
             'compression',
-            'Compresión del Servidor',
+            Translator::t('infrastructure.comp.name'),
             $hasCompression,
-            $hasCompression ? strtoupper($encoding) : 'Sin compresión',
+            $hasCompression
+                ? Translator::t('infrastructure.comp.display.ok', ['encoding' => strtoupper($encoding)])
+                : Translator::t('infrastructure.comp.display.none'),
             $hasCompression ? 100 : 20,
             $hasCompression
-                ? "El servidor usa compresión $encoding. Reduce el tamaño de transferencia."
-                : 'No se detectó compresión GZIP o Brotli. Los archivos se transfieren sin comprimir.',
-            !$hasCompression ? 'Habilitar compresión GZIP o Brotli en la configuración del servidor.' : '',
-            'Configuramos compresión Brotli/GZIP para máxima eficiencia.'
+                ? Translator::t('infrastructure.comp.desc.ok', ['encoding' => $encoding])
+                : Translator::t('infrastructure.comp.desc.none'),
+            !$hasCompression ? Translator::t('infrastructure.comp.recommend') : '',
+            Translator::t('infrastructure.comp.solution')
         );
     }
 
@@ -181,15 +185,17 @@ class InfrastructureAnalyzer {
 
         return Scoring::createMetric(
             'php_exposed',
-            'Versión PHP Expuesta',
+            Translator::t('infrastructure.php.name'),
             $isExposed,
-            $isExposed ? $phpVersion : 'Oculta',
+            $isExposed
+                ? Translator::t('infrastructure.php.display.exposed', ['value' => $phpVersion])
+                : Translator::t('infrastructure.php.display.ok'),
             $isExposed ? 40 : 100,
             $isExposed
-                ? "La versión de PHP está expuesta: $phpVersion. Facilita que atacantes conozcan vulnerabilidades."
-                : 'La versión de PHP está oculta. Buena práctica de seguridad.',
-            $isExposed ? 'Ocultar el header X-Powered-By en la configuración de PHP.' : '',
-            'Ocultamos toda información del servidor que pueda ser usada por atacantes.'
+                ? Translator::t('infrastructure.php.desc.exposed', ['value' => $phpVersion])
+                : Translator::t('infrastructure.php.desc.ok'),
+            $isExposed ? Translator::t('infrastructure.php.recommend') : '',
+            Translator::t('infrastructure.php.solution')
         );
     }
 
@@ -198,11 +204,11 @@ class InfrastructureAnalyzer {
      */
     private function checkHosting(): array {
         $host = parse_url($this->url, PHP_URL_HOST);
-        $ip = $host ? gethostbyname($host) : 'No resuelto';
+        $ip = $host ? gethostbyname($host) : Translator::t('infrastructure.host.ip.unresolved');
 
         // Detectar algunos proveedores por reverse DNS
         $reverseDns = $ip !== $host ? @gethostbyaddr($ip) : '';
-        $provider = 'No identificado';
+        $provider = Translator::t('infrastructure.host.provider.unknown');
 
         if ($reverseDns) {
             if (str_contains($reverseDns, 'amazonaws.com')) $provider = 'AWS';
@@ -217,13 +223,13 @@ class InfrastructureAnalyzer {
 
         return Scoring::createMetric(
             'hosting',
-            'Hosting / IP',
+            Translator::t('infrastructure.host.name'),
             $ip,
-            "$provider ($ip)",
+            Translator::t('infrastructure.host.display', ['provider' => $provider, 'ip' => $ip]),
             null, // Informativo
-            "IP del servidor: $ip. Proveedor detectado: $provider.",
+            Translator::t('infrastructure.host.desc', ['ip' => $ip, 'provider' => $provider]),
             '',
-            'Evaluamos tu hosting y recomendamos la mejor opción para WordPress.'
+            Translator::t('infrastructure.host.solution')
         );
     }
 }

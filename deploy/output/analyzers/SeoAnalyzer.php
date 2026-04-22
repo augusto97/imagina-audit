@@ -68,14 +68,14 @@ class SeoAnalyzer {
 
         return [
             'id' => 'seo',
-            'name' => 'SEO',
+            'name' => Translator::t('modules.seo.name'),
             'icon' => 'search',
             'score' => $score,
             'level' => Scoring::getLevel($score),
             'weight' => $defaults['weight_seo'],
             'metrics' => $metrics,
-            'summary' => "Tu sitio tiene una puntuación SEO de $score/100.",
-            'salesMessage' => $defaults['sales_seo'],
+            'summary' => Translator::t('seo.summary', ['score' => $score]),
+            'salesMessage' => $defaults['sales_seo'] !== '' ? $defaults['sales_seo'] : Translator::t('modules.sales.seo'),
         ];
     }
 

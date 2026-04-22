@@ -11,7 +11,7 @@ require_once dirname(__DIR__) . '/bootstrap.php';
 Auth::requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 try {
@@ -87,5 +87,5 @@ try {
     ]);
 } catch (Throwable $e) {
     Logger::error('queue-status falló: ' . $e->getMessage());
-    Response::error('Error obteniendo estado de la cola.', 500);
+    Response::error(Translator::t('admin_api.queue_status.error'), 500);
 }
