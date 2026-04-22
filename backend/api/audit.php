@@ -249,15 +249,23 @@ try {
         $notifEmail = $notifRow['value'] ?? '';
         if (!empty($notifEmail) && filter_var($notifEmail, FILTER_VALIDATE_EMAIL)) {
             $score = $result['globalScore'];
-            $leadName = trim($leadData['leadName']) ?: 'No proporcionado';
-            $leadCompany = trim($leadData['leadCompany']) ?: 'No proporcionado';
-            $subject = "Nuevo lead: {$result['domain']} (Score: $score/100)";
-            $emailBody = "Nuevo lead capturado en Imagina Audit\n\n"
-                . "Sitio: {$result['url']}\nScore: $score/100 ({$result['globalLevel']})\n\n"
-                . "Nombre: $leadName\nEmail: " . ($leadEmail ?: 'No proporcionado') . "\n"
-                . "WhatsApp: " . ($leadWhatsapp ?: 'No proporcionado') . "\n"
-                . "Empresa: $leadCompany\nFecha: " . date('d/m/Y H:i') . "\n";
-            Mailer::send($notifEmail, $subject, $emailBody);
+            $fallback = Translator::t('email.lead.fallback');
+            $params = [
+                'domain'   => $result['domain'],
+                'url'      => $result['url'],
+                'score'    => $score,
+                'level'    => $result['globalLevel'],
+                'name'     => trim($leadData['leadName']) ?: $fallback,
+                'email'    => $leadEmail ?: $fallback,
+                'whatsapp' => $leadWhatsapp ?: $fallback,
+                'company'  => trim($leadData['leadCompany']) ?: $fallback,
+                'date'     => date('d/m/Y H:i'),
+            ];
+            Mailer::send(
+                $notifEmail,
+                Translator::t('email.lead.subject', $params),
+                Translator::t('email.lead.body', $params)
+            );
         }
     }
 } catch (Throwable $e) {
