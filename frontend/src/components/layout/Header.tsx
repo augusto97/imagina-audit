@@ -1,11 +1,18 @@
 import { Link } from 'react-router-dom'
-import { Shield, GitCompareArrows, ExternalLink } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Shield, GitCompareArrows, ExternalLink, LogIn, UserCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useConfigStore } from '@/store/configStore'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import { useUser } from '@/hooks/useUser'
 
 export default function Header() {
+  const { t } = useTranslation()
   const { logoUrl, companyName, header } = useConfigStore((s) => s.config)
+  // useUser hace un checkSession al montar. Lo pagamos una vez por página
+  // porque es necesario para decidir si mostrar "Sign in" o el avatar del
+  // user — y una vez hidratado el store, los otros componentes leen de ahí.
+  const { isAuthenticated, user } = useUser()
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-[var(--border-default)] bg-white/90 backdrop-blur-lg">
@@ -41,6 +48,23 @@ export default function Header() {
                 <span className="hidden sm:inline">{header.externalText || header.externalUrl}</span>
               </Button>
             </a>
+          )}
+          {isAuthenticated && user ? (
+            <Link to="/account">
+              <Button variant="ghost" size="sm" className="text-[var(--text-secondary)]">
+                <UserCircle className="h-4 w-4" strokeWidth={1.5} />
+                <span className="hidden sm:inline max-w-[160px] truncate">
+                  {user.name || user.email}
+                </span>
+              </Button>
+            </Link>
+          ) : (
+            <Link to="/login">
+              <Button variant="ghost" size="sm" className="text-[var(--text-secondary)]">
+                <LogIn className="h-4 w-4" strokeWidth={1.5} />
+                <span className="hidden sm:inline">{t('nav.sign_in')}</span>
+              </Button>
+            </Link>
           )}
         </nav>
       </div>
