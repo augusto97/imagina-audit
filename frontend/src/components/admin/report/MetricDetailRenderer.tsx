@@ -248,13 +248,13 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
     const tags = details.tags as Record<string, string | null>
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3">
-        <p className="text-xs font-bold text-[var(--text-tertiary)] mb-1">ETIQUETAS DETECTADAS</p>
+        <p className="text-xs font-bold text-[var(--text-tertiary)] mb-1">{t('report.md_tags_title')}</p>
         <div className="space-y-1 text-xs">
           {Object.entries(tags).map(([key, val]) => (
             <div key={key} className="flex gap-2">
               <span className="font-mono font-semibold w-36 shrink-0">{key}</span>
               <span className={val ? 'text-[var(--text-secondary)]' : 'text-red-500 font-medium'}>
-                {val ? (String(val).length > 60 ? String(val).substring(0, 60) + '...' : String(val)) : '✗ Faltante'}
+                {val ? (String(val).length > 60 ? String(val).substring(0, 60) + '...' : String(val)) : t('report.md_tags_missing')}
               </span>
             </div>
           ))}
@@ -269,7 +269,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
     if (opps.length === 0) return null
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3">
-        <p className="text-xs font-bold text-[var(--text-tertiary)] mb-1">OPORTUNIDADES DE OPTIMIZACIÓN</p>
+        <p className="text-xs font-bold text-[var(--text-tertiary)] mb-1">{t('report.md_opps_title')}</p>
         <div className="space-y-1.5 text-xs">
           {opps.map((o, i) => (
             <div key={i} className="flex items-center justify-between gap-2">
@@ -293,14 +293,14 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
     return (
       <div className="mt-2 space-y-3">
         <div className="rounded-lg border border-gray-200 bg-white p-4 max-w-lg">
-          <p className="text-xs text-gray-500 mb-1">Vista previa en escritorio</p>
+          <p className="text-xs text-gray-500 mb-1">{t('report.md_serp_preview')}</p>
           <div className="text-xs text-emerald-700 mb-0.5">{domain}</div>
           <div className="text-blue-700 text-base hover:underline cursor-pointer leading-snug">{title.length > 70 ? title.substring(0, 67) + '...' : title}</div>
-          <div className="text-xs text-gray-600 mt-1 leading-relaxed">{desc.length > 160 ? desc.substring(0, 157) + '...' : desc || 'Sin meta description'}</div>
+          <div className="text-xs text-gray-600 mt-1 leading-relaxed">{desc.length > 160 ? desc.substring(0, 157) + '...' : desc || t('report.md_serp_no_description')}</div>
         </div>
         <div className="flex gap-4 text-[10px] text-gray-400">
-          <span>Title: {String(details.titleLength)} car.</span>
-          <span>Description: {String(details.descriptionLength)} car.</span>
+          <span>{t('report.md_serp_title_chars', { count: details.titleLength })}</span>
+          <span>{t('report.md_serp_desc_chars', { count: details.descriptionLength })}</span>
         </div>
       </div>
     )
@@ -315,7 +315,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
         {links.map((l, i) => (
           <div key={i} className="text-[11px] border-b border-gray-100 pb-1 last:border-0">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={`text-[9px] px-1.5 py-0.5 rounded ${l.type === 'internal' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>{l.type === 'internal' ? 'Int' : 'Ext'}</span>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded ${l.type === 'internal' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>{l.type === 'internal' ? t('report.md_linkstat_int') : t('report.md_linkstat_ext')}</span>
               <span className={`text-[9px] ${l.follow === 'nofollow' ? 'text-red-500' : 'text-gray-400'}`}>{l.follow}</span>
               <span className="text-gray-700 font-medium">{l.anchor}</span>
             </div>
@@ -334,7 +334,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
       <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3 text-xs space-y-2">
         {Object.keys(words).length > 0 && (
           <div>
-            <p className="font-bold text-[var(--text-tertiary)] mb-1">PALABRAS MÁS FRECUENTES</p>
+            <p className="font-bold text-[var(--text-tertiary)] mb-1">{t('report.md_kw_top_words')}</p>
             <div className="flex flex-wrap gap-1.5">
               {Object.entries(words).map(([w, c]) => (
                 <span key={w} className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">{w} <b>{String(c)}</b></span>
@@ -344,7 +344,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
         )}
         {Object.keys(phrases).length > 0 && (
           <div>
-            <p className="font-bold text-[var(--text-tertiary)] mb-1">FRASES FRECUENTES</p>
+            <p className="font-bold text-[var(--text-tertiary)] mb-1">{t('report.md_kw_top_phrases')}</p>
             <div className="flex flex-wrap gap-1.5">
               {Object.entries(phrases).map(([p, c]) => (
                 <span key={p} className="px-2 py-0.5 rounded bg-blue-50 text-blue-700">{p} <b>{String(c)}</b></span>
@@ -365,7 +365,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
           <div key={i} className="rounded-lg bg-white/60 border border-[var(--border-default)] p-2 text-xs">
             <div className="font-mono text-gray-600 break-all">{r.variant}</div>
             <div className="font-mono text-gray-500 break-all mt-0.5">→ {r.redirectsTo}</div>
-            <span className={`text-[10px] font-medium ${r.matches ? 'text-emerald-600' : 'text-red-500'}`}>{r.matches ? '✓ Correcto' : '✗ No coincide'}</span>
+            <span className={`text-[10px] font-medium ${r.matches ? 'text-emerald-600' : 'text-red-500'}`}>{r.matches ? t('report.md_urlres_ok') : t('report.md_urlres_mismatch')}</span>
           </div>
         ))}
       </div>
@@ -389,7 +389,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
             {headings.map((h, i) => (
               <div key={i} className="flex items-start gap-2" style={{ paddingLeft: `${(h.level - 1) * 16}px` }}>
                 <span className="shrink-0 font-mono font-bold text-[var(--accent-primary)]">{h.tag}</span>
-                <span className="text-gray-700">{h.text || '(vacío)'}</span>
+                <span className="text-gray-700">{h.text || t('report.md_heading_empty')}</span>
               </div>
             ))}
           </div>
