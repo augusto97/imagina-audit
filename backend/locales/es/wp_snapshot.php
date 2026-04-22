@@ -170,4 +170,148 @@ return [
     'restroutes.desc.bad'  => '{{total}} rutas REST expuestas. Cada plugin añade endpoints; demasiados indican plugin bloat y potencialmente datos expuestos.',
     'restroutes.recommend' => 'Auditar qué plugins exponen tantas rutas. Considerar si alguno puede desactivarse o si el REST debe restringirse a usuarios autenticados.',
     'restroutes.solution'  => 'Restringimos y auditamos endpoints REST para reducir superficie de ataque.',
+
+    // env_php
+    'php.name'              => 'Configuración PHP',
+    'php.display.ok'        => 'PHP {{version}} · memory {{memory}} · exec {{exec}}s',
+    'php.display.none'      => 'No detectado',
+    'php.desc.ok'           => 'PHP {{version}} con memory_limit {{memory}} y {{exec}}s de ejecución. Configuración correcta.',
+    'php.desc.bad'          => 'Problemas detectados: {{issues}}.',
+    'php.issue.eol'         => 'PHP {{version}} es obsoleto (EOL)',
+    'php.issue.outdated'    => 'PHP {{version}} — actualizar a 8.2+ recomendado',
+    'php.issue.low_memory'  => 'memory_limit bajo ({{value}}) — WP recomienda 256M+',
+    'php.issue.low_wpmem'   => 'WP_MEMORY_LIMIT bajo ({{value}}) — puede quedarse corto en plugins pesados',
+    'php.issue.low_exec'    => 'max_execution_time de {{value}}s puede fallar en imports/backups',
+    'php.issue.missing_ext' => 'Extensiones faltantes: {{list}}',
+    'php.recommend'         => 'Actualizar PHP a 8.2+, subir memory_limit a 256M, max_execution_time a 120s, e instalar extensiones faltantes.',
+    'php.solution'          => 'Optimizamos PHP/servidor para máximo rendimiento y compatibilidad.',
+
+    // env_database
+    'envdb.name'            => 'Base de datos (motor)',
+    'envdb.display'         => '{{type}} {{version}}',
+    'envdb.desc.ok'         => '{{type}} {{version}} está actualizado.',
+    'envdb.desc.bad'        => '{{type}} {{version}}. {{recommend}}',
+    'envdb.recommend.maria_eol'   => 'MariaDB < 10.3 está en EOL. Actualizar a 10.6+',
+    'envdb.recommend.maria_old'   => 'Actualizar MariaDB a 10.6+ para mejor rendimiento',
+    'envdb.recommend.mysql_eol'   => 'MySQL < 5.7 es inseguro. Actualizar a 8.0+',
+    'envdb.recommend.mysql_old'   => 'Actualizar MySQL a 8.0+',
+    'envdb.solution'        => 'Gestionamos la actualización de motor de base de datos sin pérdida de datos.',
+
+    // wp_version_internal
+    'wpver.name'            => 'Versión de WordPress',
+    'wpver.display.current' => '{{version}} (última)',
+    'wpver.display.old'     => '{{version}} → {{latest}} disponible',
+    'wpver.desc.current'    => 'WordPress {{version}} está al día.',
+    'wpver.desc.old'        => 'WordPress {{version}}. La versión más reciente conocida es {{latest}}.',
+    'wpver.recommend'       => 'Actualizar WordPress a {{latest}} desde Escritorio → Actualizaciones. Hacer backup primero.',
+    'wpver.solution'        => 'Mantenemos WordPress core siempre actualizado, con backup y testing previo.',
+
+    // env_upload
+    'upload.name'           => 'Límites de subida',
+    'upload.display'        => 'upload {{upload}} · post {{post}}',
+    'upload.desc.bad'       => 'Límites pequeños (upload={{upload}}, post={{post}}). Puede bloquear subidas de medios o imports.',
+    'upload.desc.ok'        => 'upload_max_filesize={{upload}}, post_max_size={{post}}. Adecuado.',
+    'upload.recommend'      => 'Subir upload_max_filesize y post_max_size a 64M en php.ini o .htaccess.',
+    'upload.solution'       => 'Configuramos los límites PHP apropiados para el contenido del sitio.',
+
+    // wp_debug
+    'wpdebug.name'              => 'WP_DEBUG en producción',
+    'wpdebug.display.critical'  => 'Debug + Display ACTIVOS (crítico)',
+    'wpdebug.display.warning'   => 'Debug ON · Display OFF',
+    'wpdebug.display.off'       => 'Desactivado',
+    'wpdebug.desc.critical'     => 'WP_DEBUG y WP_DEBUG_DISPLAY están activos: los errores PHP se imprimen a los visitantes, exponiendo paths, versiones y posibles payloads.',
+    'wpdebug.desc.warning'      => 'WP_DEBUG activo pero DISPLAY desactivado. Aceptable si es para logging, pero lo ideal en producción es desactivar ambos.',
+    'wpdebug.desc.off'          => 'WP_DEBUG desactivado. Correcto para producción.',
+    'wpdebug.recommend.critical' => 'En wp-config.php: define("WP_DEBUG", false); — o como mínimo define("WP_DEBUG_DISPLAY", false);',
+    'wpdebug.recommend.warning'  => 'Si no necesitas logs, define("WP_DEBUG", false); en wp-config.php.',
+    'wpdebug.solution'          => 'Configuramos WP_DEBUG correctamente: logs internos sin exponer errores a visitantes.',
+
+    // file_editing
+    'fileedit.name'              => 'Editor de archivos (DISALLOW_FILE_EDIT)',
+    'fileedit.display.blocked'   => 'Bloqueado',
+    'fileedit.display.enabled'   => 'Habilitado',
+    'fileedit.desc.blocked'      => 'DISALLOW_FILE_EDIT está activo — el editor de temas/plugins desde admin está bloqueado. Buena práctica.',
+    'fileedit.desc.enabled'      => 'Editor de archivos activo. Si un atacante obtiene acceso al admin, puede inyectar código en temas/plugins.',
+    'fileedit.recommend'         => 'En wp-config.php: define("DISALLOW_FILE_EDIT", true);',
+    'fileedit.solution'          => 'Bloqueamos el editor de archivos y otros vectores de inyección de código.',
+
+    // xmlrpc_status
+    'xmlrpc.name'              => 'XML-RPC',
+    'xmlrpc.display.active'    => 'Activo',
+    'xmlrpc.display.inactive'  => 'Desactivado',
+    'xmlrpc.desc.active'       => 'XML-RPC está habilitado. Es superficie de ataque común para fuerza bruta y DDoS (pingback).',
+    'xmlrpc.desc.inactive'     => 'XML-RPC desactivado. Correcto.',
+    'xmlrpc.recommend'         => 'Desactivar XML-RPC si no lo usas (Jetpack/app móvil WP): add_filter("xmlrpc_enabled", "__return_false");',
+    'xmlrpc.solution'          => 'Desactivamos XML-RPC o lo protegemos contra fuerza bruta y pingback.',
+
+    // core_auto_updates
+    'autoupd.name'              => 'Auto-updates de WordPress core',
+    'autoupd.display.enabled'   => 'Habilitados',
+    'autoupd.display.manual'    => 'Manuales',
+    'autoupd.desc.enabled'      => 'Las actualizaciones automáticas del core están habilitadas. El sitio recibe parches de seguridad menores.',
+    'autoupd.desc.manual'       => 'Auto-updates del core deshabilitadas. El sitio no recibe parches de seguridad automáticos — requiere actualización manual.',
+    'autoupd.recommend'         => 'Habilitar actualizaciones menores automáticas o establecer un calendario de updates manual (semanal).',
+    'autoupd.solution'          => 'Configuramos actualizaciones automáticas seguras con monitoreo de compatibilidad.',
+
+    // db_prefix_status
+    'dbprefix.name'             => 'Prefijo de base de datos',
+    'dbprefix.display.custom'   => 'Personalizado',
+    'dbprefix.display.default'  => 'Por defecto (wp_)',
+    'dbprefix.desc.custom'      => 'Prefijo de tablas personalizado. {{note}} Dificulta ataques SQL automatizados.',
+    'dbprefix.desc.default'     => 'El prefijo de tablas es el default "wp_". Ataques SQL automatizados apuntan a este prefijo.',
+    'dbprefix.recommend'        => 'Considerar migrar a un prefijo custom (ej. "xyz_") — requiere actualizar wp-config.php y renombrar tablas/options.',
+    'dbprefix.solution'         => 'Cambiamos el prefijo de DB y blindamos contra SQL injection automatizado.',
+
+    // ssl_internal
+    'sslint.name'         => 'HTTPS (site_url)',
+    'sslint.display.on'   => 'Activo',
+    'sslint.display.off'  => 'NO activo',
+    'sslint.desc.on'      => 'El sitio usa HTTPS como URL principal. Correcto.',
+    'sslint.desc.off'     => 'El site_url usa HTTP. Los formularios y el login se transmiten sin cifrar.',
+    'sslint.recommend'    => 'Migrar a HTTPS completo. Actualizar site_url/home_url y configurar redirect 301 desde HTTP.',
+    'sslint.solution'     => 'Instalamos SSL, forzamos HTTPS y eliminamos mixed content.',
+
+    // object_cache
+    'objcache.name'        => 'Cache de objetos persistente',
+    'objcache.display.on'  => 'Activo: {{type}}',
+    'objcache.display.off' => 'No configurado',
+    'objcache.desc.on'     => 'Cache de objetos activo ({{type}}). Las consultas repetidas a la DB se sirven desde memoria — mejora significativa de rendimiento.',
+    'objcache.desc.off'    => 'Sin cache de objetos persistente. Cada request regenera consultas a la DB. En sitios con tráfico, puede ser la mayor causa de lentitud.',
+    'objcache.recommend'   => 'Instalar Redis o Memcached y activar el drop-in en wp-content/object-cache.php. Plugins: Redis Object Cache o W3 Total Cache.',
+    'objcache.solution'    => 'Instalamos Redis/Memcached y configuramos object cache para reducir carga en DB.',
+
+    // page_cache
+    'pagecache.name'        => 'Cache de página',
+    'pagecache.display.on'  => 'Detectado',
+    'pagecache.display.off' => 'No detectado',
+    'pagecache.desc.on'     => 'Se detectó cache de página (plugin tipo WP Rocket / LiteSpeed Cache / W3 Total Cache).',
+    'pagecache.desc.off'    => 'No se detectó cache de página. Cada visita ejecuta PHP + DB queries — lento y costoso.',
+    'pagecache.recommend'   => 'Instalar un plugin de cache (WP Rocket, LiteSpeed Cache, W3 Total Cache) o usar cache del servidor (Nginx FastCGI, Varnish).',
+    'pagecache.solution'    => 'Configuramos el cache de página con un plugin o a nivel de servidor para latencia <100ms.',
+
+    // opcache
+    'opcache.name'        => 'OPcache de PHP',
+    'opcache.display.on'  => 'Activo',
+    'opcache.display.off' => 'Inactivo',
+    'opcache.desc.on'     => 'OPcache activo — PHP cachea los scripts compilados. Ganancia típica: 30-60% de rendimiento PHP.',
+    'opcache.desc.off'    => 'OPcache desactivado. PHP recompila cada script en cada petición. En PHP 7.0+ es gratis y transparente — debería estar SIEMPRE activo.',
+    'opcache.recommend'   => 'Habilitar OPcache en php.ini: opcache.enable=1, opcache.memory_consumption=256, opcache.max_accelerated_files=10000.',
+    'opcache.solution'    => 'Habilitamos y tunamos OPcache para máximo rendimiento PHP.',
+
+    // image_editor
+    'imgedit.name'           => 'Editor de imágenes WP',
+    'imgedit.display'        => '{{editor}}',
+    'imgedit.desc.imagick'   => 'WordPress usa Imagick ({{editor}}) para procesar imágenes. Mejor calidad y soporte WebP que GD.',
+    'imgedit.desc.gd'        => 'WordPress usa {{editor}} (normalmente GD). Imagick produce imágenes más pequeñas y soporta formatos modernos (WebP, AVIF) mejor.',
+    'imgedit.recommend'      => 'Instalar la extensión PHP Imagick y/o reinstalar el paquete ImageMagick en el servidor.',
+    'imgedit.solution'       => 'Configuramos Imagick + WebP para imágenes optimizadas por defecto.',
+
+    // permalinks
+    'perm.name'           => 'Estructura de permalinks',
+    'perm.display.default' => 'Default (?p=123)',
+    'perm.display.custom'  => '{{structure}}',
+    'perm.desc.default'   => 'Permalinks por defecto (/?p=123). Terrible para SEO y usabilidad.',
+    'perm.desc.custom'    => 'Estructura personalizada: {{structure}}. Bien para SEO.',
+    'perm.recommend'      => 'Cambiar en Ajustes → Permalinks a "Nombre de entrada" (/%postname%/).',
+    'perm.solution'       => 'Configuramos URLs amigables para SEO.',
 ];
