@@ -28,23 +28,27 @@ class SeoOnPageChecker {
         $descLen = mb_strlen($desc);
         $issues = [];
 
-        if ($titleLen === 0) $issues[] = 'Sin título';
-        elseif ($titleLen > 70) $issues[] = 'Título será truncado en Google (>' . $titleLen . ' car.)';
-        if ($descLen === 0) $issues[] = 'Sin meta description';
-        elseif ($descLen > 160) $issues[] = 'Description será truncada (>' . $descLen . ' car.)';
-        if (!$favicon) $issues[] = 'Sin favicon';
+        if ($titleLen === 0) $issues[] = Translator::t('seo.serp.issue.no_title');
+        elseif ($titleLen > 70) $issues[] = Translator::t('seo.serp.issue.title_long', ['length' => $titleLen]);
+        if ($descLen === 0) $issues[] = Translator::t('seo.serp.issue.no_description');
+        elseif ($descLen > 160) $issues[] = Translator::t('seo.serp.issue.desc_long', ['length' => $descLen]);
+        if (!$favicon) $issues[] = Translator::t('seo.serp.issue.no_favicon');
 
         $score = 100 - (count($issues) * 20);
 
         return Scoring::createMetric(
-            'serp_preview', 'Vista previa en Google', empty($issues),
-            empty($issues) ? 'Completa' : count($issues) . ' problemas',
+            'serp_preview',
+            Translator::t('seo.serp.name'),
+            empty($issues),
+            empty($issues)
+                ? Translator::t('seo.serp.display.ok')
+                : Translator::t('seo.serp.display.issues', ['count' => count($issues)]),
             Scoring::clamp($score),
             empty($issues)
-                ? 'Tu resultado en Google se verá completo con título, descripción y favicon.'
-                : 'Problemas en la vista previa: ' . implode('. ', $issues) . '.',
-            !empty($issues) ? 'Optimizar título (30-70 car.), description (120-160 car.) y agregar favicon.' : '',
-            'Optimizamos cómo se ve tu sitio en los resultados de Google.',
+                ? Translator::t('seo.serp.desc.ok')
+                : Translator::t('seo.serp.desc.issues', ['list' => implode('. ', $issues)]),
+            !empty($issues) ? Translator::t('seo.serp.recommend') : '',
+            Translator::t('seo.serp.solution'),
             [
                 'title' => $title,
                 'description' => $desc,
@@ -63,10 +67,14 @@ class SeoOnPageChecker {
 
         if (!$title) {
             return Scoring::createMetric(
-                'title', 'Etiqueta Title', null, 'No encontrada', 0,
-                'No se encontró la etiqueta <title>. Es la señal SEO on-page más importante: aparece como título en los resultados de Google y en la pestaña del navegador.',
-                'Agregar una etiqueta <title> única y descriptiva de 30-70 caracteres con la keyword principal.',
-                'Optimizamos los títulos de todas tus páginas con keywords estratégicas para mejorar el posicionamiento.'
+                'title',
+                Translator::t('seo.title.name'),
+                null,
+                Translator::t('seo.title.display.none'),
+                0,
+                Translator::t('seo.title.desc.none'),
+                Translator::t('seo.title.recommend.none'),
+                Translator::t('seo.title.solution')
             );
         }
 
@@ -74,17 +82,17 @@ class SeoOnPageChecker {
         $score = 100;
 
         if ($length < 30) {
-            $issues[] = "Demasiado corto ($length caracteres). Google podría reescribirlo.";
+            $issues[] = Translator::t('seo.title.issue.short', ['length' => $length]);
             $score = 40;
         } elseif ($length > 70) {
-            $issues[] = "Demasiado largo ($length caracteres). Se truncará en los resultados de Google mostrando '...'.";
+            $issues[] = Translator::t('seo.title.issue.long', ['length' => $length]);
             $score = 65;
         }
 
         $genericTitles = ['home', 'inicio', 'página principal', 'untitled', 'mi sitio', 'welcome', 'just another wordpress site'];
         foreach ($genericTitles as $generic) {
             if (stripos($title, $generic) !== false && $length < 40) {
-                $issues[] = "El título parece genérico. Debería describir el contenido de la página.";
+                $issues[] = Translator::t('seo.title.issue.generic');
                 $score = min($score, 50);
                 break;
             }
@@ -92,21 +100,30 @@ class SeoOnPageChecker {
 
         $hasSeparator = preg_match('/\s[-|–—·»|]\s/', $title);
 
-        $desc = empty($issues)
-            ? "Título: \"$title\" ($length caracteres). " . ($hasSeparator ? 'Formato optimizado con separador de marca.' : 'Longitud adecuada.')
-            : "Título: \"$title\" ($length caracteres). " . implode(' ', $issues);
+        if (empty($issues)) {
+            $formatNote = $hasSeparator
+                ? Translator::t('seo.title.format.separator')
+                : Translator::t('seo.title.format.length_ok');
+            $desc = Translator::t('seo.title.desc.ok', ['title' => $title, 'length' => $length, 'formatNote' => $formatNote]);
+        } else {
+            $desc = Translator::t('seo.title.desc.issues', ['title' => $title, 'length' => $length, 'issues' => implode(' ', $issues)]);
+        }
 
         $recommendation = '';
         if ($score < 100) {
             $recommendation = $length < 30
-                ? 'Extender el título a 30-70 caracteres incluyendo la keyword principal y el nombre de la marca.'
-                : ($length > 70 ? 'Acortar el título a máximo 70 caracteres para evitar truncamiento en Google.' : 'Usar un título más descriptivo con la keyword principal de la página.');
+                ? Translator::t('seo.title.recommend.short')
+                : ($length > 70 ? Translator::t('seo.title.recommend.long') : Translator::t('seo.title.recommend.generic'));
         }
 
+        $displayTitle = mb_substr($title, 0, 60) . ($length > 60 ? '...' : '');
         return Scoring::createMetric(
-            'title', 'Etiqueta Title', $title, mb_substr($title, 0, 60) . ($length > 60 ? '...' : '') . " ($length car.)",
+            'title',
+            Translator::t('seo.title.name'),
+            $title,
+            Translator::t('seo.title.display.truncated', ['title' => $displayTitle, 'length' => $length]),
             $score, $desc, $recommendation,
-            'Optimizamos los títulos de todas tus páginas con keywords estratégicas para mejorar el posicionamiento.',
+            Translator::t('seo.title.solution'),
             ['fullTitle' => $title, 'length' => $length, 'hasSeparator' => $hasSeparator]
         );
     }
@@ -117,10 +134,14 @@ class SeoOnPageChecker {
 
         if (!$desc) {
             return Scoring::createMetric(
-                'meta_description', 'Meta Description', null, 'No encontrada', 0,
-                'No se encontró meta description. Esta etiqueta aparece como el texto debajo del título en los resultados de Google. Sin ella, Google elige un fragmento aleatorio de tu página.',
-                'Agregar una meta description atractiva de 120-160 caracteres que invite al clic e incluya la keyword principal.',
-                'Redactamos meta descriptions optimizadas para cada página importante de tu sitio.'
+                'meta_description',
+                Translator::t('seo.metadesc.name'),
+                null,
+                Translator::t('seo.metadesc.display.none'),
+                0,
+                Translator::t('seo.metadesc.desc.none'),
+                Translator::t('seo.metadesc.recommend.none'),
+                Translator::t('seo.metadesc.solution')
             );
         }
 
@@ -128,13 +149,13 @@ class SeoOnPageChecker {
         $score = 100;
 
         if ($length < 70) {
-            $issues[] = "Muy corta ($length caracteres). Google podría ignorarla y mostrar otro texto.";
+            $issues[] = Translator::t('seo.metadesc.issue.too_short', ['length' => $length]);
             $score = 35;
         } elseif ($length < 120) {
-            $issues[] = "Algo corta ($length caracteres). Se recomienda entre 120-160 para aprovechar el espacio en Google.";
+            $issues[] = Translator::t('seo.metadesc.issue.short', ['length' => $length]);
             $score = 65;
         } elseif ($length > 160) {
-            $issues[] = "Excede los 160 caracteres ($length). Google la truncará mostrando '...'.";
+            $issues[] = Translator::t('seo.metadesc.issue.long', ['length' => $length]);
             $score = 70;
         }
 
@@ -144,22 +165,28 @@ class SeoOnPageChecker {
             if (stripos($desc, $word) !== false) { $hasCta = true; break; }
         }
 
-        $description = empty($issues)
-            ? "Meta description ($length caracteres): \"" . mb_substr($desc, 0, 100) . '...". Longitud ideal.' . ($hasCta ? ' Incluye llamada a la acción.' : '')
-            : "Meta description ($length caracteres): \"" . mb_substr($desc, 0, 100) . '...". ' . implode(' ', $issues);
+        $preview = mb_substr($desc, 0, 100);
+        if (empty($issues)) {
+            $ctaNote = $hasCta ? Translator::t('seo.metadesc.desc.cta_note') : '';
+            $description = Translator::t('seo.metadesc.desc.ok', ['length' => $length, 'preview' => $preview, 'ctaNote' => $ctaNote]);
+        } else {
+            $description = Translator::t('seo.metadesc.desc.issues', ['length' => $length, 'preview' => $preview, 'issues' => implode(' ', $issues)]);
+        }
 
         $recommendation = '';
         if ($score < 100) {
             $recommendation = $length < 120
-                ? 'Extender la meta description a 120-160 caracteres con una descripción atractiva que invite al clic.'
-                : 'Acortar la meta description a máximo 160 caracteres para evitar truncamiento.';
+                ? Translator::t('seo.metadesc.recommend.short')
+                : Translator::t('seo.metadesc.recommend.long');
         }
 
         return Scoring::createMetric(
-            'meta_description', 'Meta Description', $desc,
-            mb_substr($desc, 0, 55) . '... (' . $length . ' car.)',
+            'meta_description',
+            Translator::t('seo.metadesc.name'),
+            $desc,
+            Translator::t('seo.metadesc.display.truncated', ['preview' => mb_substr($desc, 0, 55), 'length' => $length]),
             $score, $description, $recommendation,
-            'Redactamos meta descriptions optimizadas para cada página importante de tu sitio.',
+            Translator::t('seo.metadesc.solution'),
             ['fullDescription' => $desc, 'length' => $length, 'hasCta' => $hasCta]
         );
     }
@@ -170,9 +197,14 @@ class SeoOnPageChecker {
 
         if ($robots === null && $googlebot === null) {
             return Scoring::createMetric(
-                'meta_robots', 'Meta Robots', null, 'No definida (por defecto: index, follow)', 100,
-                'No se encontró la etiqueta meta robots. Por defecto Google indexa y sigue los enlaces, lo cual es correcto para la mayoría de páginas.',
-                '', 'Verificamos que las directivas de indexación sean correctas en todas las páginas.'
+                'meta_robots',
+                Translator::t('seo.metarobots.name'),
+                null,
+                Translator::t('seo.metarobots.display.default'),
+                100,
+                Translator::t('seo.metarobots.desc.default'),
+                '',
+                Translator::t('seo.metarobots.solution.default')
             );
         }
 
@@ -184,23 +216,25 @@ class SeoOnPageChecker {
         $score = 100;
         $issues = [];
         if ($hasNoindex) {
-            $issues[] = 'Contiene "noindex": Google NO indexará esta página.';
+            $issues[] = Translator::t('seo.metarobots.issue.noindex');
             $score = 0;
         }
         if ($hasNofollow) {
-            $issues[] = 'Contiene "nofollow": Google no seguirá los enlaces de esta página.';
+            $issues[] = Translator::t('seo.metarobots.issue.nofollow');
             $score = min($score, 40);
         }
 
         $desc = empty($issues)
-            ? "Meta robots: \"$value\". Configuración correcta para indexación."
-            : "Meta robots: \"$value\". ATENCIÓN: " . implode(' ', $issues) . ' Si esto no es intencional, tu página no aparecerá en Google.';
+            ? Translator::t('seo.metarobots.desc.ok', ['value' => $value])
+            : Translator::t('seo.metarobots.desc.issues', ['value' => $value, 'issues' => implode(' ', $issues)]);
 
         return Scoring::createMetric(
-            'meta_robots', 'Meta Robots', $value, $value,
+            'meta_robots',
+            Translator::t('seo.metarobots.name'),
+            $value, $value,
             $score, $desc,
-            ($hasNoindex || $hasNofollow) ? 'Verificar que las directivas noindex/nofollow sean intencionales. Si no lo son, cambiar a "index, follow".' : '',
-            'Verificamos y corregimos las directivas de indexación en todas las páginas.',
+            ($hasNoindex || $hasNofollow) ? Translator::t('seo.metarobots.recommend') : '',
+            Translator::t('seo.metarobots.solution'),
             ['hasNoindex' => $hasNoindex, 'hasNofollow' => $hasNofollow]
         );
     }
@@ -451,14 +485,14 @@ class SeoOnPageChecker {
         $favicon = $this->parser->getLinkByRel('icon') ?? $this->parser->getLinkByRel('shortcut icon');
 
         return Scoring::createMetric(
-            'favicon', 'Favicon', $favicon !== null,
-            $favicon ? 'Configurado' : 'No encontrado',
+            'favicon',
+            Translator::t('seo.favicon.name'),
+            $favicon !== null,
+            $favicon ? Translator::t('seo.favicon.display.ok') : Translator::t('seo.favicon.display.none'),
             $favicon ? 100 : 50,
-            $favicon
-                ? 'Favicon encontrado. Tu sitio muestra un icono en la pestaña del navegador.'
-                : 'No se detectó favicon. Afecta la identidad visual en navegadores y bookmarks.',
-            !$favicon ? 'Agregar un favicon para mejorar el branding.' : '',
-            'Configuramos favicons optimizados para todos los dispositivos.'
+            $favicon ? Translator::t('seo.favicon.desc.ok') : Translator::t('seo.favicon.desc.none'),
+            !$favicon ? Translator::t('seo.favicon.recommend') : '',
+            Translator::t('seo.favicon.solution')
         );
     }
 
@@ -466,14 +500,16 @@ class SeoOnPageChecker {
         $lang = $this->parser->getHtmlLang();
 
         return Scoring::createMetric(
-            'language', 'Idioma declarado', $lang !== null,
-            $lang ? "lang=\"$lang\"" : 'No declarado',
+            'language',
+            Translator::t('seo.lang.name'),
+            $lang !== null,
+            $lang ? Translator::t('seo.lang.display.ok', ['lang' => $lang]) : Translator::t('seo.lang.display.none'),
             $lang ? 100 : 30,
             $lang
-                ? "El idioma del sitio está declarado como \"$lang\"."
-                : 'No se declaró el idioma con el atributo lang. Google puede no entender el idioma correcto.',
-            !$lang ? 'Agregar lang="es" (o el idioma correspondiente) al tag <html>.' : '',
-            'Configuramos correctamente el idioma y hreflang para SEO internacional.'
+                ? Translator::t('seo.lang.desc.ok', ['lang' => $lang])
+                : Translator::t('seo.lang.desc.none'),
+            !$lang ? Translator::t('seo.lang.recommend') : '',
+            Translator::t('seo.lang.solution')
         );
     }
 
