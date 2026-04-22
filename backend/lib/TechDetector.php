@@ -116,7 +116,7 @@ class TechDetector {
 
         // Gutenberg blocks
         if (str_contains($this->html, 'wp-block-')) {
-            $builders[] = 'Gutenberg (Bloques)';
+            $builders[] = Translator::t('tech.gutenberg_blocks');
         }
 
         return $builders;
