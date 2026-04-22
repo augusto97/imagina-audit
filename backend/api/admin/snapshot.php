@@ -40,7 +40,7 @@ try {
 
 if ($method === 'GET') {
     $auditId = $_GET['audit_id'] ?? '';
-    if (empty($auditId)) Response::error('audit_id requerido', 400);
+    if (empty($auditId)) Response::error(Translator::t('admin_api.common.audit_id_required'), 400);
 
     $row = $db->queryOne("SELECT source, source_url, snapshot_json, analysis_json, created_at FROM wp_snapshots WHERE audit_id = ?", [$auditId]);
     if (!$row) Response::success(null);
@@ -56,7 +56,7 @@ if ($method === 'GET') {
 
 if ($method === 'DELETE') {
     $auditId = $_GET['audit_id'] ?? '';
-    if (empty($auditId)) Response::error('audit_id requerido', 400);
+    if (empty($auditId)) Response::error(Translator::t('admin_api.common.audit_id_required'), 400);
     $db->execute("DELETE FROM wp_snapshots WHERE audit_id = ?", [$auditId]);
     Response::success(['ok' => true]);
 }
@@ -67,34 +67,34 @@ if ($method === 'POST') {
     $body = Response::getJsonBody(10 * 1024 * 1024, 128);
     $auditId = $body['auditId'] ?? '';
 
-    if (empty($auditId)) Response::error('auditId requerido', 400);
+    if (empty($auditId)) Response::error(Translator::t('admin_api.snapshot.audit_id_required'), 400);
 
     $jsonData = $body['jsonData'] ?? null;
-    if (empty($jsonData)) Response::error('jsonData requerido', 400);
+    if (empty($jsonData)) Response::error(Translator::t('admin_api.snapshot.json_data_required'), 400);
 
     $snapshotData = null;
     if (is_string($jsonData)) {
         if (strlen($jsonData) > 10 * 1024 * 1024) {
-            Response::error('jsonData excede el tope de 10MB', 413);
+            Response::error(Translator::t('admin_api.snapshot.json_data_too_big'), 413);
         }
         $snapshotData = json_decode($jsonData, true, 128);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            Response::error('JSON inválido: ' . json_last_error_msg(), 400);
+            Response::error(Translator::t('admin_api.snapshot.json_invalid_reason', ['reason' => json_last_error_msg()]), 400);
         }
     } elseif (is_array($jsonData)) {
         $snapshotData = $jsonData;
     }
 
     if (!is_array($snapshotData)) {
-        Response::error('JSON inválido', 400);
+        Response::error(Translator::t('admin_api.snapshot.json_invalid'), 400);
     }
 
     // Validar estructura esperada de wp-snapshot
     if (!isset($snapshotData['sections']) || !is_array($snapshotData['sections'])) {
-        Response::error('El JSON no tiene la estructura esperada de wp-snapshot (falta "sections").', 422);
+        Response::error(Translator::t('admin_api.snapshot.missing_sections'), 422);
     }
     if (count($snapshotData['sections']) > 200) {
-        Response::error('El snapshot tiene demasiadas secciones (posible payload malicioso).', 422);
+        Response::error(Translator::t('admin_api.snapshot.too_many_sections'), 422);
     }
 
     // Run standalone analyzer for preview
@@ -103,7 +103,7 @@ if ($method === 'POST') {
         $analysis = $analyzer->analyze();
     } catch (Throwable $e) {
         Logger::error('WpSnapshotAnalyzer falló: ' . $e->getMessage());
-        Response::error('Error al analizar el snapshot: ' . $e->getMessage(), 500);
+        Response::error(Translator::t('admin_api.snapshot.analyze_error', ['details' => $e->getMessage()]), 500);
     }
 
     // Save snapshot to DB (upsert) — comprimido con gzip

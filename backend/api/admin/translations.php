@@ -54,10 +54,10 @@ if ($method === 'GET') {
     $lang = strtolower(substr(trim($_GET['lang'] ?? ''), 0, 2));
     $namespace = trim($_GET['namespace'] ?? '');
     if (!in_array($lang, Translator::SUPPORTED, true)) {
-        Response::error('Idioma no soportado', 400);
+        Response::error(Translator::t('admin_api.translations.lang_unsupported'), 400);
     }
     if (empty($namespace) || !preg_match('/^[a-z_][a-z0-9_]*$/i', $namespace)) {
-        Response::error('Namespace inválido', 400);
+        Response::error(Translator::t('admin_api.translations.namespace_invalid'), 400);
     }
 
     // Base bundle (archivo PHP)
@@ -126,13 +126,13 @@ if ($method === 'PUT') {
     $reviewed = !empty($body['reviewed']) ? 1 : 0;
 
     if (!in_array($lang, Translator::SUPPORTED, true)) {
-        Response::error('Idioma no soportado', 400);
+        Response::error(Translator::t('admin_api.translations.lang_unsupported'), 400);
     }
     if (empty($namespace) || empty($key)) {
-        Response::error('namespace y key son obligatorios', 400);
+        Response::error(Translator::t('admin_api.translations.namespace_and_key_required'), 400);
     }
     if (!in_array($source, ['manual', 'ai', 'import'], true)) {
-        Response::error('source inválido', 400);
+        Response::error(Translator::t('admin_api.translations.source_invalid'), 400);
     }
 
     $existing = $db->queryOne(
@@ -161,7 +161,7 @@ if ($method === 'DELETE') {
     $key = trim($_GET['key'] ?? '');
 
     if (!in_array($lang, Translator::SUPPORTED, true)) {
-        Response::error('Idioma no soportado', 400);
+        Response::error(Translator::t('admin_api.translations.lang_unsupported'), 400);
     }
 
     if (!empty($key)) {
@@ -175,11 +175,11 @@ if ($method === 'DELETE') {
             [$lang, $namespace]
         );
     } else {
-        Response::error('namespace (y opcionalmente key) son obligatorios', 400);
+        Response::error(Translator::t('admin_api.translations.namespace_and_key_optional'), 400);
     }
 
     Translator::reset();
     Response::success(['success' => true]);
 }
 
-Response::error('Método no permitido', 405);
+Response::error(Translator::t('api.common.method_not_allowed'), 405);

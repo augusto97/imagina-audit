@@ -135,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         Response::success($config);
     } catch (Throwable $e) {
         Logger::error('Error en settings GET: ' . $e->getMessage());
-        Response::error('Error al obtener configuración.', 500);
+        Response::error(Translator::t('admin_api.settings.fetch_error'), 500);
     }
 }
 
@@ -194,8 +194,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         Response::success();
     } catch (Throwable $e) {
         Logger::error('Error en settings PUT: ' . $e->getMessage());
-        Response::error('Error al guardar configuración.', 500);
+        Response::error(Translator::t('admin_api.settings.save_error'), 500);
     }
 }
 
-Response::error('Método no permitido', 405);
+Response::error(Translator::t('api.common.method_not_allowed'), 405);
