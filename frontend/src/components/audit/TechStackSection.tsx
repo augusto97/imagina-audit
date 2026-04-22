@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import {
   Server, Blocks, Layout, ShoppingCart, Zap, Search,
   ShieldCheck, Code2, Palette, Type, Globe, BarChart3, Cpu, Wifi,
@@ -35,6 +36,7 @@ interface TechCategory {
 }
 
 export default function TechStackSection({ techStack }: TechStackSectionProps) {
+  const { t } = useTranslation()
   if (!techStack) return null
 
   // Construir categorías con sus valores
@@ -47,20 +49,20 @@ export default function TechStackSection({ techStack }: TechStackSectionProps) {
     }
   }
 
-  add('Servidor', Server, techStack.server, 'bg-slate-100 text-slate-600')
-  add('CMS', Blocks, techStack.cms, 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]')
-  add('Page Builder', Layout, techStack.pageBuilder, 'bg-violet-50 text-violet-600')
-  add('Ecommerce', ShoppingCart, techStack.ecommerce, 'bg-emerald-50 text-emerald-600')
-  add('Cache', Zap, techStack.cachePlugin, 'bg-amber-50 text-amber-600')
-  add('SEO', Search, techStack.seoPlugin, 'bg-blue-50 text-blue-600')
-  add('Seguridad', ShieldCheck, techStack.securityPlugin, 'bg-red-50 text-red-600')
-  add('JavaScript', Code2, techStack.jsLibraries, 'bg-yellow-50 text-yellow-700')
-  add('CSS Framework', Palette, techStack.cssFramework, 'bg-pink-50 text-pink-600')
-  add('Fuentes', Type, techStack.fonts, 'bg-indigo-50 text-indigo-600')
-  add('CDN', Globe, techStack.cdn, 'bg-cyan-50 text-cyan-600')
-  add('Analytics', BarChart3, techStack.analytics, 'bg-teal-50 text-teal-600')
-  add('PHP', Cpu, techStack.phpVersion, 'bg-purple-50 text-purple-600')
-  add('Protocolo HTTP', Wifi, techStack.httpProtocol, 'bg-gray-100 text-gray-600')
+  add(t('report.techstack_server'), Server, techStack.server, 'bg-slate-100 text-slate-600')
+  add(t('report.techstack_cms'), Blocks, techStack.cms, 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]')
+  add(t('report.techstack_page_builder'), Layout, techStack.pageBuilder, 'bg-violet-50 text-violet-600')
+  add(t('report.techstack_ecommerce'), ShoppingCart, techStack.ecommerce, 'bg-emerald-50 text-emerald-600')
+  add(t('report.techstack_cache'), Zap, techStack.cachePlugin, 'bg-amber-50 text-amber-600')
+  add(t('report.techstack_seo_plugin'), Search, techStack.seoPlugin, 'bg-blue-50 text-blue-600')
+  add(t('report.techstack_security_plugin'), ShieldCheck, techStack.securityPlugin, 'bg-red-50 text-red-600')
+  add(t('report.techstack_js_libraries'), Code2, techStack.jsLibraries, 'bg-yellow-50 text-yellow-700')
+  add(t('report.techstack_css_framework'), Palette, techStack.cssFramework, 'bg-pink-50 text-pink-600')
+  add(t('report.techstack_fonts'), Type, techStack.fonts, 'bg-indigo-50 text-indigo-600')
+  add(t('report.techstack_cdn'), Globe, techStack.cdn, 'bg-cyan-50 text-cyan-600')
+  add(t('report.techstack_analytics'), BarChart3, techStack.analytics, 'bg-teal-50 text-teal-600')
+  add(t('report.techstack_php'), Cpu, techStack.phpVersion, 'bg-purple-50 text-purple-600')
+  add(t('report.techstack_protocol'), Wifi, techStack.httpProtocol, 'bg-gray-100 text-gray-600')
 
   // Hosting info
   const hi = (techStack as Record<string, unknown>).hostingInfo as Record<string, unknown> | undefined
@@ -69,7 +71,7 @@ export default function TechStackSection({ techStack }: TechStackSectionProps) {
     if (hi.provider) hostingVals.push(String(hi.provider))
     if (hi.ip) hostingVals.push(String(hi.ip))
     if (hi.city || hi.country) hostingVals.push([hi.city, hi.country].filter(Boolean).join(', '))
-    add('Hosting', MapPin, hostingVals, 'bg-orange-50 text-orange-600')
+    add(t('report.techstack_hosting'), MapPin, hostingVals, 'bg-orange-50 text-orange-600')
   }
 
   // Domain info
@@ -79,10 +81,11 @@ export default function TechStackSection({ techStack }: TechStackSectionProps) {
     if (di.registrar) domainVals.push(String(di.registrar))
     if (di.expiryDate) {
       const days = di.daysUntilExpiry as number | null
-      domainVals.push(`Expira: ${String(di.expiryDate)}${days !== null && days !== undefined ? ` (${days}d)` : ''}`)
+      const daysSuffix = days !== null && days !== undefined ? ` (${t('report.techstack_days_short', { days })})` : ''
+      domainVals.push(`${t('report.techstack_expires')}: ${String(di.expiryDate)}${daysSuffix}`)
     }
-    if (di.createdDate) domainVals.push(`Desde: ${String(di.createdDate)}`)
-    add('Dominio', Calendar, domainVals, 'bg-lime-50 text-lime-700')
+    if (di.createdDate) domainVals.push(`${t('report.techstack_registered')}: ${String(di.createdDate)}`)
+    add(t('report.techstack_domain'), Calendar, domainVals, 'bg-lime-50 text-lime-700')
   }
 
   if (categories.length === 0) return null
@@ -100,8 +103,8 @@ export default function TechStackSection({ techStack }: TechStackSectionProps) {
               <Code2 className="h-4 w-4 text-[var(--accent-primary)]" strokeWidth={1.5} />
             </div>
             <div>
-              <CardTitle className="text-base">Stack Tecnológico</CardTitle>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Tecnologías detectadas (informativo, no afecta la puntuación)</p>
+              <CardTitle className="text-base">{t('report.techstack_title')}</CardTitle>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{t('report.techstack_subtitle')}</p>
             </div>
           </div>
         </CardHeader>
