@@ -95,4 +95,25 @@ return [
 
     // ——— /admin/waterfall.php ———————————————————————————————————
     'waterfall.id_required' => 'id is required',
+
+    // ——— /admin/plans.php (P4.2) ————————————————————————————————
+    'plans.fetch_error'  => 'Failed to load plans.',
+    'plans.create_error' => 'Failed to create the plan.',
+    'plans.update_error' => 'Failed to update the plan.',
+    'plans.delete_error' => 'Failed to delete the plan.',
+    'plans.name_required' => 'Plan name is required.',
+    'plans.limit_invalid' => 'Monthly limit must be 0 or greater (0 = unlimited).',
+    'plans.not_found'    => 'Plan not found.',
+    'plans.in_use'       => 'Cannot delete: the plan is assigned to {{count}} user(s). Reassign them first.',
+
+    // ——— /admin/users.php (P4.2) ————————————————————————————————
+    'users.fetch_error'   => 'Failed to load users.',
+    'users.create_error'  => 'Failed to create the user.',
+    'users.update_error'  => 'Failed to update the user.',
+    'users.delete_error'  => 'Failed to delete the user.',
+    'users.not_found'     => 'User not found.',
+    'users.email_required' => 'Email is required.',
+    'users.email_invalid' => 'Invalid email address.',
+    'users.email_exists'  => 'A user with that email already exists.',
+    'users.password_too_short' => 'Password must be at least 10 characters.',
 ];

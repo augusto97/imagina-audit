@@ -95,4 +95,25 @@ return [
 
     // ——— /admin/waterfall.php ———————————————————————————————————
     'waterfall.id_required' => 'id requerido',
+
+    // ——— /admin/plans.php (P4.2) ————————————————————————————————
+    'plans.fetch_error'  => 'Error al cargar los planes.',
+    'plans.create_error' => 'Error al crear el plan.',
+    'plans.update_error' => 'Error al actualizar el plan.',
+    'plans.delete_error' => 'Error al eliminar el plan.',
+    'plans.name_required' => 'El nombre del plan es obligatorio.',
+    'plans.limit_invalid' => 'El límite mensual debe ser 0 o mayor (0 = ilimitado).',
+    'plans.not_found'    => 'Plan no encontrado.',
+    'plans.in_use'       => 'No se puede eliminar: el plan está asignado a {{count}} usuario(s). Reasígnelos primero.',
+
+    // ——— /admin/users.php (P4.2) ————————————————————————————————
+    'users.fetch_error'   => 'Error al cargar los usuarios.',
+    'users.create_error'  => 'Error al crear el usuario.',
+    'users.update_error'  => 'Error al actualizar el usuario.',
+    'users.delete_error'  => 'Error al eliminar el usuario.',
+    'users.not_found'     => 'Usuario no encontrado.',
+    'users.email_required' => 'El email es obligatorio.',
+    'users.email_invalid' => 'Email inválido.',
+    'users.email_exists'  => 'Ya existe un usuario con ese email.',
+    'users.password_too_short' => 'La contraseña debe tener al menos 10 caracteres.',
 ];
