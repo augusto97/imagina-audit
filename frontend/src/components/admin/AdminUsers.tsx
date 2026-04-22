@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Plus, Pencil, Trash2, UserCog, Search } from 'lucide-react'
@@ -327,7 +327,7 @@ function UserModal({
 
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <Switch id="userActive" checked={isActive} onCheckedChange={(v) => setValue('isActive', v)} />
+              <Switch id="userActive" checked={isActive} onCheckedChange={(v: boolean) => setValue('isActive', v)} />
               <Label htmlFor="userActive">{t('admin_users.field_active')}</Label>
             </div>
             <p className="text-[11px] text-[var(--text-tertiary)]">{t('admin_users.field_active_hint')}</p>
