@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { Download, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { getLevelLabel, formatCurrency } from '@/lib/utils'
 import type { AuditResult } from '@/types/audit'
@@ -9,6 +10,7 @@ interface PdfReportProps {
 }
 
 export default function PdfReport({ result }: PdfReportProps) {
+  const { t, i18n } = useTranslation()
   const [generating, setGenerating] = useState(false)
 
   const generatePdf = useCallback(async () => {
@@ -55,12 +57,16 @@ export default function PdfReport({ result }: PdfReportProps) {
         addFooter(pageNum)
       }
 
+      const locale = i18n.language || 'en'
+      const shortDate = (iso: string) => new Date(iso).toLocaleDateString(locale)
+      const longDate = (iso: string) => new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })
+
       const addFooter = (page: number) => {
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(7)
         doc.setTextColor(...C.muted)
-        doc.text(`Imagina Audit · ${result.domain} · ${new Date(result.timestamp).toLocaleDateString('es-CO')}`, m, H - 8)
-        doc.text(`Página ${page}`, W - m, H - 8, { align: 'right' })
+        doc.text(`Imagina Audit · ${result.domain} · ${shortDate(result.timestamp)}`, m, H - 8)
+        doc.text(t('report.pdf_footer_page', { page }), W - m, H - 8, { align: 'right' })
       }
 
       const sectionTitle = (title: string) => {
@@ -85,10 +91,10 @@ export default function PdfReport({ result }: PdfReportProps) {
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(26)
       doc.setTextColor(...C.white)
-      doc.text('Informe de Auditoría Web', W / 2, 22, { align: 'center' })
+      doc.text(t('report.pdf_cover_title'), W / 2, 22, { align: 'center' })
       doc.setFontSize(12)
       doc.setFont('helvetica', 'normal')
-      doc.text('Análisis completo de seguridad, rendimiento y SEO', W / 2, 33, { align: 'center' })
+      doc.text(t('report.pdf_cover_subtitle'), W / 2, 33, { align: 'center' })
       doc.setFontSize(10)
       doc.text(result.url, W / 2, 45, { align: 'center' })
 
@@ -110,7 +116,7 @@ export default function PdfReport({ result }: PdfReportProps) {
       doc.text(String(result.globalScore), W / 2, y + 20, { align: 'center', baseline: 'middle' })
       doc.setFontSize(10)
       doc.setTextColor(...C.muted)
-      doc.text('/100', W / 2, y + 32, { align: 'center' })
+      doc.text(t('report.pdf_cover_score_unit'), W / 2, y + 32, { align: 'center' })
       y += 42
       doc.setFontSize(16)
       doc.setTextColor(...sc)
@@ -120,10 +126,10 @@ export default function PdfReport({ result }: PdfReportProps) {
       y += 12
       doc.setFontSize(9)
       const badges = [
-        { text: `${result.totalIssues.critical} Críticos`, color: [...C.critical] as RGB },
-        { text: `${result.totalIssues.warning} Importantes`, color: [...C.warning] as RGB },
-        { text: `${result.totalIssues.good} Correctos`, color: [...C.good] as RGB },
-      ].filter(b => parseInt(b.text) > 0)
+        { count: result.totalIssues.critical, text: t('report.pdf_cover_badge_critical', { count: result.totalIssues.critical }), color: [...C.critical] as RGB },
+        { count: result.totalIssues.warning, text: t('report.pdf_cover_badge_warning', { count: result.totalIssues.warning }), color: [...C.warning] as RGB },
+        { count: result.totalIssues.good,     text: t('report.pdf_cover_badge_good',     { count: result.totalIssues.good     }), color: [...C.good]     as RGB },
+      ].filter(b => b.count > 0)
 
       const bW = 32
       const bStart = W / 2 - (badges.length * (bW + 3)) / 2
@@ -141,7 +147,7 @@ export default function PdfReport({ result }: PdfReportProps) {
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(10)
       doc.setTextColor(...C.dark)
-      doc.text('Puntuación por Módulo', W / 2, y, { align: 'center' })
+      doc.text(t('report.pdf_cover_modules_title'), W / 2, y, { align: 'center' })
       y += 8
 
       const cols = 4
@@ -171,12 +177,16 @@ export default function PdfReport({ result }: PdfReportProps) {
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(8)
       doc.setTextColor(...C.muted)
-      doc.text(`Fecha: ${new Date(result.timestamp).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}  ·  Duración: ${(result.scanDurationMs / 1000).toFixed(1)}s  ·  WordPress: ${result.isWordPress ? 'Sí' : 'No'}`, W / 2, y, { align: 'center' })
+      doc.text(t('report.pdf_cover_meta', {
+        date: longDate(result.timestamp),
+        duration: (result.scanDurationMs / 1000).toFixed(1),
+        wp: result.isWordPress ? t('report.pdf_cover_wp_yes') : t('report.pdf_cover_wp_no'),
+      }), W / 2, y, { align: 'center' })
       addFooter(1)
 
       // ========== RESUMEN EJECUTIVO ==========
       newPage()
-      sectionTitle('Resumen Ejecutivo')
+      sectionTitle(t('report.pdf_executive_title'))
 
       // Problemas críticos primero
       const allIssues: Array<{ name: string; module: string; level: string; desc: string; rec: string }> = []
@@ -198,13 +208,16 @@ export default function PdfReport({ result }: PdfReportProps) {
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(10)
         doc.setTextColor(...C.good)
-        doc.text('No se detectaron problemas críticos. El sitio está en buen estado general.', m, y)
+        doc.text(t('report.pdf_executive_no_issues'), m, y)
         y += 10
       } else {
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(9)
         doc.setTextColor(...C.text)
-        doc.text(`Se detectaron ${allIssues.length} problemas que requieren atención:`, m, y)
+        doc.text(
+          t(allIssues.length === 1 ? 'report.pdf_executive_intro_one' : 'report.pdf_executive_intro_other', { count: allIssues.length }),
+          m, y
+        )
         y += 7
 
         allIssues.slice(0, 20).forEach((issue, idx) => {
@@ -249,7 +262,7 @@ export default function PdfReport({ result }: PdfReportProps) {
       // ========== DETALLE POR MÓDULO ==========
       for (const mod of result.modules) {
         newPage()
-        sectionTitle(`${mod.name} — ${mod.score != null ? mod.score + '/100' : 'N/A'}`)
+        sectionTitle(`${mod.name} — ${mod.score != null ? mod.score + t('report.pdf_cover_score_unit') : t('report.pdf_module_na')}`)
 
         // Summary
         doc.setFont('helvetica', 'italic')
@@ -292,7 +305,7 @@ export default function PdfReport({ result }: PdfReportProps) {
           if (metric.recommendation && (metric.level === 'critical' || metric.level === 'warning')) {
             doc.setFontSize(7)
             doc.setTextColor(...C.accent)
-            const mRecLines = wrap('Cómo corregir: ' + metric.recommendation, cW - 8, 2)
+            const mRecLines = wrap(t('report.pdf_module_how_to_fix') + metric.recommendation, cW - 8, 2)
             doc.text(mRecLines, m + 7, y)
             y += mRecLines.length * 3
           }
@@ -304,11 +317,16 @@ export default function PdfReport({ result }: PdfReportProps) {
       // ========== IMPACTO ECONÓMICO ==========
       if (result.economicImpact.estimatedMonthlyLoss > 0) {
         ensure(25)
-        sectionTitle('Impacto Económico Estimado')
+        sectionTitle(t('report.pdf_economic_title'))
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(14)
         doc.setTextColor(...C.warning)
-        doc.text(`~${formatCurrency(result.economicImpact.estimatedMonthlyLoss, result.economicImpact.currency)}/mes`, m, y + 2)
+        doc.text(
+          t('report.pdf_economic_amount', {
+            amount: formatCurrency(result.economicImpact.estimatedMonthlyLoss, result.economicImpact.currency),
+          }),
+          m, y + 2
+        )
         y += 8
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(8)
@@ -321,16 +339,16 @@ export default function PdfReport({ result }: PdfReportProps) {
       // ========== MAPA DE SOLUCIONES ==========
       if (result.solutionMap.length > 0) {
         newPage()
-        sectionTitle('Plan de Soluciones — Imagina WP')
+        sectionTitle(t('report.pdf_solutions_title'))
 
         doc.setFillColor(...C.light)
         doc.rect(m, y, cW, 6, 'F')
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(7)
         doc.setTextColor(...C.text)
-        doc.text('Problema', m + 7, y + 4)
-        doc.text('Solución', m + cW * 0.55, y + 4)
-        doc.text('Plan', m + cW - 2, y + 4, { align: 'right' })
+        doc.text(t('report.pdf_solutions_header_problem'), m + 7, y + 4)
+        doc.text(t('report.pdf_solutions_header_solution'), m + cW * 0.55, y + 4)
+        doc.text(t('report.pdf_solutions_header_plan'), m + cW - 2, y + 4, { align: 'right' })
         y += 8
 
         for (const sol of result.solutionMap.slice(0, 25)) {
@@ -366,35 +384,35 @@ export default function PdfReport({ result }: PdfReportProps) {
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(22)
       doc.setTextColor(...C.white)
-      doc.text('Todos estos problemas', W / 2, y, { align: 'center' })
-      doc.text('tienen solución', W / 2, y + 10, { align: 'center' })
+      doc.text(t('report.pdf_backcover_line1'), W / 2, y, { align: 'center' })
+      doc.text(t('report.pdf_backcover_line2'), W / 2, y + 10, { align: 'center' })
 
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(10)
-      doc.text('Imagina WP · Especialistas exclusivos en WordPress', W / 2, y + 25, { align: 'center' })
-      doc.text('15 años de experiencia · imaginawp.com', W / 2, y + 32, { align: 'center' })
+      doc.text(t('report.pdf_backcover_tagline'), W / 2, y + 25, { align: 'center' })
+      doc.text(t('report.pdf_backcover_experience'), W / 2, y + 32, { align: 'center' })
 
       y = H / 2 + 35
       doc.setTextColor(...C.dark)
       doc.setFontSize(9)
-      doc.text('Generado por Imagina Audit · ' + new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }), W / 2, y, { align: 'center' })
+      doc.text(t('report.pdf_generated_by', { date: longDate(new Date().toISOString()) }), W / 2, y, { align: 'center' })
       addFooter(pageNum)
 
-      doc.save(`auditoria-${result.domain}-${new Date().toISOString().slice(0, 10)}.pdf`)
+      doc.save(`${t('report.pdf_filename_prefix')}-${result.domain}-${new Date().toISOString().slice(0, 10)}.pdf`)
     } catch (err) {
       console.error('Error generando PDF:', err)
     } finally {
       setGenerating(false)
     }
-  }, [result])
+  }, [result, t, i18n.language])
 
   return (
-    <Button variant="outline" size="sm" onClick={generatePdf} disabled={generating} title="Descargar PDF" className="h-8 px-2 sm:px-3">
+    <Button variant="outline" size="sm" onClick={generatePdf} disabled={generating} title={t('report.pdf_button_title')} className="h-8 px-2 sm:px-3">
       {generating
         ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
         : <Download className="h-4 w-4" strokeWidth={1.5} />
       }
-      <span className="hidden sm:inline">{generating ? 'Generando...' : 'Descargar PDF'}</span>
+      <span className="hidden sm:inline">{generating ? t('report.pdf_button_generating') : t('report.pdf_button_download')}</span>
     </Button>
   )
 }
