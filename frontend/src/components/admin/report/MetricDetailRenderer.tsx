@@ -130,13 +130,13 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'directory_listing' && Array.isArray(details.exposed)) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-red-200 p-3">
-        <p className="text-xs font-bold text-red-600 mb-1">DIRECTORIOS CON LISTADO PÚBLICO</p>
+        <p className="text-xs font-bold text-red-600 mb-1">{t('report.md_dir_listing_title')}</p>
         <ul className="space-y-1">
           {(details.exposed as string[]).map((d, i) => (
             <li key={i} className="text-xs font-mono text-red-700">{d}</li>
           ))}
         </ul>
-        <p className="text-xs text-[var(--text-secondary)] mt-2">Agregar <code className="font-mono bg-gray-100 px-1 rounded">Options -Indexes</code> en .htaccess de cada directorio.</p>
+        <p className="text-xs text-[var(--text-secondary)] mt-2">{t('report.md_dir_listing_note_prefix')}<code className="font-mono bg-gray-100 px-1 rounded">Options -Indexes</code>{t('report.md_dir_listing_note_suffix')}</p>
       </div>
     )
   }
@@ -150,9 +150,9 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
       <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] overflow-hidden">
         <table className="w-full text-xs">
           <thead><tr className="bg-[var(--bg-tertiary)]">
-            <th className="text-left px-3 py-1.5 font-semibold">Plugin</th>
-            <th className="text-left px-3 py-1.5 font-semibold">Instalada</th>
-            <th className="text-left px-3 py-1.5 font-semibold">Actualizar a</th>
+            <th className="text-left px-3 py-1.5 font-semibold">{t('report.md_plugins_plugin')}</th>
+            <th className="text-left px-3 py-1.5 font-semibold">{t('report.md_plugins_installed')}</th>
+            <th className="text-left px-3 py-1.5 font-semibold">{t('report.md_plugins_update_to')}</th>
           </tr></thead>
           <tbody>
             {outdated.map((p, i) => (
@@ -172,13 +172,13 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'sensitive_files' && Array.isArray(details.files) && (details.files as string[]).length > 0) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-red-200 p-3">
-        <p className="text-xs font-bold text-red-600 mb-1">ARCHIVOS EXPUESTOS PÚBLICAMENTE</p>
+        <p className="text-xs font-bold text-red-600 mb-1">{t('report.md_sensitive_title')}</p>
         <ul className="space-y-1">
           {(details.files as string[]).map((f, i) => (
             <li key={i} className="text-xs font-mono text-red-700">{f}</li>
           ))}
         </ul>
-        <p className="text-xs text-[var(--text-secondary)] mt-2">Eliminar estos archivos del servidor o bloquear acceso vía .htaccess.</p>
+        <p className="text-xs text-[var(--text-secondary)] mt-2">{t('report.md_sensitive_note')}</p>
       </div>
     )
   }
@@ -187,7 +187,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'security_headers' && details.missing && Array.isArray(details.missing)) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3">
-        <p className="text-xs font-bold text-[var(--text-tertiary)] mb-1">HEADERS FALTANTES — Agregar en .htaccess o configuración del servidor</p>
+        <p className="text-xs font-bold text-[var(--text-tertiary)] mb-1">{t('report.md_headers_missing_title')}</p>
         <div className="space-y-1.5 font-mono text-xs">
           {(details.missing as string[]).map((h, i) => (
             <div key={i} className="text-[var(--text-primary)]">
@@ -223,9 +223,9 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
                 </div>
                 {v.name != null && <p className="text-xs text-gray-600 mt-1">{String(v.name)}</p>}
                 <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-500">
-                  {v.fixedInVersion != null && !v.unfixed && <span>Fix: <span className="font-semibold text-emerald-600">v{String(v.fixedInVersion)}</span></span>}
-                  {v.unfixed === true && <span className="font-semibold text-red-600">Sin corrección disponible</span>}
-                  {v.affectedVersions != null && <span>Afecta: {String(v.affectedVersions)}</span>}
+                  {v.fixedInVersion != null && !v.unfixed && <span>{t('report.md_vuln_fix', { version: v.fixedInVersion })}</span>}
+                  {v.unfixed === true && <span className="font-semibold text-red-600">{t('report.md_vuln_unfixed')}</span>}
+                  {v.affectedVersions != null && <span>{t('report.md_vuln_affects', { range: v.affectedVersions })}</span>}
                 </div>
               </div>
               {v.cvssScore != null && Number(v.cvssScore) > 0 && (
@@ -233,7 +233,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
                   <div className={`inline-block px-2.5 py-1 rounded-md text-sm font-bold ${cvssColor(Number(v.cvssScore))}`}>
                     {Number(v.cvssScore).toFixed(1)}
                   </div>
-                  <div className="text-[9px] text-gray-400 mt-0.5">CVSS</div>
+                  <div className="text-[9px] text-gray-400 mt-0.5">{t('report.md_vuln_cvss')}</div>
                 </div>
               )}
             </div>
