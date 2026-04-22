@@ -252,7 +252,7 @@ class PageHealthAnalyzer {
             $opens = substr_count(strtolower($this->html), "<$tag");
             $closes = substr_count(strtolower($this->html), "</$tag>");
             if ($opens > 0 && $closes === 0) {
-                $errors[] = "Tag <$tag> sin cerrar";
+                $errors[] = Translator::t('page_health.htmlerr.err.unclosed', ['tag' => $tag]);
             }
         }
 
@@ -260,27 +260,32 @@ class PageHealthAnalyzer {
         $deprecated = ['<center', '<font ', '<marquee', '<blink', '<strike'];
         foreach ($deprecated as $tag) {
             if (stripos($this->html, $tag) !== false) {
-                $errors[] = "Tag obsoleto: $tag";
+                $errors[] = Translator::t('page_health.htmlerr.err.deprecated', ['tag' => $tag]);
             }
         }
 
         // Check for inline styles (excessive)
         $inlineStyles = substr_count($this->html, 'style="');
         if ($inlineStyles > 30) {
-            $errors[] = "$inlineStyles estilos inline (excesivo)";
+            $errors[] = Translator::t('page_health.htmlerr.err.inline_styles', ['count' => $inlineStyles]);
         }
 
         $count = count($errors);
         $score = $count === 0 ? 100 : ($count <= 2 ? 70 : 40);
 
         return Scoring::createMetric(
-            'html_errors', 'Errores y alertas HTML', $count, $count === 0 ? 'Sin errores detectados' : "$count problemas",
+            'html_errors',
+            Translator::t('page_health.htmlerr.name'),
+            $count,
+            $count === 0
+                ? Translator::t('page_health.htmlerr.display.ok')
+                : Translator::t('page_health.htmlerr.display.bad', ['count' => $count]),
             $score,
             $count === 0
-                ? 'No se detectaron errores HTML importantes.'
-                : 'Se detectaron problemas en el HTML: ' . implode(', ', array_slice($errors, 0, 5)) . '.',
-            $count > 0 ? 'Corregir los errores HTML detectados para mejorar la compatibilidad con los navegadores.' : '',
-            'Corregimos los errores HTML y optimizamos la estructura del código.',
+                ? Translator::t('page_health.htmlerr.desc.ok')
+                : Translator::t('page_health.htmlerr.desc.bad', ['list' => implode(', ', array_slice($errors, 0, 5))]),
+            $count > 0 ? Translator::t('page_health.htmlerr.recommend') : '',
+            Translator::t('page_health.htmlerr.solution'),
             ['errors' => $errors, 'inlineStyles' => $inlineStyles]
         );
     }
@@ -311,7 +316,7 @@ class PageHealthAnalyzer {
 
             $linkDetails[] = [
                 'href' => mb_substr($href, 0, 120),
-                'anchor' => mb_substr(trim($link['text'] ?? ''), 0, 60) ?: '(sin texto)',
+                'anchor' => mb_substr(trim($link['text'] ?? ''), 0, 60) ?: '',
                 'type' => $isInternal ? 'internal' : 'external',
                 'follow' => $isNofollow ? 'nofollow' : 'dofollow',
             ];
@@ -320,13 +325,24 @@ class PageHealthAnalyzer {
         $total = $internal + $external;
         $extDofollow = count(array_filter($linkDetails, fn($l) => $l['type'] === 'external' && $l['follow'] === 'dofollow'));
 
+        $params = [
+            'total' => $total,
+            'internal' => $internal,
+            'external' => $external,
+            'extDofollow' => $extDofollow,
+            'dofollow' => $dofollow,
+            'nofollow' => $nofollow,
+        ];
+
         return Scoring::createMetric(
-            'link_stats', 'Estadísticas de enlaces', $total,
-            "$total enlaces ($internal int. · $external ext. · $extDofollow ext. dofollow)",
+            'link_stats',
+            Translator::t('page_health.links.name'),
+            $total,
+            Translator::t('page_health.links.display', $params),
             null, // Informativo — no afecta score
-            "La página tiene $total enlaces: $internal internos y $external externos. $dofollow dofollow y $nofollow nofollow. $extDofollow enlaces externos dofollow.",
-            $total > 200 ? 'Reducir el número de enlaces a menos de 200 para no diluir el PageRank.' : '',
-            'Optimizamos la estructura de enlaces internos para mejorar el SEO.',
+            Translator::t('page_health.links.desc', $params),
+            $total > 200 ? Translator::t('page_health.links.recommend') : '',
+            Translator::t('page_health.links.solution'),
             ['total' => $total, 'internal' => $internal, 'external' => $external, 'dofollow' => $dofollow, 'nofollow' => $nofollow, 'extDofollow' => $extDofollow, 'links' => array_slice($linkDetails, 0, 50)]
         );
     }
@@ -375,14 +391,18 @@ class PageHealthAnalyzer {
         $brokenDisplay = array_map(fn($b) => basename(parse_url($b['url'], PHP_URL_PATH) ?: $b['url']) . " ({$b['status']})", $broken);
 
         return Scoring::createMetric(
-            'broken_resources', 'Recursos rotos', $count,
-            $count === 0 ? 'Ninguno detectado' : "$count recursos rotos",
+            'broken_resources',
+            Translator::t('page_health.broken.name'),
+            $count,
+            $count === 0
+                ? Translator::t('page_health.broken.display.ok')
+                : Translator::t('page_health.broken.display.bad', ['count' => $count]),
             $score,
             $count === 0
-                ? "Se verificaron $checked recursos y no se encontraron rotos."
-                : "Se encontraron $count recursos rotos de $checked verificados: " . implode(', ', $brokenDisplay) . '.',
-            $count > 0 ? 'Corregir o eliminar los recursos rotos (imágenes o scripts que devuelven error 404).' : '',
-            'Identificamos y corregimos todos los recursos rotos del sitio.',
+                ? Translator::t('page_health.broken.desc.ok', ['checked' => $checked])
+                : Translator::t('page_health.broken.desc.bad', ['count' => $count, 'checked' => $checked, 'list' => implode(', ', $brokenDisplay)]),
+            $count > 0 ? Translator::t('page_health.broken.recommend') : '',
+            Translator::t('page_health.broken.solution'),
             ['broken' => $broken, 'checked' => $checked, 'totalResources' => count($resources)]
         );
     }
@@ -476,23 +496,36 @@ class PageHealthAnalyzer {
 
         if ($htmlSize === 0) {
             return Scoring::createMetric(
-                'text_code_ratio', 'Ratio Texto/Código', 0, 'Sin datos', 50,
-                'No se pudo calcular el ratio texto/código.', '',
-                'Optimizamos el código para un mejor ratio texto/código.'
+                'text_code_ratio',
+                Translator::t('page_health.ratio.name'),
+                0,
+                Translator::t('page_health.ratio.display.none'),
+                50,
+                Translator::t('page_health.ratio.desc.none'),
+                '',
+                Translator::t('page_health.ratio.solution')
             );
         }
 
         $ratio = round(($textSize / $htmlSize) * 100, 1);
         $score = $ratio >= 25 ? 100 : ($ratio >= 15 ? 80 : ($ratio >= 10 ? 60 : ($ratio >= 5 ? 40 : 15)));
 
+        if ($ratio >= 15) {
+            $desc = Translator::t('page_health.ratio.desc.good', ['ratio' => $ratio]);
+        } else {
+            $desc = Translator::t('page_health.ratio.desc.low_prefix', ['ratio' => $ratio])
+                . ($ratio < 10 ? Translator::t('page_health.ratio.desc.very_low') : Translator::t('page_health.ratio.desc.below_rec'));
+        }
+
         return Scoring::createMetric(
-            'text_code_ratio', 'Ratio Texto/Código', $ratio, "$ratio%",
+            'text_code_ratio',
+            Translator::t('page_health.ratio.name'),
+            $ratio,
+            Translator::t('page_health.ratio.display', ['ratio' => $ratio]),
             $score,
-            $ratio >= 15
-                ? "El ratio texto/código es $ratio%. Buen equilibrio entre contenido visible y código HTML."
-                : "El ratio texto/código es $ratio%. " . ($ratio < 10 ? 'Muy bajo — los buscadores podrían considerar que esta página tiene poco contenido relevante.' : 'Se recomienda al menos 15% para que los buscadores valoren el contenido.'),
-            $ratio < 15 ? 'Reducir el código innecesario (CSS/JS inline, HTML redundante) y agregar más contenido de texto visible.' : '',
-            'Optimizamos el código eliminando bloat y mejorando la proporción de contenido útil.',
+            $desc,
+            $ratio < 15 ? Translator::t('page_health.ratio.recommend') : '',
+            Translator::t('page_health.ratio.solution'),
             ['textSize' => $textSize, 'htmlSize' => $htmlSize, 'ratio' => $ratio]
         );
     }
@@ -507,21 +540,30 @@ class PageHealthAnalyzer {
 
         if ($hasCustom) {
             return Scoring::createMetric(
-                'custom_404', 'Página 404 personalizada', true, 'Configurada (HTTP 404)',
-                100, 'El servidor devuelve código 404 para páginas inexistentes. Correcto.',
-                '', 'Configuramos páginas 404 personalizadas con enlaces útiles.'
+                'custom_404',
+                Translator::t('page_health.n404.name'),
+                true,
+                Translator::t('page_health.n404.display.ok'),
+                100,
+                Translator::t('page_health.n404.desc.ok'),
+                '',
+                Translator::t('page_health.n404.solution')
             );
         }
 
         return Scoring::createMetric(
-            'custom_404', 'Página 404 personalizada', false,
-            $returns200 ? 'Devuelve 200 en vez de 404' : "Devuelve $status",
+            'custom_404',
+            Translator::t('page_health.n404.name'),
+            false,
+            $returns200
+                ? Translator::t('page_health.n404.display.soft')
+                : Translator::t('page_health.n404.display.other', ['code' => $status]),
             $returns200 ? 30 : 50,
             $returns200
-                ? 'El servidor devuelve código 200 para URLs inexistentes en vez de 404. Esto causa "soft 404" que confunde a Google y desperdicia crawl budget.'
-                : "El servidor devuelve código $status para páginas inexistentes.",
-            'Configurar el servidor para devolver código HTTP 404 en páginas inexistentes y mostrar una página útil con enlaces.',
-            'Configuramos páginas 404 personalizadas que ayudan a los usuarios a navegar.'
+                ? Translator::t('page_health.n404.desc.soft')
+                : Translator::t('page_health.n404.desc.other', ['code' => $status]),
+            Translator::t('page_health.n404.recommend'),
+            Translator::t('page_health.n404.solution')
         );
     }
 
@@ -568,15 +610,17 @@ class PageHealthAnalyzer {
 
         $score = $allResolve ? 100 : 60;
         $desc = $allResolve
-            ? 'Todas las variantes del dominio (http/https, www/sin-www) redirigen correctamente a la URL principal.'
-            : 'No todas las variantes del dominio redirigen al mismo destino. Esto puede causar contenido duplicado.';
+            ? Translator::t('page_health.urlres.desc.ok')
+            : Translator::t('page_health.urlres.desc.bad');
 
         return Scoring::createMetric(
-            'url_resolution', 'Resolución de URL (www/https)', $allResolve,
-            $allResolve ? 'Todas redirigen correctamente' : 'Inconsistencias detectadas',
+            'url_resolution',
+            Translator::t('page_health.urlres.name'),
+            $allResolve,
+            $allResolve ? Translator::t('page_health.urlres.display.ok') : Translator::t('page_health.urlres.display.bad'),
             $score, $desc,
-            $allResolve ? '' : 'Configurar redirecciones 301 para que http, https, www y sin-www apunten a la misma URL.',
-            'Configuramos las redirecciones correctas para evitar contenido duplicado.',
+            $allResolve ? '' : Translator::t('page_health.urlres.recommend'),
+            Translator::t('page_health.urlres.solution'),
             ['results' => $results]
         );
     }

@@ -72,4 +72,64 @@ return [
     'doctype.desc.none'    => '<!DOCTYPE html> not found. Without DOCTYPE, browsers fall into "quirks mode" and render inconsistently.',
     'doctype.recommend'    => 'Add <!DOCTYPE html> as the first line of the document.',
     'doctype.solution'     => 'We verify every page has the correct DOCTYPE declaration.',
+
+    // html_errors
+    'htmlerr.name'         => 'HTML errors & warnings',
+    'htmlerr.display.ok'   => 'No errors detected',
+    'htmlerr.display.bad'  => '{{count}} issues',
+    'htmlerr.desc.ok'      => 'No major HTML errors detected.',
+    'htmlerr.desc.bad'     => 'HTML issues detected: {{list}}.',
+    'htmlerr.err.unclosed'   => 'Unclosed <{{tag}}> tag',
+    'htmlerr.err.deprecated' => 'Obsolete tag: {{tag}}',
+    'htmlerr.err.inline_styles' => '{{count}} inline styles (excessive)',
+    'htmlerr.recommend'    => 'Fix the detected HTML errors to improve browser compatibility.',
+    'htmlerr.solution'     => 'We fix HTML errors and optimize the code structure.',
+
+    // link_stats
+    'links.name'           => 'Link statistics',
+    'links.display'        => '{{total}} links ({{internal}} int. · {{external}} ext. · {{extDofollow}} ext. dofollow)',
+    'links.desc'           => 'The page has {{total}} links: {{internal}} internal and {{external}} external. {{dofollow}} dofollow and {{nofollow}} nofollow. {{extDofollow}} external dofollow links.',
+    'links.recommend'      => 'Reduce the number of links to fewer than 200 to avoid diluting PageRank.',
+    'links.solution'       => 'We optimize the internal link structure to improve SEO.',
+
+    // broken_resources
+    'broken.name'          => 'Broken resources',
+    'broken.display.ok'    => 'None detected',
+    'broken.display.bad'   => '{{count}} broken resources',
+    'broken.desc.ok'       => '{{checked}} resources checked and none were broken.',
+    'broken.desc.bad'      => '{{count}} broken resources found out of {{checked}} checked: {{list}}.',
+    'broken.recommend'     => 'Fix or remove broken resources (images or scripts returning 404).',
+    'broken.solution'      => 'We identify and fix all broken resources on the site.',
+
+    // text_code_ratio
+    'ratio.name'             => 'Text/Code Ratio',
+    'ratio.display.none'     => 'No data',
+    'ratio.display'          => '{{ratio}}%',
+    'ratio.desc.none'        => 'Could not compute the text/code ratio.',
+    'ratio.desc.good'        => 'Text/code ratio is {{ratio}}%. Good balance between visible content and HTML code.',
+    'ratio.desc.low_prefix'  => 'Text/code ratio is {{ratio}}%. ',
+    'ratio.desc.very_low'    => 'Very low — search engines may consider that this page has little relevant content.',
+    'ratio.desc.below_rec'   => 'At least 15% is recommended so search engines value the content.',
+    'ratio.recommend'        => 'Reduce unnecessary code (inline CSS/JS, redundant HTML) and add more visible text content.',
+    'ratio.solution'         => 'We optimize the code by removing bloat and improving the useful-content ratio.',
+
+    // custom_404
+    'n404.name'               => 'Custom 404 page',
+    'n404.display.ok'         => 'Configured (HTTP 404)',
+    'n404.display.soft'       => 'Returns 200 instead of 404',
+    'n404.display.other'      => 'Returns {{code}}',
+    'n404.desc.ok'            => 'The server returns status 404 for non-existent pages. Correct.',
+    'n404.desc.soft'          => 'The server returns 200 for non-existent URLs instead of 404. This is a "soft 404" that confuses Google and wastes crawl budget.',
+    'n404.desc.other'         => 'The server returns status {{code}} for non-existent pages.',
+    'n404.recommend'          => 'Configure the server to return HTTP 404 on non-existent pages and display a useful page with links.',
+    'n404.solution'           => 'We configure custom 404 pages with helpful links.',
+
+    // url_resolution
+    'urlres.name'          => 'URL resolution (www/https)',
+    'urlres.display.ok'    => 'All redirect correctly',
+    'urlres.display.bad'   => 'Inconsistencies detected',
+    'urlres.desc.ok'       => 'All domain variants (http/https, www/non-www) correctly redirect to the main URL.',
+    'urlres.desc.bad'      => 'Not all domain variants redirect to the same destination. This may cause duplicate content.',
+    'urlres.recommend'     => 'Configure 301 redirects so http, https, www and non-www all point to the same URL.',
+    'urlres.solution'      => 'We configure the correct redirects to avoid duplicate content.',
 ];
