@@ -1,4 +1,5 @@
 import { Gauge, Zap, Database as DbIcon, Image as ImageIcon, Link as LinkIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { SectionCard, IssueList } from './ui'
 import type { SnapshotReport } from '@/types/snapshotReport'
 
@@ -7,33 +8,34 @@ import type { SnapshotReport } from '@/types/snapshotReport'
  * (activo/no) con la acción recomendada para habilitarlo.
  */
 export default function PerformanceSection({ report }: { report: SnapshotReport }) {
+  const { t } = useTranslation()
   const s = report.performance.summary
 
   return (
     <SectionCard
-      title="Rendimiento"
-      subtitle="Cache stack y configuración de ejecución"
+      title={t('report.snap_perf_title')}
+      subtitle={t('report.snap_perf_subtitle')}
       icon={<Gauge className="h-4 w-4 text-[var(--accent-primary)]" strokeWidth={1.75} />}
     >
       {/* Cache stack as a stat grid */}
       <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <CacheTile
           icon={<LinkIcon className="h-3.5 w-3.5" />}
-          label="Page cache"
+          label={t('report.snap_perf_kpi_page_cache')}
           active={Boolean(s.pageCache)}
-          detail={s.pageCache ? 'Detectado en headers' : 'No se detecta plugin ni cache de servidor'}
+          detail={s.pageCache ? t('report.snap_perf_page_cache_on') : t('report.snap_perf_page_cache_off')}
         />
         <CacheTile
           icon={<DbIcon className="h-3.5 w-3.5" />}
-          label="Object cache"
+          label={t('report.snap_perf_kpi_object_cache')}
           active={Boolean(s.objectCache)}
-          detail={s.objectCache ? String(s.objectCacheType || 'Activo') : 'Cache en DB (default, lento)'}
+          detail={s.objectCache ? String(s.objectCacheType || t('report.snap_perf_state_enabled')) : t('report.snap_perf_cache_default')}
         />
         <CacheTile
           icon={<Zap className="h-3.5 w-3.5" />}
-          label="OPcache"
+          label={t('report.snap_perf_kpi_opcache')}
           active={Boolean(s.opcache)}
-          detail={s.opcache ? 'Bytecode cacheado' : 'PHP recompila en cada request'}
+          detail={s.opcache ? t('report.snap_perf_opcache_on') : t('report.snap_perf_opcache_off')}
         />
       </div>
 
@@ -41,13 +43,13 @@ export default function PerformanceSection({ report }: { report: SnapshotReport 
       <div className="mb-4 grid gap-2 sm:grid-cols-2">
         <InfoRow
           icon={<ImageIcon className="h-3.5 w-3.5" />}
-          label="Image editor"
+          label={t('report.snap_perf_kpi_image_editor')}
           value={String(s.imageEditor || '—')}
           good={(s.imageEditor as string || '').toLowerCase().includes('imagick')}
         />
         <InfoRow
           icon={<LinkIcon className="h-3.5 w-3.5" />}
-          label="Permalink structure"
+          label={t('report.snap_perf_kpi_permalinks')}
           value={String(s.permalinks || '—')}
           mono
           good={Boolean(s.permalinks) && !String(s.permalinks).startsWith('/?')}
@@ -55,7 +57,7 @@ export default function PerformanceSection({ report }: { report: SnapshotReport 
       </div>
 
       <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-        Hallazgos accionables
+        {t('report.snap_perf_actionable')}
       </h4>
       <IssueList issues={report.performance.issues} />
     </SectionCard>
