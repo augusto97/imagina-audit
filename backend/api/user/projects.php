@@ -187,12 +187,45 @@ if ($method === 'POST') {
         );
         $newId = (int) $db->lastInsertId();
 
-        // Retroactivo: enganchar audits existentes del user con esta URL exacta
-        // (si ya escaneaba la URL antes de crear el proyecto, se agrupan).
-        $db->execute(
-            "UPDATE audits SET project_id = ? WHERE user_id = ? AND LOWER(url) = ? AND project_id IS NULL",
-            [$newId, $userId, $normalizedUrl]
+        // Retroactivo: enganchar audits existentes del user con esta URL.
+        // Audits viejos pueden tener URL con case/trailing-slash distinto al
+        // normalizado — por eso comparamos ambos lados con normalizeUrl en
+        // PHP. Filtramos primero por domain para no traer de más.
+        $candidates = $db->query(
+            "SELECT id, url FROM audits
+             WHERE user_id = ? AND project_id IS NULL AND LOWER(domain) = ?",
+            [$userId, $domain]
         );
+        $matchIds = [];
+        foreach ($candidates as $c) {
+            if (Project::normalizeUrl((string) $c['url']) === $normalizedUrl) {
+                $matchIds[] = (string) $c['id'];
+            }
+        }
+        if (!empty($matchIds)) {
+            $placeholders = implode(',', array_fill(0, count($matchIds), '?'));
+            $params = array_merge([$newId], $matchIds);
+            $db->execute(
+                "UPDATE audits SET project_id = ? WHERE id IN ($placeholders)",
+                $params
+            );
+            // Rearmar el checklist vivo a partir del último audit retroactivo
+            // atado — así el user entra al proyecto y ya ve tareas.
+            $latest = $db->queryOne(
+                "SELECT result_json FROM audits WHERE project_id = ? ORDER BY created_at DESC LIMIT 1",
+                [$newId]
+            );
+            if ($latest) {
+                $decoded = JsonStore::decode($latest['result_json']);
+                if (is_array($decoded)) {
+                    try {
+                        Project::reconcileChecklist($db, $newId, Project::flattenMetrics($decoded));
+                    } catch (Throwable $e) {
+                        Logger::warning('reconcileChecklist retroactivo falló: ' . $e->getMessage());
+                    }
+                }
+            }
+        }
 
         Response::success(['id' => $newId], 201);
     } catch (Throwable $e) {
