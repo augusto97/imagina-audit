@@ -86,4 +86,88 @@ return [
     'themesinact.desc'         => '{{count}} temas inactivos en disco. Aunque no se usen, su código sigue en el servidor y puede contener vulnerabilidades. Mantener solo el activo (+ su padre si es child + uno default como fallback).',
     'themesinact.recommend'    => 'Eliminar temas inactivos desde Apariencia → Temas → Detalles → Eliminar.',
     'themesinact.solution'     => 'Limpiamos temas innecesarios reduciendo superficie de ataque.',
+
+    // db_size
+    'dbsize.name'           => 'Tamaño de la base de datos',
+    'dbsize.display'        => '{{size}} · {{rows}} filas · {{tables}} tablas',
+    'dbsize.desc.ok'        => 'Base de datos de {{size}} ({{rows}} filas, {{tables}} tablas). Tamaño saludable.',
+    'dbsize.desc.heavy'     => 'Base de datos de {{size}} — {{label}}. En las tablas top se ve dónde está el peso (ver detalles).',
+    'dbsize.label.critical' => 'CRÍTICO: DB muy pesada',
+    'dbsize.label.large'    => 'grande',
+    'dbsize.recommend'      => 'Revisar las tablas top: plugins de seguridad (Wordfence = wfHits, wfLogins), orders (WooCommerce), logs. Muchas veces un plugin acumula logs sin rotación.',
+    'dbsize.solution'       => 'Optimizamos la DB: purgamos logs de plugins, ajustamos retención, y añadimos índices donde hace falta.',
+
+    // db_autoload
+    'dbautoload.name'      => 'Opciones autoload',
+    'dbautoload.display'   => '{{size}} · {{count}} opciones',
+    'dbautoload.desc.ok'   => 'Autoload de {{size}} con {{count}} opciones. Saludable (<512 KB es lo deseable).',
+    'dbautoload.desc.bad'  => 'Autoload pesado ({{size}}, {{count}} opciones). Cada request a WP carga TODAS estas opciones en memoria — un autoload de varios MB ralentiza absolutamente todo el sitio.',
+    'dbautoload.recommend' => 'Instalar plugin "WP-Optimize" o "Autoload Options Monitor" para identificar qué opciones pesan más. Muchas veces plugins desactivados dejan basura con autoload=yes.',
+    'dbautoload.solution'  => 'Limpiamos opciones autoload pesadas y configuramos buenas prácticas.',
+
+    // db_engine
+    'dbengine.name'      => 'Motor de base de datos',
+    'dbengine.display'   => '{{count}} tablas con MyISAM',
+    'dbengine.desc'      => '{{count}} tablas usan MyISAM. Sin transacciones, sin row-level locking, sin foreign keys. InnoDB es superior en rendimiento y concurrencia.',
+    'dbengine.recommend' => 'Convertir a InnoDB: ALTER TABLE nombre_tabla ENGINE=InnoDB; (una por una, empezando por las más pequeñas). Hacer backup antes.',
+    'dbengine.solution'  => 'Migramos tablas MyISAM a InnoDB para concurrencia y rendimiento.',
+
+    // db_revisions
+    'dbrev.name'      => 'Revisiones de posts',
+    'dbrev.display'   => '{{count}} revisiones',
+    'dbrev.desc.ok'   => '{{count}} revisiones acumuladas. Cantidad normal.',
+    'dbrev.desc.bad'  => '{{count}} revisiones ocupando espacio en wp_posts. Cada edición genera una revisión nueva sin límite por defecto.',
+    'dbrev.recommend' => 'Limitar revisiones: en wp-config.php, define("WP_POST_REVISIONS", 5). Limpiar las antiguas con WP-Optimize o plugin similar.',
+    'dbrev.solution'  => 'Limpiamos revisiones antiguas y limitamos las futuras.',
+
+    // db_transients
+    'dbtrans.name'      => 'Transients en options',
+    'dbtrans.display'   => '{{count}} transients',
+    'dbtrans.desc.ok'   => '{{count}} transients. Normal.',
+    'dbtrans.desc.bad'  => '{{count}} transients. Muchos plugins dejan transients expirados que se acumulan — WP no los limpia solo si no usan TTL correcto.',
+    'dbtrans.recommend' => 'Limpiar con WP-Optimize. Configurar cache de objetos (Redis) para que los transients vayan a memoria en vez de a wp_options.',
+    'dbtrans.solution'  => 'Configuramos Redis object cache para que transients no toquen la DB.',
+
+    // db_orphaned_meta
+    'dbmeta.name'      => 'Metadata huérfana',
+    'dbmeta.display'   => '{{count}} registros huérfanos',
+    'dbmeta.desc'      => '{{count}} registros en wp_postmeta apuntan a posts que ya no existen. Son datos basura acumulados por plugins que no limpian al borrar posts.',
+    'dbmeta.recommend' => 'Limpiar con WP-Optimize o SQL: DELETE pm FROM wp_postmeta pm LEFT JOIN wp_posts p ON pm.post_id = p.ID WHERE p.ID IS NULL;',
+    'dbmeta.solution'  => 'Limpiamos metadata huérfana y otros residuos de la DB.',
+
+    // cron_status
+    'cron.name'                => 'Tareas programadas (WP Cron)',
+    'cron.display.ok'          => '{{total}} tareas OK',
+    'cron.display.overdue'     => '{{overdue}} atrasadas de {{total}}',
+    'cron.desc.ok'             => '{{total}} cron jobs registrados, ejecutando a tiempo.',
+    'cron.desc.ok_no_wpcron'   => ' WP_CRON está deshabilitado (debería haber cron real del servidor configurado).',
+    'cron.desc.overdue'        => '{{overdue}} de {{total}} cron jobs atrasados. Tareas automáticas (actualizaciones, emails, backups) no se están ejecutando.',
+    'cron.recommend.no_wpcron' => 'Verificar que el cron del servidor esté llamando a wp-cron.php cada minuto.',
+    'cron.recommend.low_traf'  => 'En sitios con tráfico bajo, WP_CRON no se dispara. Configurar cron real del sistema: */5 * * * * wget -qO- https://tu-sitio.com/wp-cron.php',
+    'cron.solution'            => 'Configuramos cron real del servidor para que las tareas se ejecuten a tiempo.',
+
+    // media_library
+    'media.name'             => 'Biblioteca de medios',
+    'media.display'          => '{{count}} archivos · {{size}}',
+    'media.desc.ok'          => '{{count}} archivos ({{size}}) en la biblioteca. Tamaño razonable.',
+    'media.desc.bad_prefix'  => '{{count}} archivos ocupando {{size}}. ',
+    'media.desc.bad_heavy'   => 'La biblioteca es pesada — probablemente hay imágenes sin comprimir ni convertir a WebP.',
+    'media.desc.bad_normal'  => 'Optimizable con compresión y WebP.',
+    'media.recommend'        => 'Instalar ShortPixel o Imagify para comprimir y convertir a WebP automáticamente. Configurar lazy loading (WP ya lo hace desde 5.5).',
+    'media.solution'         => 'Comprimimos imágenes, las convertimos a WebP y servimos via CDN.',
+
+    // custom_post_types
+    'cpt.name'         => 'Tipos de contenido',
+    'cpt.display'      => '{{custom}} custom · {{total}} total',
+    'cpt.desc.none'    => 'Solo se usan los tipos nativos de WP (posts, pages). Estructura simple.',
+    'cpt.desc.custom'  => '{{custom}} tipos de contenido personalizados (CPTs) registrados por plugins/tema. Pueden afectar rendimiento si se abusa del REST (show_in_rest=true expone todo el contenido).',
+    'cpt.solution'     => 'Auditamos los CPTs y optimizamos queries/índices para los que manejan mucho contenido.',
+
+    // rest_api_routes
+    'restroutes.name'      => 'Rutas REST API',
+    'restroutes.display'   => '{{total}} rutas en {{namespaces}} namespaces',
+    'restroutes.desc.ok'   => '{{total}} rutas REST. Volumen normal para un sitio WordPress.',
+    'restroutes.desc.bad'  => '{{total}} rutas REST expuestas. Cada plugin añade endpoints; demasiados indican plugin bloat y potencialmente datos expuestos.',
+    'restroutes.recommend' => 'Auditar qué plugins exponen tantas rutas. Considerar si alguno puede desactivarse o si el REST debe restringirse a usuarios autenticados.',
+    'restroutes.solution'  => 'Restringimos y auditamos endpoints REST para reducir superficie de ataque.',
 ];

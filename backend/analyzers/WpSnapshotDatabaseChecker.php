@@ -38,16 +38,20 @@ class WpSnapshotDatabaseChecker {
             'engine' => $t['engine'] ?? '',
         ], array_slice($sorted, 0, 10));
 
+        $label = $mb > 1500
+            ? Translator::t('wp_snapshot.dbsize.label.critical')
+            : Translator::t('wp_snapshot.dbsize.label.large');
         return Scoring::createMetric(
-            'db_size', 'Tamaño de la base de datos',
+            'db_size',
+            Translator::t('wp_snapshot.dbsize.name'),
             $humanSize,
-            "$humanSize · $totalRows filas · $totalTables tablas",
+            Translator::t('wp_snapshot.dbsize.display', ['size' => $humanSize, 'rows' => $totalRows, 'tables' => $totalTables]),
             $score,
             $mb < 200
-                ? "Base de datos de $humanSize ($totalRows filas, $totalTables tablas). Tamaño saludable."
-                : "Base de datos de $humanSize — " . ($mb > 1500 ? 'CRÍTICO: DB muy pesada' : 'grande') . ". En las tablas top se ve dónde está el peso (ver detalles).",
-            $mb > 500 ? 'Revisar las tablas top: plugins de seguridad (Wordfence = wfHits, wfLogins), orders (WooCommerce), logs. Muchas veces un plugin acumula logs sin rotación.' : '',
-            'Optimizamos la DB: purgamos logs de plugins, ajustamos retención, y añadimos índices donde hace falta.',
+                ? Translator::t('wp_snapshot.dbsize.desc.ok', ['size' => $humanSize, 'rows' => $totalRows, 'tables' => $totalTables])
+                : Translator::t('wp_snapshot.dbsize.desc.heavy', ['size' => $humanSize, 'label' => $label]),
+            $mb > 500 ? Translator::t('wp_snapshot.dbsize.recommend') : '',
+            Translator::t('wp_snapshot.dbsize.solution'),
             ['totalSize' => $totalSize, 'humanSize' => $humanSize, 'totalRows' => $totalRows, 'totalTables' => $totalTables, 'topTables' => $topTables]
         );
     }
@@ -65,17 +69,16 @@ class WpSnapshotDatabaseChecker {
         $score = $mb < 0.5 ? 100 : ($mb < 1 ? 85 : ($mb < 3 ? 55 : 20));
 
         return Scoring::createMetric(
-            'db_autoload', 'Opciones autoload',
+            'db_autoload',
+            Translator::t('wp_snapshot.dbautoload.name'),
             $autoloadHuman,
-            "$autoloadHuman · $count opciones",
+            Translator::t('wp_snapshot.dbautoload.display', ['size' => $autoloadHuman, 'count' => $count]),
             $score,
             $mb < 0.5
-                ? "Autoload de $autoloadHuman con $count opciones. Saludable (<512 KB es lo deseable)."
-                : "Autoload pesado ($autoloadHuman, $count opciones). Cada request a WP carga TODAS estas opciones en memoria — un autoload de varios MB ralentiza absolutamente todo el sitio.",
-            $mb > 1
-                ? 'Instalar plugin "WP-Optimize" o "Autoload Options Monitor" para identificar qué opciones pesan más. Muchas veces plugins desactivados dejan basura con autoload=yes.'
-                : '',
-            'Limpiamos opciones autoload pesadas y configuramos buenas prácticas.',
+                ? Translator::t('wp_snapshot.dbautoload.desc.ok', ['size' => $autoloadHuman, 'count' => $count])
+                : Translator::t('wp_snapshot.dbautoload.desc.bad', ['size' => $autoloadHuman, 'count' => $count]),
+            $mb > 1 ? Translator::t('wp_snapshot.dbautoload.recommend') : '',
+            Translator::t('wp_snapshot.dbautoload.solution'),
             ['size' => $autoloadSize, 'human' => $autoloadHuman, 'count' => $count]
         );
     }
@@ -102,13 +105,14 @@ class WpSnapshotDatabaseChecker {
         $score = $count <= 2 ? 75 : ($count <= 10 ? 55 : 35);
 
         return Scoring::createMetric(
-            'db_engine', 'Motor de base de datos',
+            'db_engine',
+            Translator::t('wp_snapshot.dbengine.name'),
             $count,
-            "$count tablas con MyISAM",
+            Translator::t('wp_snapshot.dbengine.display', ['count' => $count]),
             $score,
-            "$count tablas usan MyISAM. Sin transacciones, sin row-level locking, sin foreign keys. InnoDB es superior en rendimiento y concurrencia.",
-            'Convertir a InnoDB: ALTER TABLE nombre_tabla ENGINE=InnoDB; (una por una, empezando por las más pequeñas). Hacer backup antes.',
-            'Migramos tablas MyISAM a InnoDB para concurrencia y rendimiento.',
+            Translator::t('wp_snapshot.dbengine.desc', ['count' => $count]),
+            Translator::t('wp_snapshot.dbengine.recommend'),
+            Translator::t('wp_snapshot.dbengine.solution'),
             ['count' => $count, 'tables' => array_slice($myisam, 0, 15)]
         );
     }
@@ -121,15 +125,16 @@ class WpSnapshotDatabaseChecker {
         $score = $revisions < 100 ? 100 : ($revisions < 500 ? 90 : ($revisions < 2000 ? 65 : 30));
 
         return Scoring::createMetric(
-            'db_revisions', 'Revisiones de posts',
+            'db_revisions',
+            Translator::t('wp_snapshot.dbrev.name'),
             $revisions,
-            "$revisions revisiones",
+            Translator::t('wp_snapshot.dbrev.display', ['count' => $revisions]),
             $score,
             $revisions < 100
-                ? "$revisions revisiones acumuladas. Cantidad normal."
-                : "$revisions revisiones ocupando espacio en wp_posts. Cada edición genera una revisión nueva sin límite por defecto.",
-            $revisions > 500 ? 'Limitar revisiones: en wp-config.php, define("WP_POST_REVISIONS", 5). Limpiar las antiguas con WP-Optimize o plugin similar.' : '',
-            'Limpiamos revisiones antiguas y limitamos las futuras.',
+                ? Translator::t('wp_snapshot.dbrev.desc.ok', ['count' => $revisions])
+                : Translator::t('wp_snapshot.dbrev.desc.bad', ['count' => $revisions]),
+            $revisions > 500 ? Translator::t('wp_snapshot.dbrev.recommend') : '',
+            Translator::t('wp_snapshot.dbrev.solution'),
             ['count' => $revisions]
         );
     }
@@ -142,15 +147,16 @@ class WpSnapshotDatabaseChecker {
         $score = $t < 300 ? 100 : ($t < 1000 ? 85 : ($t < 5000 ? 50 : 25));
 
         return Scoring::createMetric(
-            'db_transients', 'Transients en options',
+            'db_transients',
+            Translator::t('wp_snapshot.dbtrans.name'),
             $t,
-            "$t transients",
+            Translator::t('wp_snapshot.dbtrans.display', ['count' => $t]),
             $score,
             $t < 300
-                ? "$t transients. Normal."
-                : "$t transients. Muchos plugins dejan transients expirados que se acumulan — WP no los limpia solo si no usan TTL correcto.",
-            $t > 1000 ? 'Limpiar con WP-Optimize. Configurar cache de objetos (Redis) para que los transients vayan a memoria en vez de a wp_options.' : '',
-            'Configuramos Redis object cache para que transients no toquen la DB.',
+                ? Translator::t('wp_snapshot.dbtrans.desc.ok', ['count' => $t])
+                : Translator::t('wp_snapshot.dbtrans.desc.bad', ['count' => $t]),
+            $t > 1000 ? Translator::t('wp_snapshot.dbtrans.recommend') : '',
+            Translator::t('wp_snapshot.dbtrans.solution'),
             ['count' => $t]
         );
     }
@@ -163,13 +169,14 @@ class WpSnapshotDatabaseChecker {
         $score = $orphaned < 100 ? 80 : ($orphaned < 1000 ? 55 : 25);
 
         return Scoring::createMetric(
-            'db_orphaned_meta', 'Metadata huérfana',
+            'db_orphaned_meta',
+            Translator::t('wp_snapshot.dbmeta.name'),
             $orphaned,
-            "$orphaned registros huérfanos",
+            Translator::t('wp_snapshot.dbmeta.display', ['count' => $orphaned]),
             $score,
-            "$orphaned registros en wp_postmeta apuntan a posts que ya no existen. Son datos basura acumulados por plugins que no limpian al borrar posts.",
-            'Limpiar con WP-Optimize o SQL: DELETE pm FROM wp_postmeta pm LEFT JOIN wp_posts p ON pm.post_id = p.ID WHERE p.ID IS NULL;',
-            'Limpiamos metadata huérfana y otros residuos de la DB.',
+            Translator::t('wp_snapshot.dbmeta.desc', ['count' => $orphaned]),
+            Translator::t('wp_snapshot.dbmeta.recommend'),
+            Translator::t('wp_snapshot.dbmeta.solution'),
             ['count' => $orphaned]
         );
     }
@@ -197,20 +204,24 @@ class WpSnapshotDatabaseChecker {
             if (count($upcomingHooks) >= 20) break;
         }
 
+        $okSuffix = $wpCronDisabled ? Translator::t('wp_snapshot.cron.desc.ok_no_wpcron') : '';
         return Scoring::createMetric(
-            'cron_status', 'Tareas programadas (WP Cron)',
+            'cron_status',
+            Translator::t('wp_snapshot.cron.name'),
             $overdue,
-            $overdue === 0 ? "$total tareas OK" : "$overdue atrasadas de $total",
+            $overdue === 0
+                ? Translator::t('wp_snapshot.cron.display.ok', ['total' => $total])
+                : Translator::t('wp_snapshot.cron.display.overdue', ['overdue' => $overdue, 'total' => $total]),
             $score,
             $overdue === 0
-                ? "$total cron jobs registrados, ejecutando a tiempo." . ($wpCronDisabled ? ' WP_CRON está deshabilitado (debería haber cron real del servidor configurado).' : '')
-                : "$overdue de $total cron jobs atrasados. Tareas automáticas (actualizaciones, emails, backups) no se están ejecutando.",
+                ? Translator::t('wp_snapshot.cron.desc.ok', ['total' => $total]) . $okSuffix
+                : Translator::t('wp_snapshot.cron.desc.overdue', ['overdue' => $overdue, 'total' => $total]),
             $overdue > 0
                 ? ($wpCronDisabled
-                    ? 'Verificar que el cron del servidor esté llamando a wp-cron.php cada minuto.'
-                    : 'En sitios con tráfico bajo, WP_CRON no se dispara. Configurar cron real del sistema: */5 * * * * wget -qO- https://tu-sitio.com/wp-cron.php')
+                    ? Translator::t('wp_snapshot.cron.recommend.no_wpcron')
+                    : Translator::t('wp_snapshot.cron.recommend.low_traf'))
                 : '',
-            'Configuramos cron real del servidor para que las tareas se ejecuten a tiempo.',
+            Translator::t('wp_snapshot.cron.solution'),
             ['total' => $total, 'overdue' => $overdue, 'wpCronDisabled' => $wpCronDisabled, 'alternate' => $alternate, 'hooks' => $upcomingHooks]
         );
     }
@@ -241,16 +252,20 @@ class WpSnapshotDatabaseChecker {
             }
         }
 
+        $badSuffix = $gb > 5
+            ? Translator::t('wp_snapshot.media.desc.bad_heavy')
+            : Translator::t('wp_snapshot.media.desc.bad_normal');
         return Scoring::createMetric(
-            'media_library', 'Biblioteca de medios',
+            'media_library',
+            Translator::t('wp_snapshot.media.name'),
             $count,
-            "$count archivos · $humanSize",
+            Translator::t('wp_snapshot.media.display', ['count' => $count, 'size' => $humanSize]),
             $score,
             $gb < 1
-                ? "$count archivos ($humanSize) en la biblioteca. Tamaño razonable."
-                : "$count archivos ocupando $humanSize. " . ($gb > 5 ? 'La biblioteca es pesada — probablemente hay imágenes sin comprimir ni convertir a WebP.' : 'Optimizable con compresión y WebP.'),
-            $gb > 1 ? 'Instalar ShortPixel o Imagify para comprimir y convertir a WebP automáticamente. Configurar lazy loading (WP ya lo hace desde 5.5).' : '',
-            'Comprimimos imágenes, las convertimos a WebP y servimos via CDN.',
+                ? Translator::t('wp_snapshot.media.desc.ok', ['count' => $count, 'size' => $humanSize])
+                : Translator::t('wp_snapshot.media.desc.bad_prefix', ['count' => $count, 'size' => $humanSize]) . $badSuffix,
+            $gb > 1 ? Translator::t('wp_snapshot.media.recommend') : '',
+            Translator::t('wp_snapshot.media.solution'),
             ['count' => $count, 'size' => $size, 'humanSize' => $humanSize, 'mimeSummary' => $mimeDetail]
         );
     }
@@ -274,15 +289,16 @@ class WpSnapshotDatabaseChecker {
         ], array_slice($customList, 0, 15));
 
         return Scoring::createMetric(
-            'custom_post_types', 'Tipos de contenido',
+            'custom_post_types',
+            Translator::t('wp_snapshot.cpt.name'),
             $custom,
-            "$custom custom · $total total",
+            Translator::t('wp_snapshot.cpt.display', ['custom' => $custom, 'total' => $total]),
             null,
             $custom === 0
-                ? 'Solo se usan los tipos nativos de WP (posts, pages). Estructura simple.'
-                : "$custom tipos de contenido personalizados (CPTs) registrados por plugins/tema. Pueden afectar rendimiento si se abusa del REST (show_in_rest=true expone todo el contenido).",
+                ? Translator::t('wp_snapshot.cpt.desc.none')
+                : Translator::t('wp_snapshot.cpt.desc.custom', ['custom' => $custom]),
             '',
-            'Auditamos los CPTs y optimizamos queries/índices para los que manejan mucho contenido.',
+            Translator::t('wp_snapshot.cpt.solution'),
             ['total' => $total, 'custom' => $custom, 'customTypes' => $customSummary]
         );
     }
@@ -309,15 +325,16 @@ class WpSnapshotDatabaseChecker {
         $topNamespaces = array_slice($topNamespaces, 0, 10);
 
         return Scoring::createMetric(
-            'rest_api_routes', 'Rutas REST API',
+            'rest_api_routes',
+            Translator::t('wp_snapshot.restroutes.name'),
             $total,
-            "$total rutas en " . count($namespaces) . ' namespaces',
+            Translator::t('wp_snapshot.restroutes.display', ['total' => $total, 'namespaces' => count($namespaces)]),
             $score,
             $total < 300
-                ? "$total rutas REST. Volumen normal para un sitio WordPress."
-                : "$total rutas REST expuestas. Cada plugin añade endpoints; demasiados indican plugin bloat y potencialmente datos expuestos.",
-            $total > 800 ? 'Auditar qué plugins exponen tantas rutas. Considerar si alguno puede desactivarse o si el REST debe restringirse a usuarios autenticados.' : '',
-            'Restringimos y auditamos endpoints REST para reducir superficie de ataque.',
+                ? Translator::t('wp_snapshot.restroutes.desc.ok', ['total' => $total])
+                : Translator::t('wp_snapshot.restroutes.desc.bad', ['total' => $total]),
+            $total > 800 ? Translator::t('wp_snapshot.restroutes.recommend') : '',
+            Translator::t('wp_snapshot.restroutes.solution'),
             ['total' => $total, 'namespaces' => $namespaces, 'topNamespaces' => $topNamespaces]
         );
     }
