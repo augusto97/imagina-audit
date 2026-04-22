@@ -9,6 +9,8 @@ import NotFoundPage from './pages/NotFoundPage'
 import { useConfigStore } from './store/configStore'
 
 const AdminPage = lazy(() => import('./pages/AdminPage'))
+const UserLoginPage = lazy(() => import('./pages/UserLoginPage'))
+const UserAccountPage = lazy(() => import('./pages/UserAccountPage'))
 
 function App() {
   const reloadConfig = useConfigStore((s) => s.reload)
@@ -30,6 +32,24 @@ function App() {
             </div>
           }>
             <AdminPage />
+          </Suspense>
+        } />
+        <Route path="/login" element={
+          <Suspense fallback={
+            <div className="flex h-screen items-center justify-center bg-[var(--bg-secondary)]">
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-primary)]" />
+            </div>
+          }>
+            <UserLoginPage />
+          </Suspense>
+        } />
+        <Route path="/account" element={
+          <Suspense fallback={
+            <div className="flex h-screen items-center justify-center bg-[var(--bg-secondary)]">
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-primary)]" />
+            </div>
+          }>
+            <UserAccountPage />
           </Suspense>
         } />
         <Route path="*" element={<NotFoundPage />} />

@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { API_BASE_URL, DEFAULT_CONFIG } from './constants'
 import { useAuthStore } from '@/store/authStore'
+import { useUserAuthStore } from '@/store/userAuthStore'
 import type { AuditRequest, AuditResult, AuditProgress } from '@/types/audit'
 
 /** Cliente HTTP configurado para el backend PHP */
@@ -21,13 +22,22 @@ api.interceptors.request.use((config) => {
   const url = config.url ?? ''
   const method = (config.method ?? 'get').toLowerCase()
   const isMutation = ['post', 'put', 'delete', 'patch'].includes(method)
-  const isAdmin = url.includes('/admin/')
 
-  if (isAdmin && isMutation) {
-    const token = useAuthStore.getState().csrfToken
-    if (token) {
-      config.headers = config.headers ?? {}
-      config.headers['X-CSRF-Token'] = token
+  // CSRF del admin sólo para /admin/*; CSRF del user sólo para /user/*
+  // mutaciones. Son dos tokens distintos porque las sesiones son independientes.
+  if (isMutation) {
+    if (url.includes('/admin/')) {
+      const token = useAuthStore.getState().csrfToken
+      if (token) {
+        config.headers = config.headers ?? {}
+        config.headers['X-CSRF-Token'] = token
+      }
+    } else if (url.includes('/user/')) {
+      const token = useUserAuthStore.getState().csrfToken
+      if (token) {
+        config.headers = config.headers ?? {}
+        config.headers['X-CSRF-Token'] = token
+      }
     }
   }
   return config

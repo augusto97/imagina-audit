@@ -86,7 +86,16 @@
     "twofa_back": "Volver al paso anterior",
     "twofa_recovery_hint": "Si perdiste acceso a tu app, también puedes ingresar un recovery code de 10 caracteres.",
     "twofa_invalid": "Código inválido",
-    "twofa_used_recovery": "Usaste un recovery code. Regenera los códigos desde Admin → 2FA."
+    "twofa_used_recovery": "Usaste un recovery code. Regenera los códigos desde Admin → 2FA.",
+    "user_title": "Iniciar sesión",
+    "user_subtitle": "Ingresa a tu cuenta",
+    "user_email_label": "Email",
+    "user_email_placeholder": "tu@email.com",
+    "user_password_label": "Contraseña",
+    "user_password_placeholder": "••••••••",
+    "user_submit": "Entrar",
+    "user_invalid": "Credenciales inválidas",
+    "user_no_account_hint": "¿No tenés cuenta? Contactá al administrador del sitio."
   },
   "dashboard": {
     "title": "Dashboard",

@@ -86,7 +86,16 @@
     "twofa_back": "Back to previous step",
     "twofa_recovery_hint": "If you lost access to your app, you can also enter a 10-character recovery code.",
     "twofa_invalid": "Invalid code",
-    "twofa_used_recovery": "You used a recovery code. Regenerate the codes from Admin → 2FA."
+    "twofa_used_recovery": "You used a recovery code. Regenerate the codes from Admin → 2FA.",
+    "user_title": "Sign in",
+    "user_subtitle": "Sign in to your account",
+    "user_email_label": "Email",
+    "user_email_placeholder": "you@example.com",
+    "user_password_label": "Password",
+    "user_password_placeholder": "••••••••",
+    "user_submit": "Sign in",
+    "user_invalid": "Invalid credentials",
+    "user_no_account_hint": "Don't have an account? Contact the site administrator."
   },
   "dashboard": {
     "title": "Dashboard",
