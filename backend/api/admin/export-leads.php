@@ -67,5 +67,5 @@ try {
     exit;
 } catch (Throwable $e) {
     Logger::error('Error exportando CSV: ' . $e->getMessage());
-    Response::error('Error al exportar.', 500);
+    Response::error(Translator::t('admin_api.export_leads.error'), 500);
 }

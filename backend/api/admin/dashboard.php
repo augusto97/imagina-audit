@@ -231,5 +231,5 @@ try {
     ]);
 } catch (Throwable $e) {
     Logger::error('Error en dashboard: ' . $e->getMessage());
-    Response::error('Error al obtener estadísticas.', 500);
+    Response::error(Translator::t('admin_api.dashboard.stats_error'), 500);
 }

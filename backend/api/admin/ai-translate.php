@@ -32,7 +32,7 @@ require_once __DIR__ . '/../bootstrap.php';
 Auth::requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 set_time_limit(120); // traducir 50 items puede tardar 1-2 min
@@ -46,16 +46,16 @@ $persist = !array_key_exists('persist', $body) || !empty($body['persist']);
 $providerRequested = $body['provider'] ?? null;
 
 if (!in_array($targetLang, Translator::SUPPORTED, true)) {
-    Response::error('Idioma destino no soportado', 400);
+    Response::error(Translator::t('admin_api.ai_translate.lang_not_supported'), 400);
 }
 if ($sourceLang === $targetLang) {
-    Response::error('El idioma origen y destino no pueden ser iguales', 400);
+    Response::error(Translator::t('admin_api.ai_translate.lang_same'), 400);
 }
 if (!is_array($items) || empty($items)) {
-    Response::error('items es obligatorio', 400);
+    Response::error(Translator::t('admin_api.ai_translate.items_required'), 400);
 }
 if (empty($namespace)) {
-    Response::error('namespace es obligatorio', 400);
+    Response::error(Translator::t('admin_api.ai_translate.namespace_required'), 400);
 }
 
 // Instanciar provider (viene del body o del setting default_ai_provider)
@@ -70,7 +70,7 @@ foreach ($settingsRows as $row) {
 
 $providerId = $providerRequested ?: ($settings['default_ai_provider'] ?? 'claude');
 if (!in_array($providerId, ['chatgpt', 'claude', 'google'], true)) {
-    Response::error('Provider inválido', 400);
+    Response::error(Translator::t('admin_api.ai_translate.provider_invalid'), 400);
 }
 
 try {
