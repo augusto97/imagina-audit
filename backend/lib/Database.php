@@ -169,6 +169,10 @@ class Database {
             "ALTER TABLE audits ADD COLUMN lang TEXT NOT NULL DEFAULT 'en'",
             // Columna `user_id` añadida para asociar audits a cuentas (P4 users)
             "ALTER TABLE audits ADD COLUMN user_id INTEGER",
+            // Columna `project_id` añadida para atar audits a proyectos (P5)
+            "ALTER TABLE audits ADD COLUMN project_id INTEGER",
+            // Columna `max_projects` en plans — cupo de proyectos por plan (0=ilimitado)
+            "ALTER TABLE plans ADD COLUMN max_projects INTEGER NOT NULL DEFAULT 0",
         ];
         foreach ($migrations as $sql) {
             try { $this->pdo->exec($sql); } catch (Throwable $e) { /* columna ya existe */ }
