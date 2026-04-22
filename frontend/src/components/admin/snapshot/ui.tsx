@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AlertCircle, AlertTriangle, Info, CheckCircle, ShieldAlert, Shield } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -57,11 +58,12 @@ export function KpiTile({
 
 /** Lista de issues accionables (severidad + acción). */
 export function IssueList({ issues }: { issues: SnapshotIssue[] }) {
+  const { t } = useTranslation()
   if (issues.length === 0) {
     return (
       <div className="flex items-center gap-2 rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
         <CheckCircle className="h-4 w-4 shrink-0" strokeWidth={2} />
-        Sin hallazgos accionables en esta sección.
+        {t('report.snap_no_issues')}
       </div>
     )
   }
@@ -97,18 +99,21 @@ export function SeverityIcon({ severity }: { severity: string }) {
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { variant: 'success' | 'warning' | 'destructive' | 'secondary'; label: string }> = {
-    good:     { variant: 'success',     label: 'OK' },
-    warning:  { variant: 'warning',     label: 'Warning' },
-    critical: { variant: 'destructive', label: 'Crítico' },
-    info:     { variant: 'secondary',   label: 'Info' },
-    safe:     { variant: 'success',     label: 'Seguro' },
-    outdated: { variant: 'warning',     label: 'Desactualizado' },
-    vulnerable: { variant: 'destructive', label: 'Vulnerable' },
-    outdated_vulnerable: { variant: 'destructive', label: 'Vulnerable + Desact.' },
+  const { t } = useTranslation()
+  const map: Record<string, { variant: 'success' | 'warning' | 'destructive' | 'secondary'; labelKey: string }> = {
+    good:     { variant: 'success',     labelKey: 'report.snap_status_ok' },
+    warning:  { variant: 'warning',     labelKey: 'report.snap_status_warning' },
+    critical: { variant: 'destructive', labelKey: 'report.snap_status_critical' },
+    info:     { variant: 'secondary',   labelKey: 'report.snap_status_info' },
+    safe:     { variant: 'success',     labelKey: 'report.snap_status_safe' },
+    outdated: { variant: 'warning',     labelKey: 'report.snap_status_outdated' },
+    vulnerable: { variant: 'destructive', labelKey: 'report.snap_status_vulnerable' },
+    outdated_vulnerable: { variant: 'destructive', labelKey: 'report.snap_status_outdated_vulnerable' },
   }
-  const m = map[status] || { variant: 'secondary' as const, label: status }
-  return <Badge variant={m.variant} className="text-[10px] px-1.5 py-0">{m.label}</Badge>
+  const m = map[status]
+  const label = m ? t(m.labelKey) : status
+  const variant = m?.variant ?? 'secondary'
+  return <Badge variant={variant} className="text-[10px] px-1.5 py-0">{label}</Badge>
 }
 
 export function VulnIcon({ status }: { status: string }) {
@@ -135,12 +140,13 @@ export function KeyValueList({ rows }: { rows: Array<[string, ReactNode]> }) {
 
 /** Yes/No visual compacto */
 export function YesNo({ value, positive = true }: { value: boolean; positive?: boolean }) {
+  const { t } = useTranslation()
   // Si positive=true, true es "bueno" (verde); si positive=false, false es "bueno"
   const isGood = positive ? value : !value
   return (
     <span className={`inline-flex items-center gap-1 ${isGood ? 'text-emerald-600' : 'text-red-600'}`}>
       {isGood ? <CheckCircle className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
-      {value ? 'Sí' : 'No'}
+      {value ? t('report.snap_yes') : t('report.snap_no')}
     </span>
   )
 }
