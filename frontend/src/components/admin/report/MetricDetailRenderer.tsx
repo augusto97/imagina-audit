@@ -76,13 +76,13 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'rest_api_exposed' && details.users && Array.isArray(details.users)) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-red-200 p-3">
-        <p className="text-xs font-bold text-red-600 mb-1">USUARIOS EXPUESTOS VÍA REST API</p>
+        <p className="text-xs font-bold text-red-600 mb-1">{t('report.md_rest_exposed_title')}</p>
         <div className="flex flex-wrap gap-2">
           {(details.users as string[]).map((u, i) => (
             <span key={i} className="text-xs font-mono px-2 py-0.5 bg-red-100 rounded text-red-700">{u}</span>
           ))}
         </div>
-        <p className="text-xs text-[var(--text-secondary)] mt-2">Bloquear en functions.php o con plugin de seguridad (Wordfence, iThemes).</p>
+        <p className="text-xs text-[var(--text-secondary)] mt-2">{t('report.md_rest_exposed_note')}</p>
       </div>
     )
   }
@@ -91,9 +91,9 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'user_enumeration' && details.username) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-amber-200 p-3 text-xs">
-        <span className="font-semibold">Username detectado:</span>{' '}
+        <span className="font-semibold">{t('report.md_user_enum_label')}</span>{' '}
         <span className="font-mono text-amber-700">{String(details.username)}</span>
-        <p className="text-[var(--text-secondary)] mt-1">Bloquear /?author=N con regla en .htaccess:<br/>
+        <p className="text-[var(--text-secondary)] mt-1">{t('report.md_user_enum_note_prefix')}<br/>
           <code className="font-mono bg-gray-100 px-1 rounded">RewriteRule ^/?author= - [F,L]</code>
         </p>
       </div>
@@ -104,7 +104,7 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'images_alt' && Array.isArray(details.missingExamples) && (details.missingExamples as string[]).length > 0) {
     return (
       <div className="mt-2 rounded-lg bg-white/60 border border-[var(--border-default)] p-3">
-        <p className="text-xs font-bold text-[var(--text-tertiary)] mb-1">IMÁGENES SIN TEXTO ALT ({String(details.withoutAlt)} total)</p>
+        <p className="text-xs font-bold text-[var(--text-tertiary)] mb-1">{t('report.md_images_alt_title', { count: details.withoutAlt })}</p>
         <div className="flex flex-wrap gap-1.5">
           {(details.missingExamples as string[]).map((f, i) => (
             <span key={i} className="text-[10px] font-mono px-2 py-0.5 bg-gray-100 rounded text-[var(--text-secondary)] break-all">{f}</span>
@@ -118,10 +118,10 @@ export function renderTechnicalDetails(metricId: string, details: Record<string,
   if (metricId === 'internal_links' && (details.internal !== undefined || details.external !== undefined)) {
     return (
       <div className="mt-2 flex flex-wrap gap-3 text-xs">
-        <span className="px-2 py-1 rounded-lg bg-white/60 border border-[var(--border-default)]">Internos: <b>{String(details.internal ?? 0)}</b></span>
-        <span className="px-2 py-1 rounded-lg bg-white/60 border border-[var(--border-default)]">Externos: <b>{String(details.external ?? 0)}</b></span>
-        {Number(details.nofollow) > 0 && <span className="px-2 py-1 rounded-lg bg-white/60 border border-[var(--border-default)]">Nofollow: <b>{String(details.nofollow)}</b></span>}
-        {Number(details.emptyAnchors) > 0 && <span className="px-2 py-1 rounded-lg bg-amber-50 border border-amber-200">Sin anchor text: <b>{String(details.emptyAnchors)}</b></span>}
+        <span className="px-2 py-1 rounded-lg bg-white/60 border border-[var(--border-default)]">{t('report.md_links_internal')} <b>{String(details.internal ?? 0)}</b></span>
+        <span className="px-2 py-1 rounded-lg bg-white/60 border border-[var(--border-default)]">{t('report.md_links_external')} <b>{String(details.external ?? 0)}</b></span>
+        {Number(details.nofollow) > 0 && <span className="px-2 py-1 rounded-lg bg-white/60 border border-[var(--border-default)]">{t('report.md_links_nofollow')} <b>{String(details.nofollow)}</b></span>}
+        {Number(details.emptyAnchors) > 0 && <span className="px-2 py-1 rounded-lg bg-amber-50 border border-amber-200">{t('report.md_links_empty_anchor')} <b>{String(details.emptyAnchors)}</b></span>}
       </div>
     )
   }
