@@ -28,23 +28,27 @@ class SeoOnPageChecker {
         $descLen = mb_strlen($desc);
         $issues = [];
 
-        if ($titleLen === 0) $issues[] = 'Sin título';
-        elseif ($titleLen > 70) $issues[] = 'Título será truncado en Google (>' . $titleLen . ' car.)';
-        if ($descLen === 0) $issues[] = 'Sin meta description';
-        elseif ($descLen > 160) $issues[] = 'Description será truncada (>' . $descLen . ' car.)';
-        if (!$favicon) $issues[] = 'Sin favicon';
+        if ($titleLen === 0) $issues[] = Translator::t('seo.serp.issue.no_title');
+        elseif ($titleLen > 70) $issues[] = Translator::t('seo.serp.issue.title_long', ['length' => $titleLen]);
+        if ($descLen === 0) $issues[] = Translator::t('seo.serp.issue.no_description');
+        elseif ($descLen > 160) $issues[] = Translator::t('seo.serp.issue.desc_long', ['length' => $descLen]);
+        if (!$favicon) $issues[] = Translator::t('seo.serp.issue.no_favicon');
 
         $score = 100 - (count($issues) * 20);
 
         return Scoring::createMetric(
-            'serp_preview', 'Vista previa en Google', empty($issues),
-            empty($issues) ? 'Completa' : count($issues) . ' problemas',
+            'serp_preview',
+            Translator::t('seo.serp.name'),
+            empty($issues),
+            empty($issues)
+                ? Translator::t('seo.serp.display.ok')
+                : Translator::t('seo.serp.display.issues', ['count' => count($issues)]),
             Scoring::clamp($score),
             empty($issues)
-                ? 'Tu resultado en Google se verá completo con título, descripción y favicon.'
-                : 'Problemas en la vista previa: ' . implode('. ', $issues) . '.',
-            !empty($issues) ? 'Optimizar título (30-70 car.), description (120-160 car.) y agregar favicon.' : '',
-            'Optimizamos cómo se ve tu sitio en los resultados de Google.',
+                ? Translator::t('seo.serp.desc.ok')
+                : Translator::t('seo.serp.desc.issues', ['list' => implode('. ', $issues)]),
+            !empty($issues) ? Translator::t('seo.serp.recommend') : '',
+            Translator::t('seo.serp.solution'),
             [
                 'title' => $title,
                 'description' => $desc,
@@ -63,10 +67,14 @@ class SeoOnPageChecker {
 
         if (!$title) {
             return Scoring::createMetric(
-                'title', 'Etiqueta Title', null, 'No encontrada', 0,
-                'No se encontró la etiqueta <title>. Es la señal SEO on-page más importante: aparece como título en los resultados de Google y en la pestaña del navegador.',
-                'Agregar una etiqueta <title> única y descriptiva de 30-70 caracteres con la keyword principal.',
-                'Optimizamos los títulos de todas tus páginas con keywords estratégicas para mejorar el posicionamiento.'
+                'title',
+                Translator::t('seo.title.name'),
+                null,
+                Translator::t('seo.title.display.none'),
+                0,
+                Translator::t('seo.title.desc.none'),
+                Translator::t('seo.title.recommend.none'),
+                Translator::t('seo.title.solution')
             );
         }
 
@@ -74,17 +82,17 @@ class SeoOnPageChecker {
         $score = 100;
 
         if ($length < 30) {
-            $issues[] = "Demasiado corto ($length caracteres). Google podría reescribirlo.";
+            $issues[] = Translator::t('seo.title.issue.short', ['length' => $length]);
             $score = 40;
         } elseif ($length > 70) {
-            $issues[] = "Demasiado largo ($length caracteres). Se truncará en los resultados de Google mostrando '...'.";
+            $issues[] = Translator::t('seo.title.issue.long', ['length' => $length]);
             $score = 65;
         }
 
         $genericTitles = ['home', 'inicio', 'página principal', 'untitled', 'mi sitio', 'welcome', 'just another wordpress site'];
         foreach ($genericTitles as $generic) {
             if (stripos($title, $generic) !== false && $length < 40) {
-                $issues[] = "El título parece genérico. Debería describir el contenido de la página.";
+                $issues[] = Translator::t('seo.title.issue.generic');
                 $score = min($score, 50);
                 break;
             }
@@ -92,21 +100,30 @@ class SeoOnPageChecker {
 
         $hasSeparator = preg_match('/\s[-|–—·»|]\s/', $title);
 
-        $desc = empty($issues)
-            ? "Título: \"$title\" ($length caracteres). " . ($hasSeparator ? 'Formato optimizado con separador de marca.' : 'Longitud adecuada.')
-            : "Título: \"$title\" ($length caracteres). " . implode(' ', $issues);
+        if (empty($issues)) {
+            $formatNote = $hasSeparator
+                ? Translator::t('seo.title.format.separator')
+                : Translator::t('seo.title.format.length_ok');
+            $desc = Translator::t('seo.title.desc.ok', ['title' => $title, 'length' => $length, 'formatNote' => $formatNote]);
+        } else {
+            $desc = Translator::t('seo.title.desc.issues', ['title' => $title, 'length' => $length, 'issues' => implode(' ', $issues)]);
+        }
 
         $recommendation = '';
         if ($score < 100) {
             $recommendation = $length < 30
-                ? 'Extender el título a 30-70 caracteres incluyendo la keyword principal y el nombre de la marca.'
-                : ($length > 70 ? 'Acortar el título a máximo 70 caracteres para evitar truncamiento en Google.' : 'Usar un título más descriptivo con la keyword principal de la página.');
+                ? Translator::t('seo.title.recommend.short')
+                : ($length > 70 ? Translator::t('seo.title.recommend.long') : Translator::t('seo.title.recommend.generic'));
         }
 
+        $displayTitle = mb_substr($title, 0, 60) . ($length > 60 ? '...' : '');
         return Scoring::createMetric(
-            'title', 'Etiqueta Title', $title, mb_substr($title, 0, 60) . ($length > 60 ? '...' : '') . " ($length car.)",
+            'title',
+            Translator::t('seo.title.name'),
+            $title,
+            Translator::t('seo.title.display.truncated', ['title' => $displayTitle, 'length' => $length]),
             $score, $desc, $recommendation,
-            'Optimizamos los títulos de todas tus páginas con keywords estratégicas para mejorar el posicionamiento.',
+            Translator::t('seo.title.solution'),
             ['fullTitle' => $title, 'length' => $length, 'hasSeparator' => $hasSeparator]
         );
     }
@@ -117,10 +134,14 @@ class SeoOnPageChecker {
 
         if (!$desc) {
             return Scoring::createMetric(
-                'meta_description', 'Meta Description', null, 'No encontrada', 0,
-                'No se encontró meta description. Esta etiqueta aparece como el texto debajo del título en los resultados de Google. Sin ella, Google elige un fragmento aleatorio de tu página.',
-                'Agregar una meta description atractiva de 120-160 caracteres que invite al clic e incluya la keyword principal.',
-                'Redactamos meta descriptions optimizadas para cada página importante de tu sitio.'
+                'meta_description',
+                Translator::t('seo.metadesc.name'),
+                null,
+                Translator::t('seo.metadesc.display.none'),
+                0,
+                Translator::t('seo.metadesc.desc.none'),
+                Translator::t('seo.metadesc.recommend.none'),
+                Translator::t('seo.metadesc.solution')
             );
         }
 
@@ -128,13 +149,13 @@ class SeoOnPageChecker {
         $score = 100;
 
         if ($length < 70) {
-            $issues[] = "Muy corta ($length caracteres). Google podría ignorarla y mostrar otro texto.";
+            $issues[] = Translator::t('seo.metadesc.issue.too_short', ['length' => $length]);
             $score = 35;
         } elseif ($length < 120) {
-            $issues[] = "Algo corta ($length caracteres). Se recomienda entre 120-160 para aprovechar el espacio en Google.";
+            $issues[] = Translator::t('seo.metadesc.issue.short', ['length' => $length]);
             $score = 65;
         } elseif ($length > 160) {
-            $issues[] = "Excede los 160 caracteres ($length). Google la truncará mostrando '...'.";
+            $issues[] = Translator::t('seo.metadesc.issue.long', ['length' => $length]);
             $score = 70;
         }
 
@@ -144,22 +165,28 @@ class SeoOnPageChecker {
             if (stripos($desc, $word) !== false) { $hasCta = true; break; }
         }
 
-        $description = empty($issues)
-            ? "Meta description ($length caracteres): \"" . mb_substr($desc, 0, 100) . '...". Longitud ideal.' . ($hasCta ? ' Incluye llamada a la acción.' : '')
-            : "Meta description ($length caracteres): \"" . mb_substr($desc, 0, 100) . '...". ' . implode(' ', $issues);
+        $preview = mb_substr($desc, 0, 100);
+        if (empty($issues)) {
+            $ctaNote = $hasCta ? Translator::t('seo.metadesc.desc.cta_note') : '';
+            $description = Translator::t('seo.metadesc.desc.ok', ['length' => $length, 'preview' => $preview, 'ctaNote' => $ctaNote]);
+        } else {
+            $description = Translator::t('seo.metadesc.desc.issues', ['length' => $length, 'preview' => $preview, 'issues' => implode(' ', $issues)]);
+        }
 
         $recommendation = '';
         if ($score < 100) {
             $recommendation = $length < 120
-                ? 'Extender la meta description a 120-160 caracteres con una descripción atractiva que invite al clic.'
-                : 'Acortar la meta description a máximo 160 caracteres para evitar truncamiento.';
+                ? Translator::t('seo.metadesc.recommend.short')
+                : Translator::t('seo.metadesc.recommend.long');
         }
 
         return Scoring::createMetric(
-            'meta_description', 'Meta Description', $desc,
-            mb_substr($desc, 0, 55) . '... (' . $length . ' car.)',
+            'meta_description',
+            Translator::t('seo.metadesc.name'),
+            $desc,
+            Translator::t('seo.metadesc.display.truncated', ['preview' => mb_substr($desc, 0, 55), 'length' => $length]),
             $score, $description, $recommendation,
-            'Redactamos meta descriptions optimizadas para cada página importante de tu sitio.',
+            Translator::t('seo.metadesc.solution'),
             ['fullDescription' => $desc, 'length' => $length, 'hasCta' => $hasCta]
         );
     }
@@ -170,9 +197,14 @@ class SeoOnPageChecker {
 
         if ($robots === null && $googlebot === null) {
             return Scoring::createMetric(
-                'meta_robots', 'Meta Robots', null, 'No definida (por defecto: index, follow)', 100,
-                'No se encontró la etiqueta meta robots. Por defecto Google indexa y sigue los enlaces, lo cual es correcto para la mayoría de páginas.',
-                '', 'Verificamos que las directivas de indexación sean correctas en todas las páginas.'
+                'meta_robots',
+                Translator::t('seo.metarobots.name'),
+                null,
+                Translator::t('seo.metarobots.display.default'),
+                100,
+                Translator::t('seo.metarobots.desc.default'),
+                '',
+                Translator::t('seo.metarobots.solution.default')
             );
         }
 
@@ -184,23 +216,25 @@ class SeoOnPageChecker {
         $score = 100;
         $issues = [];
         if ($hasNoindex) {
-            $issues[] = 'Contiene "noindex": Google NO indexará esta página.';
+            $issues[] = Translator::t('seo.metarobots.issue.noindex');
             $score = 0;
         }
         if ($hasNofollow) {
-            $issues[] = 'Contiene "nofollow": Google no seguirá los enlaces de esta página.';
+            $issues[] = Translator::t('seo.metarobots.issue.nofollow');
             $score = min($score, 40);
         }
 
         $desc = empty($issues)
-            ? "Meta robots: \"$value\". Configuración correcta para indexación."
-            : "Meta robots: \"$value\". ATENCIÓN: " . implode(' ', $issues) . ' Si esto no es intencional, tu página no aparecerá en Google.';
+            ? Translator::t('seo.metarobots.desc.ok', ['value' => $value])
+            : Translator::t('seo.metarobots.desc.issues', ['value' => $value, 'issues' => implode(' ', $issues)]);
 
         return Scoring::createMetric(
-            'meta_robots', 'Meta Robots', $value, $value,
+            'meta_robots',
+            Translator::t('seo.metarobots.name'),
+            $value, $value,
             $score, $desc,
-            ($hasNoindex || $hasNofollow) ? 'Verificar que las directivas noindex/nofollow sean intencionales. Si no lo son, cambiar a "index, follow".' : '',
-            'Verificamos y corregimos las directivas de indexación en todas las páginas.',
+            ($hasNoindex || $hasNofollow) ? Translator::t('seo.metarobots.recommend') : '',
+            Translator::t('seo.metarobots.solution'),
             ['hasNoindex' => $hasNoindex, 'hasNofollow' => $hasNofollow]
         );
     }
@@ -213,20 +247,28 @@ class SeoOnPageChecker {
 
         if ($h1Count === 0) {
             return Scoring::createMetric(
-                'h1', 'Encabezado H1', 0, 'No encontrado', 0,
-                'No se encontró ningún encabezado H1. El H1 es la etiqueta de encabezado más importante: le dice a Google de qué trata la página. Toda página debe tener exactamente un H1.',
-                'Agregar un encabezado H1 único que describa el contenido principal e incluya la keyword objetivo.',
-                'Optimizamos la estructura de encabezados para mejorar el SEO on-page.'
+                'h1',
+                Translator::t('seo.h1.name'),
+                0,
+                Translator::t('seo.h1.display.none'),
+                0,
+                Translator::t('seo.h1.desc.none'),
+                Translator::t('seo.h1.recommend.none'),
+                Translator::t('seo.h1.solution')
             );
         }
 
         if ($h1Count > 1) {
             $h1Texts = array_map(fn($h) => '"' . mb_substr($h['text'], 0, 50) . '"', $h1s);
             return Scoring::createMetric(
-                'h1', 'Encabezado H1', $h1Count, "$h1Count H1 encontrados (debería ser 1)", 30,
-                "Se encontraron $h1Count encabezados H1: " . implode(', ', $h1Texts) . '. Solo debe haber uno por página. Múltiples H1 confunden a Google sobre cuál es el tema principal.',
-                'Mantener solo un H1 principal. Cambiar los demás a H2 o H3 según corresponda.',
-                'Optimizamos la estructura de encabezados para mejorar el SEO on-page.',
+                'h1',
+                Translator::t('seo.h1.name'),
+                $h1Count,
+                Translator::t('seo.h1.display.multiple', ['count' => $h1Count]),
+                30,
+                Translator::t('seo.h1.desc.multiple', ['count' => $h1Count, 'list' => implode(', ', $h1Texts)]),
+                Translator::t('seo.h1.recommend.multiple'),
+                Translator::t('seo.h1.solution'),
                 ['h1Texts' => array_map(fn($h) => $h['text'], $h1s)]
             );
         }
@@ -234,22 +276,27 @@ class SeoOnPageChecker {
         $h1Text = $h1s[0]['text'];
         $h1Len = mb_strlen($h1Text);
         $score = 100;
-        $notes = "H1: \"$h1Text\".";
+        $notes = Translator::t('seo.h1.desc.ok_prefix', ['text' => $h1Text]);
 
         if ($h1Len < 10) {
-            $notes .= " Muy corto ($h1Len caracteres), podría ser más descriptivo.";
+            $notes .= Translator::t('seo.h1.desc.length_short', ['length' => $h1Len]);
             $score = 70;
         } elseif ($h1Len > 80) {
-            $notes .= " Bastante largo ($h1Len caracteres). Se recomienda menos de 70 caracteres.";
+            $notes .= Translator::t('seo.h1.desc.length_long', ['length' => $h1Len]);
             $score = 75;
         } else {
-            $notes .= " Longitud adecuada ($h1Len caracteres).";
+            $notes .= Translator::t('seo.h1.desc.length_ok', ['length' => $h1Len]);
         }
 
+        $displayText = mb_substr($h1Text, 0, 45) . ($h1Len > 45 ? '...' : '');
         return Scoring::createMetric(
-            'h1', 'Encabezado H1', 1, '1 H1: "' . mb_substr($h1Text, 0, 45) . ($h1Len > 45 ? '...' : '') . '"',
-            $score, $notes, $score < 100 ? 'Ajustar el H1 para que sea descriptivo, entre 20-70 caracteres, con la keyword principal.' : '',
-            'Optimizamos la estructura de encabezados para mejorar el SEO on-page.',
+            'h1',
+            Translator::t('seo.h1.name'),
+            1,
+            Translator::t('seo.h1.display.ok', ['text' => $displayText]),
+            $score, $notes,
+            $score < 100 ? Translator::t('seo.h1.recommend.length') : '',
+            Translator::t('seo.h1.solution'),
             ['h1Text' => $h1Text, 'h1Length' => $h1Len]
         );
     }
@@ -264,10 +311,14 @@ class SeoOnPageChecker {
 
         if ($totalHeadings === 0) {
             return Scoring::createMetric(
-                'heading_hierarchy', 'Jerarquía de Encabezados', 0, 'Sin encabezados', 0,
-                'No se encontró ningún encabezado (H1-H6). Los encabezados son esenciales para que Google entienda la estructura y temas de tu contenido.',
-                'Agregar una estructura de encabezados lógica: un H1, seguido de H2 para secciones, H3 para subsecciones.',
-                'Estructuramos el contenido con una jerarquía de encabezados optimizada para SEO.'
+                'heading_hierarchy',
+                Translator::t('seo.hhier.name'),
+                0,
+                Translator::t('seo.hhier.display.none'),
+                0,
+                Translator::t('seo.hhier.desc.none'),
+                Translator::t('seo.hhier.recommend.none'),
+                Translator::t('seo.hhier.solution')
             );
         }
 
@@ -287,30 +338,31 @@ class SeoOnPageChecker {
             }
         }
         if ($skipsLevel) {
-            $issues[] = 'La jerarquía salta niveles (ej: de H1 a H3 sin H2).';
+            $issues[] = Translator::t('seo.hhier.issue.skips');
             $score -= 15;
         }
 
         if ($counts['h2'] === 0) {
-            $issues[] = 'No hay encabezados H2 para dividir el contenido en secciones.';
+            $issues[] = Translator::t('seo.hhier.issue.no_h2');
             $score -= 20;
         }
 
         $summary = "H1:{$counts['h1']} · H2:{$counts['h2']} · H3:{$counts['h3']}";
         if ($counts['h4'] > 0) $summary .= " · H4:{$counts['h4']}";
 
-        $desc = "Estructura de encabezados: $summary. Total: $totalHeadings encabezados.";
-        if (!empty($issues)) {
-            $desc .= ' Problemas: ' . implode(' ', $issues);
-        } else {
-            $desc .= ' Jerarquía lógica y bien organizada.';
-        }
+        $desc = Translator::t('seo.hhier.desc.prefix', ['summary' => $summary, 'total' => $totalHeadings]);
+        $desc .= empty($issues)
+            ? Translator::t('seo.hhier.desc.logical')
+            : Translator::t('seo.hhier.desc.issues', ['issues' => implode(' ', $issues)]);
 
         return Scoring::createMetric(
-            'heading_hierarchy', 'Jerarquía de Encabezados', $totalHeadings, $summary,
+            'heading_hierarchy',
+            Translator::t('seo.hhier.name'),
+            $totalHeadings,
+            Translator::t('seo.hhier.display.summary', ['summary' => $summary]),
             Scoring::clamp($score), $desc,
-            !empty($issues) ? 'Corregir la jerarquía: H1 → H2 → H3 sin saltar niveles. Usar H2 para secciones principales.' : '',
-            'Estructuramos el contenido con una jerarquía de encabezados optimizada para SEO.',
+            !empty($issues) ? Translator::t('seo.hhier.recommend.fix') : '',
+            Translator::t('seo.hhier.solution'),
             [
                 'counts' => $counts,
                 'skipsLevel' => $skipsLevel,
@@ -342,16 +394,21 @@ class SeoOnPageChecker {
 
         $count = count($oversized);
         $score = $count === 0 ? 100 : Scoring::clamp(100 - ($count * 15));
+        $sampleList = implode('; ', array_map(fn($o) => "{$o['tag']} ({$o['length']} car.)", array_slice($oversized, 0, 3)));
 
         return Scoring::createMetric(
-            'oversize_headings', 'Encabezados demasiado largos', $count,
-            $count === 0 ? 'Todos dentro del límite' : "$count encabezados exceden el largo recomendado",
+            'oversize_headings',
+            Translator::t('seo.over_head.name'),
+            $count,
+            $count === 0
+                ? Translator::t('seo.over_head.display.ok')
+                : Translator::t('seo.over_head.display.exceeded', ['count' => $count]),
             $score,
             $count === 0
-                ? 'Todos los encabezados tienen una longitud adecuada. H1 hasta 70 caracteres, H2-H6 hasta 100.'
-                : "$count encabezados son demasiado largos: " . implode('; ', array_map(fn($o) => "{$o['tag']} ({$o['length']} car.)", array_slice($oversized, 0, 3))) . '.',
-            $count > 0 ? 'Acortar los encabezados que excedan el límite. H1 máx. 70 caracteres, H2-H6 máx. 100.' : '',
-            'Optimizamos los encabezados para que sean concisos y descriptivos.',
+                ? Translator::t('seo.over_head.desc.ok')
+                : Translator::t('seo.over_head.desc.exceeded', ['count' => $count, 'list' => $sampleList]),
+            $count > 0 ? Translator::t('seo.over_head.recommend') : '',
+            Translator::t('seo.over_head.solution'),
             ['oversized' => $oversized]
         );
     }
@@ -362,10 +419,14 @@ class SeoOnPageChecker {
 
         if ($total === 0) {
             return Scoring::createMetric(
-                'images_alt', 'Imágenes con texto alt', 0, 'Sin imágenes en la página', 70,
-                'No se encontraron imágenes en la página. Las imágenes enriquecen el contenido y pueden generar tráfico desde Google Imágenes.',
-                'Considerar agregar imágenes relevantes con textos alt descriptivos.',
-                'Optimizamos todas las imágenes con textos alt descriptivos y formatos modernos.'
+                'images_alt',
+                Translator::t('seo.imgalt.name'),
+                0,
+                Translator::t('seo.imgalt.display.none'),
+                70,
+                Translator::t('seo.imgalt.desc.none'),
+                Translator::t('seo.imgalt.recommend.none'),
+                Translator::t('seo.imgalt.solution')
             );
         }
 
@@ -392,23 +453,27 @@ class SeoOnPageChecker {
         $percent = round(($withAlt / $total) * 100);
         $score = $percent >= 90 ? 100 : (int) round($percent * 0.9);
 
-        $desc = "$withAlt de $total imágenes tienen texto alt ($percent%). ";
+        $desc = Translator::t('seo.imgalt.desc.prefix', ['withAlt' => $withAlt, 'total' => $total, 'percent' => $percent]);
         if ($withoutAltCount > 0) {
-            $sampleMissing = array_slice($withoutAlt, 0, 5);
-            $desc .= "Imágenes sin alt: " . implode(', ', $sampleMissing);
-            if ($withoutAltCount > 5) $desc .= " y " . ($withoutAltCount - 5) . " más";
-            $desc .= '. Google no puede interpretar imágenes sin texto alternativo.';
+            $sampleMissing = implode(', ', array_slice($withoutAlt, 0, 5));
+            $more = $withoutAltCount > 5
+                ? Translator::t('seo.imgalt.desc.more_count', ['count' => $withoutAltCount - 5])
+                : '';
+            $desc .= Translator::t('seo.imgalt.desc.missing', ['sample' => $sampleMissing, 'more' => $more]);
         } else {
-            $desc .= 'Todas las imágenes tienen texto alternativo. Excelente para accesibilidad y SEO.';
+            $desc .= Translator::t('seo.imgalt.desc.all_ok');
         }
-        $desc .= " Lazy loading: $withLazyLoad/$total imágenes.";
+        $desc .= Translator::t('seo.imgalt.desc.lazy_suffix', ['count' => $withLazyLoad, 'total' => $total]);
 
+        $lazyStr = $withLazyLoad > 0 ? Translator::t('seo.imgalt.display.lazy', ['count' => $withLazyLoad]) : '';
         return Scoring::createMetric(
-            'images_alt', 'Imágenes con texto alt', $withAlt,
-            "$withAlt/$total con alt ($percent%)" . ($withLazyLoad > 0 ? " · $withLazyLoad lazy" : ''),
+            'images_alt',
+            Translator::t('seo.imgalt.name'),
+            $withAlt,
+            Translator::t('seo.imgalt.display.stats', ['withAlt' => $withAlt, 'total' => $total, 'percent' => $percent, 'lazy' => $lazyStr]),
             $score, $desc,
-            $withoutAltCount > 0 ? "Agregar texto alt descriptivo a las $withoutAltCount imágenes que lo necesitan. El alt debe describir el contenido de la imagen." : '',
-            'Optimizamos todas las imágenes con textos alt descriptivos y formatos modernos (WebP).',
+            $withoutAltCount > 0 ? Translator::t('seo.imgalt.recommend.missing', ['count' => $withoutAltCount]) : '',
+            Translator::t('seo.imgalt.solution'),
             ['total' => $total, 'withAlt' => $withAlt, 'withoutAlt' => $withoutAltCount, 'lazyLoaded' => $withLazyLoad, 'missingExamples' => array_slice($withoutAlt, 0, 10)]
         );
     }
@@ -435,14 +500,18 @@ class SeoOnPageChecker {
         $score = $count === 0 ? 100 : Scoring::clamp(100 - ($count * 10));
 
         return Scoring::createMetric(
-            'oversized_alt', 'Textos ALT demasiado largos', $count,
-            $count === 0 ? 'Todos dentro del límite' : "$count imágenes con alt excesivo",
+            'oversized_alt',
+            Translator::t('seo.alt_over.name'),
+            $count,
+            $count === 0
+                ? Translator::t('seo.alt_over.display.ok')
+                : Translator::t('seo.alt_over.display.exceeded', ['count' => $count]),
             $score,
             $count === 0
-                ? "Las $totalImages imágenes revisadas tienen textos alt de longitud adecuada (máx. 125 caracteres)."
-                : "$count imágenes tienen textos alt de más de 125 caracteres. Textos alt muy largos pueden ser ignorados por los buscadores.",
-            $count > 0 ? 'Acortar los textos alt a máximo 125 caracteres. Deben ser descriptivos pero concisos.' : '',
-            'Optimizamos los textos alt para que sean descriptivos y de longitud adecuada.',
+                ? Translator::t('seo.alt_over.desc.ok', ['total' => $totalImages])
+                : Translator::t('seo.alt_over.desc.exceeded', ['count' => $count]),
+            $count > 0 ? Translator::t('seo.alt_over.recommend') : '',
+            Translator::t('seo.alt_over.solution'),
             ['oversized' => $oversized, 'totalImages' => $totalImages]
         );
     }
@@ -451,14 +520,14 @@ class SeoOnPageChecker {
         $favicon = $this->parser->getLinkByRel('icon') ?? $this->parser->getLinkByRel('shortcut icon');
 
         return Scoring::createMetric(
-            'favicon', 'Favicon', $favicon !== null,
-            $favicon ? 'Configurado' : 'No encontrado',
+            'favicon',
+            Translator::t('seo.favicon.name'),
+            $favicon !== null,
+            $favicon ? Translator::t('seo.favicon.display.ok') : Translator::t('seo.favicon.display.none'),
             $favicon ? 100 : 50,
-            $favicon
-                ? 'Favicon encontrado. Tu sitio muestra un icono en la pestaña del navegador.'
-                : 'No se detectó favicon. Afecta la identidad visual en navegadores y bookmarks.',
-            !$favicon ? 'Agregar un favicon para mejorar el branding.' : '',
-            'Configuramos favicons optimizados para todos los dispositivos.'
+            $favicon ? Translator::t('seo.favicon.desc.ok') : Translator::t('seo.favicon.desc.none'),
+            !$favicon ? Translator::t('seo.favicon.recommend') : '',
+            Translator::t('seo.favicon.solution')
         );
     }
 
@@ -466,14 +535,16 @@ class SeoOnPageChecker {
         $lang = $this->parser->getHtmlLang();
 
         return Scoring::createMetric(
-            'language', 'Idioma declarado', $lang !== null,
-            $lang ? "lang=\"$lang\"" : 'No declarado',
+            'language',
+            Translator::t('seo.lang.name'),
+            $lang !== null,
+            $lang ? Translator::t('seo.lang.display.ok', ['lang' => $lang]) : Translator::t('seo.lang.display.none'),
             $lang ? 100 : 30,
             $lang
-                ? "El idioma del sitio está declarado como \"$lang\"."
-                : 'No se declaró el idioma con el atributo lang. Google puede no entender el idioma correcto.',
-            !$lang ? 'Agregar lang="es" (o el idioma correspondiente) al tag <html>.' : '',
-            'Configuramos correctamente el idioma y hreflang para SEO internacional.'
+                ? Translator::t('seo.lang.desc.ok', ['lang' => $lang])
+                : Translator::t('seo.lang.desc.none'),
+            !$lang ? Translator::t('seo.lang.recommend') : '',
+            Translator::t('seo.lang.solution')
         );
     }
 
@@ -527,31 +598,33 @@ class SeoOnPageChecker {
 
         if ($wordCount < 100) {
             return Scoring::createMetric(
-                'content_length', 'Cantidad de contenido', $wordCount, "$wordCount palabras", 15,
-                "La página tiene solo $wordCount palabras. Es extremadamente poco contenido. Google necesita texto suficiente para entender de qué trata la página y posicionarla correctamente. Las páginas con poco contenido raramente rankean bien.",
-                'Desarrollar contenido original de al menos 300 palabras. Para posicionar keywords competitivas, se recomiendan 800+ palabras.',
-                'Desarrollamos estrategias de contenido y redactamos textos optimizados para SEO.'
+                'content_length',
+                Translator::t('seo.content.name'),
+                $wordCount,
+                Translator::t('seo.content.display', ['count' => $wordCount]),
+                15,
+                Translator::t('seo.content.desc.very_low', ['count' => $wordCount]),
+                Translator::t('seo.content.recommend.very_low'),
+                Translator::t('seo.content.solution')
             );
         }
 
         $score = $wordCount >= 800 ? 100 : ($wordCount >= 500 ? 85 : ($wordCount >= 300 ? 65 : 40));
 
-        $desc = "La página tiene $wordCount palabras de contenido visible. ";
-        if ($wordCount >= 800) {
-            $desc .= 'Volumen de contenido sólido para SEO. Las páginas con contenido extenso y relevante tienden a posicionar mejor.';
-        } elseif ($wordCount >= 500) {
-            $desc .= 'Buen volumen de contenido. Para keywords competitivas, considerar expandir a 800+ palabras.';
-        } elseif ($wordCount >= 300) {
-            $desc .= 'Contenido mínimo aceptable, pero podría ser insuficiente para competir en resultados de Google.';
-        } else {
-            $desc .= 'Contenido escaso. Google prefiere páginas con contenido sustancial y útil para el usuario.';
-        }
+        $desc = Translator::t('seo.content.desc.prefix', ['count' => $wordCount]);
+        if ($wordCount >= 800)      $desc .= Translator::t('seo.content.desc.solid');
+        elseif ($wordCount >= 500)  $desc .= Translator::t('seo.content.desc.good');
+        elseif ($wordCount >= 300)  $desc .= Translator::t('seo.content.desc.min');
+        else                        $desc .= Translator::t('seo.content.desc.scarce');
 
         return Scoring::createMetric(
-            'content_length', 'Cantidad de contenido', $wordCount, "$wordCount palabras",
+            'content_length',
+            Translator::t('seo.content.name'),
+            $wordCount,
+            Translator::t('seo.content.display', ['count' => $wordCount]),
             $score, $desc,
-            $wordCount < 500 ? 'Expandir el contenido a mínimo 500 palabras con información útil, preguntas frecuentes o descripciones detalladas.' : '',
-            'Desarrollamos estrategias de contenido y redactamos textos optimizados para SEO.',
+            $wordCount < 500 ? Translator::t('seo.content.recommend.low') : '',
+            Translator::t('seo.content.solution'),
             ['wordCount' => $wordCount]
         );
     }
@@ -597,10 +670,14 @@ class SeoOnPageChecker {
         $totalWords = count($words);
         if ($totalWords < 20) {
             return Scoring::createMetric(
-                'keyword_density', 'Análisis de palabras clave', 0, 'Contenido insuficiente', 30,
-                'No hay suficiente contenido para analizar palabras clave.',
-                'Agregar más contenido relevante a la página.',
-                'Desarrollamos estrategia de contenido con keywords objetivo.'
+                'keyword_density',
+                Translator::t('seo.kw.name'),
+                0,
+                Translator::t('seo.kw.display.none'),
+                30,
+                Translator::t('seo.kw.desc.none'),
+                Translator::t('seo.kw.recommend.none'),
+                Translator::t('seo.kw.solution')
             );
         }
 
@@ -643,19 +720,29 @@ class SeoOnPageChecker {
         $keywordList = array_map(fn($w, $c) => "$w ($c)", array_keys($topWords), array_values($topWords));
         $phraseList = array_map(fn($p, $c) => "$p ($c)", array_keys($topPhrases), array_values($topPhrases));
 
-        $desc = 'Palabras más frecuentes: ' . implode(', ', array_slice($keywordList, 0, 5)) . '.';
-        if (!empty($phraseList)) $desc .= ' Frases: ' . implode(', ', array_slice($phraseList, 0, 3)) . '.';
+        $desc = Translator::t('seo.kw.desc.prefix', ['words' => implode(', ', array_slice($keywordList, 0, 5))]);
+        if (!empty($phraseList)) {
+            $desc .= Translator::t('seo.kw.desc.phrases', ['phrases' => implode(', ', array_slice($phraseList, 0, 3))]);
+        }
         if ($topKeyword) {
-            $desc .= $inTitle ? " \"$topKeyword\" aparece en el título." : " \"$topKeyword\" NO aparece en el título.";
-            $desc .= $inH1 ? ' Aparece en H1.' : ' NO aparece en H1.';
+            $desc .= $inTitle
+                ? Translator::t('seo.kw.desc.in_title_yes', ['keyword' => $topKeyword])
+                : Translator::t('seo.kw.desc.in_title_no', ['keyword' => $topKeyword]);
+            $desc .= $inH1
+                ? Translator::t('seo.kw.desc.in_h1_yes')
+                : Translator::t('seo.kw.desc.in_h1_no');
         }
 
         return Scoring::createMetric(
-            'keyword_density', 'Análisis de palabras clave', count($topWords),
-            $topKeyword ? "\"$topKeyword\" ({$topWords[$topKeyword]}x)" : 'Sin datos',
+            'keyword_density',
+            Translator::t('seo.kw.name'),
+            count($topWords),
+            $topKeyword
+                ? Translator::t('seo.kw.display.ok', ['keyword' => $topKeyword, 'count' => $topWords[$topKeyword]])
+                : Translator::t('seo.kw.display.none'),
             $score, $desc,
-            (!$inTitle || !$inH1) ? 'Incluir la keyword principal en el título y H1 de la página.' : '',
-            'Optimizamos el contenido con las keywords más relevantes para tu negocio.',
+            (!$inTitle || !$inH1) ? Translator::t('seo.kw.recommend.missing') : '',
+            Translator::t('seo.kw.solution'),
             ['topWords' => $topWords, 'topPhrases' => $topPhrases, 'inTitle' => $inTitle, 'inH1' => $inH1]
         );
     }

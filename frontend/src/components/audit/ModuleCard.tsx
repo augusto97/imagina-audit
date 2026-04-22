@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import {
   Shield, Gauge, Search, Smartphone, Server,
   BarChart3, HardDrive, Blocks, HeartPulse,
@@ -29,6 +30,7 @@ interface ModuleCardProps {
 }
 
 export default function ModuleCard({ module, index }: ModuleCardProps) {
+  const { t } = useTranslation()
   const Icon = iconMap[module.icon] || Shield
 
   return (
@@ -85,13 +87,13 @@ export default function ModuleCard({ module, index }: ModuleCardProps) {
                       <p className="text-[var(--text-secondary)]">{metric.description}</p>
                       {metric.recommendation && (
                         <div className="rounded-lg bg-[var(--bg-tertiary)] p-3">
-                          <p className="text-xs font-semibold text-[var(--text-tertiary)] mb-1">Recomendación</p>
+                          <p className="text-xs font-semibold text-[var(--text-tertiary)] mb-1">{t('public.module_recommendation')}</p>
                           <p className="text-[var(--text-secondary)]">{metric.recommendation}</p>
                         </div>
                       )}
                       {metric.imaginaSolution && (
                         <div className="rounded-lg border border-[var(--accent-primary)]/20 bg-[var(--accent-primary)]/5 p-3">
-                          <p className="text-xs font-semibold text-[var(--accent-primary)] mb-1">Cómo lo resuelve Imagina WP</p>
+                          <p className="text-xs font-semibold text-[var(--accent-primary)] mb-1">{t('public.module_imagina_solution')}</p>
                           <p className="text-[var(--text-secondary)]">{metric.imaginaSolution}</p>
                         </div>
                       )}
@@ -101,7 +103,7 @@ export default function ModuleCard({ module, index }: ModuleCardProps) {
               ))}
             </Accordion>
           ) : (
-            <p className="text-sm text-[var(--text-tertiary)] py-4">No hay métricas disponibles para este módulo.</p>
+            <p className="text-sm text-[var(--text-tertiary)] py-4">{t('public.module_no_metrics')}</p>
           )}
 
           {module.salesMessage && (

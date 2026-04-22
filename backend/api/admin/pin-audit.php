@@ -10,13 +10,13 @@ require_once dirname(__DIR__) . '/bootstrap.php';
 Auth::requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 $body = Response::getJsonBody();
 $auditId = trim($body['auditId'] ?? '');
 if (empty($auditId)) {
-    Response::error('auditId requerido', 400);
+    Response::error(Translator::t('admin_api.pin_audit.id_required'), 400);
 }
 $pinned = !empty($body['pinned']) ? 1 : 0;
 
@@ -24,11 +24,11 @@ try {
     $db = Database::getInstance();
     $row = $db->queryOne("SELECT id FROM audits WHERE id = ?", [$auditId]);
     if (!$row) {
-        Response::error('Auditoría no encontrada', 404);
+        Response::error(Translator::t('admin_api.common.audit_not_found'), 404);
     }
     $db->execute("UPDATE audits SET is_pinned = ? WHERE id = ?", [$pinned, $auditId]);
     Response::success(['auditId' => $auditId, 'isPinned' => (bool) $pinned]);
 } catch (Throwable $e) {
     Logger::error('pin-audit falló: ' . $e->getMessage());
-    Response::error('Error al actualizar.', 500);
+    Response::error(Translator::t('admin_api.pin_audit.update_error'), 500);
 }

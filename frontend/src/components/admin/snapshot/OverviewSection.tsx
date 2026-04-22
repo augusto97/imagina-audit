@@ -1,4 +1,5 @@
 import { LayoutDashboard, Globe, Server, Database as DbIcon, Users as UsersIcon, Gauge, ShieldAlert } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { SectionCard, KpiTile } from './ui'
 import type { SnapshotReport } from '@/types/snapshotReport'
 
@@ -8,6 +9,7 @@ import type { SnapshotReport } from '@/types/snapshotReport'
  * sepa dónde mirar más a fondo.
  */
 export default function OverviewSection({ report }: { report: SnapshotReport }) {
+  const { t } = useTranslation()
   const site = report.overview.site
   const k = report.overview.kpis
 
@@ -20,78 +22,78 @@ export default function OverviewSection({ report }: { report: SnapshotReport }) 
 
   return (
     <SectionCard
-      title="Vista general"
-      subtitle="Estado del sitio de un vistazo"
+      title={t('report.snap_overview_title')}
+      subtitle={t('report.snap_overview_subtitle')}
       icon={<LayoutDashboard className="h-4 w-4 text-[var(--accent-primary)]" strokeWidth={1.75} />}
     >
       {/* Stack técnico del sitio */}
       <div className="mb-4 grid grid-cols-2 gap-2 rounded-lg bg-[var(--bg-secondary)] p-3 text-xs sm:grid-cols-4">
-        <StackLine icon={<Globe className="h-3.5 w-3.5" />} label="WordPress" value={String(site.wpVersion || '—')} />
-        <StackLine icon={<Server className="h-3.5 w-3.5" />} label="PHP" value={String(site.phpVersion || '—')} />
-        <StackLine icon={<DbIcon className="h-3.5 w-3.5" />} label="BD" value={String(site.db || '—')} />
-        <StackLine icon={<Server className="h-3.5 w-3.5" />} label="Servidor" value={String(site.server || '—')} />
+        <StackLine icon={<Globe className="h-3.5 w-3.5" />} label={t('report.snap_overview_stack_wp')} value={String(site.wpVersion || '—')} />
+        <StackLine icon={<Server className="h-3.5 w-3.5" />} label={t('report.snap_overview_stack_php')} value={String(site.phpVersion || '—')} />
+        <StackLine icon={<DbIcon className="h-3.5 w-3.5" />} label={t('report.snap_overview_stack_db')} value={String(site.db || '—')} />
+        <StackLine icon={<Server className="h-3.5 w-3.5" />} label={t('report.snap_overview_stack_server')} value={String(site.server || '—')} />
       </div>
 
       {/* KPIs por dimensión */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <KpiTile
-          label="Plugins activos"
+          label={t('report.snap_overview_kpi_plugins_active')}
           value={Number(k.pluginsActive ?? 0)}
           suffix={`/ ${k.pluginsTotal ?? 0}`}
-          hint={Number(k.pluginsInactive ?? 0) > 0 ? `${k.pluginsInactive} inactivos` : undefined}
+          hint={Number(k.pluginsInactive ?? 0) > 0 ? t('report.snap_overview_hint_inactive', { count: k.pluginsInactive }) : undefined}
         />
         <KpiTile
-          label="Desactualizados"
+          label={t('report.snap_overview_kpi_plugins_outdated')}
           value={outdated}
           tone={outdated > 0 ? (outdated >= 5 ? 'critical' : 'warning') : 'good'}
-          hint={outdated === 0 ? 'Todo al día' : 'pendientes de update'}
+          hint={outdated === 0 ? t('report.snap_overview_hint_all_updated') : t('report.snap_overview_hint_pending_updates')}
         />
         <KpiTile
-          label="Vulnerables"
+          label={t('report.snap_overview_kpi_vulnerable')}
           value={vulnerable}
           tone={vulnerable > 0 ? 'critical' : 'good'}
-          hint="Según WPVulnerability.net"
+          hint={t('report.snap_overview_hint_per_wpvuln')}
         />
         <KpiTile
-          label="Cache stack"
+          label={t('report.snap_overview_kpi_cache_stack')}
           value={`${cacheActive}/3`}
           tone={cacheActive === 3 ? 'good' : cacheActive >= 1 ? 'warning' : 'critical'}
           hint={[
             cacheStack.page ? 'page' : null,
             cacheStack.object ? 'object' : null,
             cacheStack.opcache ? 'opcache' : null,
-          ].filter(Boolean).join(' · ') || 'ninguno activo'}
+          ].filter(Boolean).join(' · ') || t('report.snap_overview_hint_none_active')}
         />
         <KpiTile
-          label="Base de datos"
+          label={t('report.snap_overview_kpi_database')}
           value={String(k.dbSizeHuman || '—')}
-          hint={`${k.dbTables ?? 0} tablas`}
+          hint={t('report.snap_overview_hint_tables', { count: k.dbTables ?? 0 })}
         />
         <KpiTile
-          label="Usuarios"
+          label={t('report.snap_overview_kpi_users')}
           value={Number(k.users ?? 0)}
           tone={Number(k.administrators ?? 0) > 3 ? 'warning' : 'neutral'}
-          hint={`${k.administrators} administradores`}
+          hint={t('report.snap_overview_hint_admins', { count: k.administrators })}
         />
         <KpiTile
-          label="Seguridad críticos"
+          label={t('report.snap_overview_kpi_security_critical')}
           value={critical}
           tone={critical > 0 ? 'critical' : 'good'}
-          hint={warnings > 0 ? `+${warnings} warnings` : 'checks internos'}
+          hint={warnings > 0 ? t('report.snap_overview_hint_warnings', { count: warnings }) : t('report.snap_overview_hint_internal_checks')}
         />
         <KpiTile
-          label="Tema activo"
+          label={t('report.snap_overview_kpi_theme')}
           value={String(k.activeTheme || '—')}
-          hint={k.activeThemeHasUpdate ? 'actualización disponible' : undefined}
+          hint={k.activeThemeHasUpdate ? t('report.snap_overview_hint_update_available') : undefined}
           tone={k.activeThemeHasUpdate ? 'warning' : 'neutral'}
         />
       </div>
 
       {/* Mini leyenda para el lector técnico */}
       <div className="mt-4 flex flex-wrap items-center gap-4 text-[10px] text-[var(--text-tertiary)]">
-        <span className="inline-flex items-center gap-1"><Gauge className="h-3 w-3" /> Rendimiento y cache</span>
-        <span className="inline-flex items-center gap-1"><ShieldAlert className="h-3 w-3" /> Seguridad interna</span>
-        <span className="inline-flex items-center gap-1"><UsersIcon className="h-3 w-3" /> Acceso y roles</span>
+        <span className="inline-flex items-center gap-1"><Gauge className="h-3 w-3" /> {t('report.snap_overview_legend_perf')}</span>
+        <span className="inline-flex items-center gap-1"><ShieldAlert className="h-3 w-3" /> {t('report.snap_overview_legend_security')}</span>
+        <span className="inline-flex items-center gap-1"><UsersIcon className="h-3 w-3" /> {t('report.snap_overview_legend_access')}</span>
       </div>
     </SectionCard>
   )

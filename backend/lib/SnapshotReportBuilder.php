@@ -113,33 +113,31 @@ class SnapshotReportBuilder {
         if ($wpVersion !== '' && !$wpIsLatest) {
             $issues[] = [
                 'severity' => 'warning',
-                'title'    => "WordPress $wpVersion — disponible $latestWp",
-                'action'   => "Actualizar core desde Escritorio → Actualizaciones (backup previo obligatorio).",
+                'title'    => Translator::t('snapshot_report.env.wp_outdated.title', ['version' => $wpVersion, 'latest' => $latestWp]),
+                'action'   => Translator::t('snapshot_report.env.wp_outdated.action'),
             ];
         }
         $phpVersion = $env['php_version'] ?? '';
         if ($phpVersion !== '' && version_compare($phpVersion, '8.1', '<')) {
             $issues[] = [
                 'severity' => version_compare($phpVersion, '8.0', '<') ? 'critical' : 'warning',
-                'title'    => "PHP $phpVersion quedará sin soporte",
-                'action'   => "Actualizar a PHP 8.2 o superior. Verificar compatibilidad con todos los plugins activos primero.",
+                'title'    => Translator::t('snapshot_report.env.php_outdated.title', ['version' => $phpVersion]),
+                'action'   => Translator::t('snapshot_report.env.php_outdated.action'),
             ];
         }
         if (!empty($missingExts)) {
             $issues[] = [
                 'severity' => 'warning',
-                'title'    => 'Extensiones PHP recomendadas ausentes: ' . implode(', ', $missingExts),
-                'action'   => 'Instalar vía panel de PHP del hosting. Imagick es especialmente importante para WebP/compresión.',
+                'title'    => Translator::t('snapshot_report.env.missing_exts.title', ['exts' => implode(', ', $missingExts)]),
+                'action'   => Translator::t('snapshot_report.env.missing_exts.action'),
             ];
         }
         if ((bool) ($env['wp_debug'] ?? false)) {
             $severity = ($env['wp_debug_display'] ?? false) ? 'critical' : 'warning';
             $issues[] = [
                 'severity' => $severity,
-                'title'    => $severity === 'critical' ? 'WP_DEBUG + WP_DEBUG_DISPLAY activos en producción' : 'WP_DEBUG activo',
-                'action'   => $severity === 'critical'
-                    ? 'Los errores PHP se imprimen a visitantes (leak de paths, versiones). Desactivar WP_DEBUG_DISPLAY en wp-config.php ya.'
-                    : 'Aceptable si es solo para log interno. En producción lo ideal es apagar debug completamente.',
+                'title'    => Translator::t("snapshot_report.env.debug_{$severity}.title"),
+                'action'   => Translator::t("snapshot_report.env.debug_{$severity}.action"),
             ];
         }
 
@@ -335,7 +333,7 @@ class SnapshotReportBuilder {
             }
             $impact = $v['impact']['cvss'] ?? [];
             $out[] = [
-                'name'       => $v['name'] ?? 'Vulnerabilidad',
+                'name'       => $v['name'] ?? Translator::t('snapshot_report.vuln.fallback_name'),
                 'cve'        => $cve,
                 'severity'   => strtolower($impact['severity'] ?? 'medium'),
                 'cvssScore'  => $impact['score'] ?? null,
@@ -378,23 +376,23 @@ class SnapshotReportBuilder {
         if (!empty($active) && !($active['is_child_theme'] ?? false)) {
             $issues[] = [
                 'severity' => 'info',
-                'title'    => "Tema {$active['name']} sin child theme",
-                'action'   => 'Cualquier customización directa al tema se perderá al actualizar. Crear un child theme con Template: ' . strtolower($active['name'] ?? '') . '.',
+                'title'    => Translator::t('snapshot_report.themes.no_child.title', ['name' => $active['name'] ?? '']),
+                'action'   => Translator::t('snapshot_report.themes.no_child.action', ['slug' => strtolower($active['name'] ?? '')]),
             ];
         }
         if (($active['has_update'] ?? false)) {
             $issues[] = [
                 'severity' => 'warning',
-                'title'    => "Tema activo desactualizado: {$active['name']}",
-                'action'   => 'Actualizar desde Apariencia → Temas.',
+                'title'    => Translator::t('snapshot_report.themes.outdated.title', ['name' => $active['name'] ?? '']),
+                'action'   => Translator::t('snapshot_report.themes.outdated.action'),
             ];
         }
         $inactiveCount = (int) ($th['total_themes'] ?? 0) - (empty($active) ? 0 : 1);
         if ($inactiveCount >= 3) {
             $issues[] = [
                 'severity' => 'info',
-                'title'    => "$inactiveCount temas inactivos en disco",
-                'action'   => 'Eliminar temas sin usar desde Apariencia → Temas (mantener solo el activo y un default como fallback).',
+                'title'    => Translator::t('snapshot_report.themes.inactive_excess.title', ['count' => $inactiveCount]),
+                'action'   => Translator::t('snapshot_report.themes.inactive_excess.action'),
             ];
         }
 
@@ -453,19 +451,18 @@ class SnapshotReportBuilder {
 
     private function securityActionFor(string $key, array $c): string {
         $value = $c['value'] ?? null;
-        return match ($key) {
-            'wp_debug'         => 'En wp-config.php: define("WP_DEBUG", false); — o al menos desactivar WP_DEBUG_DISPLAY.',
-            'wp_debug_display' => 'define("WP_DEBUG_DISPLAY", false); en wp-config.php para no leakear errores a visitantes.',
-            'file_editing'     => $value ? '' : 'define("DISALLOW_FILE_EDIT", true); en wp-config.php.',
-            'file_mods'        => 'define("DISALLOW_FILE_MODS", true); impide instalar/actualizar plugins vía admin — solo recomendable con CI/CD.',
-            'db_prefix'        => $value ? '' : 'Cambiar prefijo de wp_ a uno custom vía script de migración (wp-config + renombrar tablas + options serializadas).',
-            'auto_updates_core' => 'Habilitar auto-updates menores: add_filter("auto_update_core", "__return_true"); o dejar defaults de WP.',
-            'app_passwords'    => 'Si no usas apps externas (Jetpack, mobile app) desactivar con add_filter("wp_is_application_passwords_available", "__return_false");',
-            'wp_config_writable' => 'Permisos de wp-config.php a 440 o 400 (read-only).',
-            'xmlrpc'           => $value ? 'Desactivar XML-RPC si no lo usas: add_filter("xmlrpc_enabled", "__return_false"); — reduce superficie de fuerza bruta.' : '',
-            'ssl'              => $value ? '' : 'Migrar a HTTPS: actualizar site_url/home_url, instalar SSL, forzar redirect 301 desde HTTP.',
-            default            => (string) ($c['note'] ?? ''),
+        // Algunos checks solo dan recomendación cuando la configuración es
+        // "insegura" (ej. ssl=false, db_prefix=wp_, xmlrpc=true).
+        $conditionallySilent = match ($key) {
+            'file_editing', 'db_prefix', 'ssl' => (bool) $value,
+            'xmlrpc'                           => !$value,
+            default                            => false,
         };
+        if ($conditionallySilent) return '';
+
+        $tKey = "snapshot_report.security.action.$key";
+        if (Translator::has($tKey)) return Translator::t($tKey);
+        return (string) ($c['note'] ?? '');
     }
 
     // ——— Database: tamaño, tablas top, autoload, cleanup ——————————
@@ -499,29 +496,32 @@ class SnapshotReportBuilder {
         if ($autoloadMb > 1) {
             $issues[] = [
                 'severity' => $autoloadMb > 3 ? 'critical' : 'warning',
-                'title'    => 'Autoload pesado: ' . ($db['autoload_size_human'] ?? '?') . ' en ' . (int) ($db['autoloaded_options'] ?? 0) . ' opciones',
-                'action'   => 'Ralentiza TODO el sitio (cada request carga estas opciones). Usar WP-Optimize / Autoload Options Monitor para identificar las más pesadas y cambiar autoload=no.',
+                'title'    => Translator::t('snapshot_report.db.autoload.title', [
+                    'size'  => $db['autoload_size_human'] ?? '?',
+                    'count' => (int) ($db['autoloaded_options'] ?? 0),
+                ]),
+                'action'   => Translator::t('snapshot_report.db.autoload.action'),
             ];
         }
         if ($revisions >= 500) {
             $issues[] = [
                 'severity' => $revisions >= 2000 ? 'warning' : 'info',
-                'title'    => "$revisions revisiones acumuladas",
-                'action'   => 'define("WP_POST_REVISIONS", 5); + limpiar históricas con WP-Optimize.',
+                'title'    => Translator::t('snapshot_report.db.revisions.title', ['count' => $revisions]),
+                'action'   => Translator::t('snapshot_report.db.revisions.action'),
             ];
         }
         if (!empty($myisam)) {
             $issues[] = [
                 'severity' => 'warning',
-                'title'    => count($myisam) . ' tablas con motor MyISAM',
-                'action'   => 'Convertir a InnoDB: ALTER TABLE nombre ENGINE=InnoDB; (una por una, backup antes).',
+                'title'    => Translator::t('snapshot_report.db.myisam.title', ['count' => count($myisam)]),
+                'action'   => Translator::t('snapshot_report.db.myisam.action'),
             ];
         }
         if ($orphaned > 100) {
             $issues[] = [
                 'severity' => 'warning',
-                'title'    => "$orphaned registros de postmeta huérfanos",
-                'action'   => 'Limpiar con WP-Optimize o SQL directo sobre wp_postmeta LEFT JOIN wp_posts.',
+                'title'    => Translator::t('snapshot_report.db.orphaned.title', ['count' => $orphaned]),
+                'action'   => Translator::t('snapshot_report.db.orphaned.action'),
             ];
         }
 
@@ -567,29 +567,29 @@ class SnapshotReportBuilder {
         if (!$opcache) {
             $issues[] = [
                 'severity' => 'critical',
-                'title'    => 'OPcache desactivado',
-                'action'   => 'En php.ini: opcache.enable=1, opcache.memory_consumption=256. Ganancia típica 30-60% en rendimiento PHP.',
+                'title'    => Translator::t('snapshot_report.perf.opcache.title'),
+                'action'   => Translator::t('snapshot_report.perf.opcache.action'),
             ];
         }
         if (!$objectCache) {
             $issues[] = [
                 'severity' => 'warning',
-                'title'    => 'Sin object cache persistente',
-                'action'   => 'Instalar Redis o Memcached + plugin Redis Object Cache. Reduce queries repetidas a DB.',
+                'title'    => Translator::t('snapshot_report.perf.object_cache.title'),
+                'action'   => Translator::t('snapshot_report.perf.object_cache.action'),
             ];
         }
         if (!$pageCache) {
             $issues[] = [
                 'severity' => 'warning',
-                'title'    => 'No se detecta page cache',
-                'action'   => 'Instalar WP Rocket / LiteSpeed Cache / W3 Total Cache, o habilitar cache a nivel de servidor (Nginx FastCGI, Varnish).',
+                'title'    => Translator::t('snapshot_report.perf.page_cache.title'),
+                'action'   => Translator::t('snapshot_report.perf.page_cache.action'),
             ];
         }
         if ($imageEditor && stripos($imageEditor, 'imagick') === false) {
             $issues[] = [
                 'severity' => 'info',
-                'title'    => "WP usa $imageEditor (sin Imagick)",
-                'action'   => 'Instalar extensión PHP Imagick para mejor calidad, WebP y AVIF.',
+                'title'    => Translator::t('snapshot_report.perf.image_editor.title', ['editor' => $imageEditor]),
+                'action'   => Translator::t('snapshot_report.perf.image_editor.action'),
             ];
         }
 
@@ -650,10 +650,10 @@ class SnapshotReportBuilder {
         if (!empty($overdueList)) {
             $issues[] = [
                 'severity' => count($overdueList) > 10 ? 'critical' : 'warning',
-                'title'    => count($overdueList) . ' cron jobs atrasados',
+                'title'    => Translator::t('snapshot_report.cron.overdue.title', ['count' => count($overdueList)]),
                 'action'   => $wpCronDisabled
-                    ? 'WP_CRON está deshabilitado. Verificar que el cron del sistema esté llamando a wp-cron.php cada minuto.'
-                    : 'Sitio con poco tráfico no dispara WP_CRON. Configurar cron del servidor: */5 * * * * wget -qO- https://tu-sitio.com/wp-cron.php',
+                    ? Translator::t('snapshot_report.cron.overdue.action_disabled')
+                    : Translator::t('snapshot_report.cron.overdue.action_low_traffic'),
             ];
         }
         // Detectar hooks con abuso (misma tarea registrada muchas veces)
@@ -661,8 +661,8 @@ class SnapshotReportBuilder {
             if ($count >= 10) {
                 $issues[] = [
                     'severity' => 'info',
-                    'title'    => "Hook $hook registrado $count veces",
-                    'action'   => 'Posible leak de wp_schedule_event sin unscheduling. Revisar el plugin responsable.',
+                    'title'    => Translator::t('snapshot_report.cron.hook_abuse.title', ['hook' => $hook, 'count' => $count]),
+                    'action'   => Translator::t('snapshot_report.cron.hook_abuse.action'),
                 ];
                 break; // solo reportar el peor
             }
@@ -723,15 +723,15 @@ class SnapshotReportBuilder {
         if ($hasJpegOrPng && !$hasWebP) {
             $issues[] = [
                 'severity' => 'warning',
-                'title'    => 'Imágenes sin formato WebP',
-                'action'   => 'Instalar ShortPixel / Imagify / EWWW para convertir JPEG/PNG a WebP automáticamente — reduce peso 25-35% típico.',
+                'title'    => Translator::t('snapshot_report.media.no_webp.title'),
+                'action'   => Translator::t('snapshot_report.media.no_webp.action'),
             ];
         }
         if ($gb > 3) {
             $issues[] = [
                 'severity' => 'warning',
-                'title'    => 'Biblioteca pesada (' . ($media['upload_dir_size_human'] ?? '?') . ')',
-                'action'   => 'Activar lazy loading nativo (ya en WP 5.5+), servir imágenes via CDN, comprimir con calidad 75-85%.',
+                'title'    => Translator::t('snapshot_report.media.heavy.title', ['size' => $media['upload_dir_size_human'] ?? '?']),
+                'action'   => Translator::t('snapshot_report.media.heavy.action'),
             ];
         }
 
@@ -775,14 +775,14 @@ class SnapshotReportBuilder {
         if ($admins > 3) {
             $issues[] = [
                 'severity' => 'warning',
-                'title'    => "$admins usuarios con rol administrator",
-                'action'   => 'Aplicar principio de mínimo privilegio: bajar a Editor a los que no necesiten tocar plugins/temas. Exigir 2FA en los que queden.',
+                'title'    => Translator::t('snapshot_report.users.too_many_admins.title', ['count' => $admins]),
+                'action'   => Translator::t('snapshot_report.users.too_many_admins.action'),
             ];
         } elseif ($admins === 0) {
             $issues[] = [
                 'severity' => 'info',
-                'title'    => 'Ningún administrator visible',
-                'action'   => 'Puede ser un sitio con rol personalizado. Verificar quién tiene "manage_options" realmente.',
+                'title'    => Translator::t('snapshot_report.users.no_admins.title'),
+                'action'   => Translator::t('snapshot_report.users.no_admins.action'),
             ];
         }
 
@@ -790,8 +790,8 @@ class SnapshotReportBuilder {
         if ($totalUsers > 1000) {
             $issues[] = [
                 'severity' => 'info',
-                'title'    => "$totalUsers usuarios registrados",
-                'action'   => 'Revisar si la tabla wp_users está creciendo por spam signups. Considerar un antispam en registro (Cloudflare Turnstile, reCAPTCHA).',
+                'title'    => Translator::t('snapshot_report.users.many_users.title', ['count' => $totalUsers]),
+                'action'   => Translator::t('snapshot_report.users.many_users.action'),
             ];
         }
 
@@ -854,8 +854,8 @@ class SnapshotReportBuilder {
         if ($totalRestRoutes > 800) {
             $issues[] = [
                 'severity' => 'info',
-                'title'    => "$totalRestRoutes rutas REST expuestas",
-                'action'   => 'Volumen alto indica plugin bloat. Auditar los top namespaces — algunos quizá se puedan desactivar en el frontend con rest_api_init.',
+                'title'    => Translator::t('snapshot_report.content.rest_bloat.title', ['count' => $totalRestRoutes]),
+                'action'   => Translator::t('snapshot_report.content.rest_bloat.action'),
             ];
         }
         // Exposed-in-REST + public CPTs (potencial leak de datos)
@@ -864,8 +864,8 @@ class SnapshotReportBuilder {
                 // Solo uno de ejemplo, no spammear
                 $issues[] = [
                     'severity' => 'info',
-                    'title'    => "CPT público \"{$p['slug']}\" expuesto en REST API",
-                    'action'   => 'Si no debería ser accesible sin auth, restringir con rest_authentication_errors o show_in_rest=false.',
+                    'title'    => Translator::t('snapshot_report.content.cpt_rest_exposed.title', ['slug' => $p['slug'] ?? '']),
+                    'action'   => Translator::t('snapshot_report.content.cpt_rest_exposed.action'),
                 ];
                 break;
             }

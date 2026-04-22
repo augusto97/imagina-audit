@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import SemaphoreIcon from './SemaphoreIcon'
@@ -9,6 +10,7 @@ interface SolutionMappingProps {
 }
 
 export default function SolutionMapping({ solutions }: SolutionMappingProps) {
+  const { t } = useTranslation()
   if (solutions.length === 0) return null
 
   return (
@@ -19,9 +21,9 @@ export default function SolutionMapping({ solutions }: SolutionMappingProps) {
     >
       <Card>
         <CardHeader>
-          <CardTitle>Mapa de Soluciones</CardTitle>
+          <CardTitle>{t('public.solutions_title')}</CardTitle>
           <p className="text-sm text-[var(--text-secondary)]">
-            Cada problema detectado tiene una solución que Imagina WP incluye en sus planes de soporte.
+            {t('public.solutions_subtitle')}
           </p>
         </CardHeader>
         <CardContent>

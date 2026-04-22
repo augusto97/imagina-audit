@@ -44,14 +44,14 @@ class MobileAnalyzer {
 
         return [
             'id' => 'mobile',
-            'name' => 'Compatibilidad Móvil',
+            'name' => Translator::t('modules.mobile.name'),
             'icon' => 'smartphone',
             'score' => $score,
             'level' => Scoring::getLevel($score),
             'weight' => $defaults['weight_mobile'],
             'metrics' => $metrics,
-            'summary' => "Tu sitio tiene una puntuación móvil de $score/100.",
-            'salesMessage' => $defaults['sales_mobile'],
+            'summary' => Translator::t('mobile.summary', ['score' => $score]),
+            'salesMessage' => $defaults['sales_mobile'] !== '' ? $defaults['sales_mobile'] : Translator::t('modules.sales.mobile'),
         ];
     }
 
@@ -71,17 +71,17 @@ class MobileAnalyzer {
 
         return Scoring::createMetric(
             'viewport',
-            'Meta Viewport',
+            Translator::t('mobile.viewport.name'),
             $viewport !== null,
-            $viewport ?: 'No configurada',
+            $viewport ?: Translator::t('mobile.viewport.display.missing'),
             $score,
             $viewport
                 ? ($hasDeviceWidth
-                    ? 'Meta viewport configurada correctamente con width=device-width.'
-                    : 'Meta viewport presente pero sin width=device-width.')
-                : 'No se encontró meta viewport. El sitio no se adaptará a pantallas móviles.',
-            !$hasDeviceWidth ? 'Agregar <meta name="viewport" content="width=device-width, initial-scale=1">.' : '',
-            'Configuramos el viewport y la experiencia móvil completa.'
+                    ? Translator::t('mobile.viewport.desc.ok')
+                    : Translator::t('mobile.viewport.desc.partial'))
+                : Translator::t('mobile.viewport.desc.missing'),
+            !$hasDeviceWidth ? Translator::t('mobile.viewport.recommendation') : '',
+            Translator::t('mobile.viewport.solution')
         );
     }
 
@@ -93,17 +93,17 @@ class MobileAnalyzer {
 
         return Scoring::createMetric(
             'mobile_speed',
-            'Velocidad en Móvil (PageSpeed)',
+            Translator::t('mobile.mobile_speed.name'),
             $this->mobileScore,
-            $this->mobileScore !== null ? "{$this->mobileScore}/100" : 'No disponible',
+            $this->mobileScore !== null ? "{$this->mobileScore}/100" : Translator::t('mobile.mobile_speed.display.none'),
             $score,
             $this->mobileScore !== null
-                ? "Google PageSpeed califica la velocidad móvil con {$this->mobileScore}/100."
-                : 'No fue posible obtener la puntuación de velocidad móvil.',
+                ? Translator::t('mobile.mobile_speed.desc.ok', ['score' => $this->mobileScore])
+                : Translator::t('mobile.mobile_speed.desc.missing'),
             ($this->mobileScore !== null && $this->mobileScore < 70)
-                ? 'Optimizar la velocidad móvil: reducir CSS/JS, optimizar imágenes, usar lazy loading.'
+                ? Translator::t('mobile.mobile_speed.recommendation')
                 : '',
-            'Optimizamos específicamente para velocidad en dispositivos móviles.'
+            Translator::t('mobile.mobile_speed.solution')
         );
     }
 
@@ -132,7 +132,7 @@ class MobileAnalyzer {
         $viewport = $this->parser->getViewport();
         $hasDeviceViewport = $viewport && str_contains(strtolower($viewport), 'width=device-width');
         if ($hasDeviceViewport) {
-            $indicators[] = 'Viewport móvil';
+            $indicators[] = Translator::t('mobile.responsive.indicator.viewport');
             $score += 25;
         }
 
@@ -143,7 +143,7 @@ class MobileAnalyzer {
             if (!empty($img['srcset'] ?? '')) { $hasSrcset = true; break; }
         }
         if ($hasSrcset || preg_match('/<picture[\s>]/i', $this->html)) {
-            $indicators[] = 'Imágenes responsivas';
+            $indicators[] = Translator::t('mobile.responsive.indicator.srcset');
             $score += 20;
         }
 
@@ -164,7 +164,7 @@ class MobileAnalyzer {
 
         // 4. @media queries: inline en <style> + en los primeros 2 CSS externos
         if ($this->hasMediaQueries()) {
-            $indicators[] = 'Media queries';
+            $indicators[] = Translator::t('mobile.responsive.indicator.media');
             $score += 40;
         }
 
@@ -179,23 +179,23 @@ class MobileAnalyzer {
             $score = 60;
         }
 
-        $displayList = !empty($indicators) ? implode(', ', $indicators) : 'No se detectaron indicadores claros';
+        $displayList = !empty($indicators) ? implode(', ', $indicators) : Translator::t('mobile.responsive.display.none');
 
         return Scoring::createMetric(
             'responsive',
-            'Diseño Responsivo',
+            Translator::t('mobile.responsive.name'),
             count($indicators),
             $displayList,
             $score,
             !empty($indicators)
-                ? 'Se detectaron indicadores de diseño responsivo: ' . $displayList . '.'
-                : 'No se detectaron indicadores claros de diseño responsivo (sin viewport móvil, sin media queries accesibles y sin clases de framework responsivo).',
+                ? Translator::t('mobile.responsive.desc.found', ['list' => $displayList])
+                : Translator::t('mobile.responsive.desc.missing'),
             $score < 70
                 ? ($hasDeviceViewport
-                    ? 'No pudimos verificar media queries en los CSS externos. Asegúrate de que el CSS principal tenga breakpoints (@media (max-width: 768px)) para tablets y móviles.'
-                    : 'Implementar diseño responsive: agregar <meta name="viewport" content="width=device-width, initial-scale=1"> y usar media queries en CSS.')
+                    ? Translator::t('mobile.responsive.recommendation.partial')
+                    : Translator::t('mobile.responsive.recommendation.missing'))
                 : '',
-            'Aseguramos que tu sitio sea 100% responsive en todos los dispositivos.',
+            Translator::t('mobile.responsive.solution'),
             ['indicators' => $indicators, 'viewport' => $viewport]
         );
     }

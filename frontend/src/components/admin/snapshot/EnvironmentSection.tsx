@@ -1,4 +1,5 @@
 import { Server, CheckCircle, XCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { SectionCard, KeyValueList, IssueList } from './ui'
 import type { SnapshotReport } from '@/types/snapshotReport'
 
@@ -7,6 +8,7 @@ import type { SnapshotReport } from '@/types/snapshotReport'
  * pares key:value, más el bloque de extensiones PHP como checklist.
  */
 export default function EnvironmentSection({ report }: { report: SnapshotReport }) {
+  const { t } = useTranslation()
   const wp = report.environment.wordpress
   const php = report.environment.php
   const db = report.environment.database
@@ -14,56 +16,56 @@ export default function EnvironmentSection({ report }: { report: SnapshotReport 
 
   return (
     <SectionCard
-      title="Entorno y servidor"
-      subtitle="Stack real del sitio"
+      title={t('report.snap_env_title')}
+      subtitle={t('report.snap_env_subtitle')}
       icon={<Server className="h-4 w-4 text-[var(--accent-primary)]" strokeWidth={1.75} />}
     >
       <div className="grid gap-3 lg:grid-cols-2">
-        <Panel title="WordPress">
+        <Panel title={t('report.snap_env_panel_wp')}>
           <KeyValueList rows={[
-            ['Versión', <span className="font-mono">{String(wp.version)}</span>],
-            ['Última conocida', <span className="font-mono text-[var(--text-tertiary)]">{String(wp.latest || '—')}</span>],
-            ['Idioma / TZ', `${wp.locale || '—'} · ${wp.timezone || '—'}`],
-            ['Multisite', <span className="font-mono">{wp.multisite ? 'Sí' : 'No'}</span>],
-            ['Permalinks', <code className="text-[11px]">{String(wp.permalinks || '—')}</code>],
+            [t('report.snap_env_row_version'), <span className="font-mono">{String(wp.version)}</span>],
+            [t('report.snap_env_row_latest'), <span className="font-mono text-[var(--text-tertiary)]">{String(wp.latest || '—')}</span>],
+            [t('report.snap_env_row_locale_tz'), `${wp.locale || '—'} · ${wp.timezone || '—'}`],
+            [t('report.snap_env_row_multisite'), <span className="font-mono">{wp.multisite ? t('report.snap_yes') : t('report.snap_no')}</span>],
+            [t('report.snap_env_row_permalinks'), <code className="text-[11px]">{String(wp.permalinks || '—')}</code>],
             ['WP_DEBUG', <DebugIndicator on={Boolean(wp.debug)} display={Boolean(wp.debugDisplay)} />],
-            ['Memory limit (WP)', <span className="font-mono">{String(wp.memoryLimit || '—')}</span>],
+            [t('report.snap_env_row_memory_limit_wp'), <span className="font-mono">{String(wp.memoryLimit || '—')}</span>],
           ]} />
         </Panel>
 
-        <Panel title="PHP">
+        <Panel title={t('report.snap_env_panel_php')}>
           <KeyValueList rows={[
-            ['Versión', <span className="font-mono">{String(php.version)}</span>],
+            [t('report.snap_env_row_version'), <span className="font-mono">{String(php.version)}</span>],
             ['memory_limit', <span className="font-mono">{String(php.memoryLimit)}</span>],
             ['max_execution', <span className="font-mono">{String(php.maxExecution)}s</span>],
             ['upload_max', <span className="font-mono">{String(php.maxUpload)}</span>],
             ['post_max_size', <span className="font-mono">{String(php.postMaxSize)}</span>],
-            ['OPcache', <span className="font-mono">{php.opcacheEnabled ? 'Activo' : 'Inactivo'}</span>],
+            [t('report.snap_env_row_opcache'), <span className="font-mono">{php.opcacheEnabled ? t('report.snap_env_opcache_active') : t('report.snap_env_opcache_inactive')}</span>],
           ]} />
           <ExtensionsGrid extensions={php.extensions as Record<string, boolean>} missing={php.missingExtensions as string[]} />
         </Panel>
 
-        <Panel title="Base de datos">
+        <Panel title={t('report.snap_env_panel_db')}>
           <KeyValueList rows={[
-            ['Motor', <span className="font-mono">{String(db.type || '—')}</span>],
-            ['Versión', <span className="font-mono">{String(db.version || '—')}</span>],
-            ['Info del server', <span className="font-mono text-[10px]">{String(db.serverInfo || '—')}</span>],
+            [t('report.snap_env_row_engine'), <span className="font-mono">{String(db.type || '—')}</span>],
+            [t('report.snap_env_row_version'), <span className="font-mono">{String(db.version || '—')}</span>],
+            [t('report.snap_env_row_server_info'), <span className="font-mono text-[10px]">{String(db.serverInfo || '—')}</span>],
           ]} />
         </Panel>
 
-        <Panel title="Servidor web">
+        <Panel title={t('report.snap_env_panel_server')}>
           <KeyValueList rows={[
-            ['Software', <span className="font-mono">{String(server.software || '—')}</span>],
-            ['Sistema', <span className="font-mono">{String(server.os || '—')}</span>],
-            ['HTTPS', <span className="font-mono">{server.isHttps ? 'Activo' : 'HTTP'}</span>],
-            ['.htaccess', <span className="font-mono">{server.htaccessWritable ? 'Escribible' : 'Read-only'}</span>],
+            [t('report.snap_env_row_software'), <span className="font-mono">{String(server.software || '—')}</span>],
+            [t('report.snap_env_row_os'), <span className="font-mono">{String(server.os || '—')}</span>],
+            [t('report.snap_env_row_https'), <span className="font-mono">{server.isHttps ? t('report.snap_env_https_active') : t('report.snap_env_https_plain')}</span>],
+            [t('report.snap_env_row_htaccess'), <span className="font-mono">{server.htaccessWritable ? t('report.snap_env_htaccess_writable') : t('report.snap_env_htaccess_readonly')}</span>],
           ]} />
         </Panel>
       </div>
 
       <div className="mt-4">
         <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-          Hallazgos accionables
+          {t('report.snap_env_actionable')}
         </h4>
         <IssueList issues={report.environment.issues} />
       </div>
@@ -81,18 +83,20 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 }
 
 function DebugIndicator({ on, display }: { on: boolean; display: boolean }) {
-  if (!on) return <span className="font-mono text-emerald-600">OFF</span>
-  if (display) return <span className="font-mono text-red-600">ON + DISPLAY</span>
-  return <span className="font-mono text-amber-600">ON (log)</span>
+  const { t } = useTranslation()
+  if (!on) return <span className="font-mono text-emerald-600">{t('report.snap_off')}</span>
+  if (display) return <span className="font-mono text-red-600">{t('report.snap_env_debug_on_display')}</span>
+  return <span className="font-mono text-amber-600">{t('report.snap_env_debug_on_log')}</span>
 }
 
 function ExtensionsGrid({ extensions, missing }: { extensions: Record<string, boolean>; missing: string[] }) {
+  const { t } = useTranslation()
   const entries = Object.entries(extensions)
   if (entries.length === 0) return null
   return (
     <div className="mt-3 border-t border-[var(--border-default)] pt-2">
       <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-        Extensiones PHP {missing.length > 0 && <span className="text-red-600">· {missing.length} faltantes</span>}
+        {t('report.snap_env_extensions_label')} {missing.length > 0 && <span className="text-red-600">{t('report.snap_env_extensions_missing', { count: missing.length })}</span>}
       </p>
       <div className="flex flex-wrap gap-1">
         {entries.map(([name, enabled]) => (

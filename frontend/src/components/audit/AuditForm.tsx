@@ -1,6 +1,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useTranslation } from 'react-i18next'
 import { Globe, User, Mail, Phone, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,32 +9,38 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useAudit } from '@/hooks/useAudit'
 import { useConfigStore } from '@/store/configStore'
 
-const auditSchema = z.object({
-  url: z.string().min(1, 'La URL es obligatoria').refine(
-    (val) => {
-      try {
-        const url = val.startsWith('http') ? val : `https://${val}`
-        new URL(url)
-        return true
-      } catch {
-        return false
-      }
-    },
-    { message: 'Ingresa una URL válida' }
-  ),
-  leadName: z.string().optional(),
-  leadEmail: z.string().email('Email no válido').optional().or(z.literal('')),
-  leadWhatsapp: z.string().optional(),
-})
-
-type AuditFormData = z.infer<typeof auditSchema>
+type AuditFormData = {
+  url: string
+  leadName?: string
+  leadEmail?: string
+  leadWhatsapp?: string
+}
 
 export default function AuditForm() {
+  const { t } = useTranslation()
   const { startAudit, status } = useAudit()
   const { home, form: formCfg } = useConfigStore((s) => s.config)
   const isScanning = status === 'scanning'
-  const microItems = (home.formMicrocopy || 'Sin instalar nada · 100% externo · Resultados en 30 seg')
+  const microItems = (home.formMicrocopy || t('public.audit_form_microcopy_default'))
     .split(/\s*[·•|]\s*/).filter(Boolean)
+
+  const auditSchema = z.object({
+    url: z.string().min(1, t('public.audit_form_url_required')).refine(
+      (val) => {
+        try {
+          const url = val.startsWith('http') ? val : `https://${val}`
+          new URL(url)
+          return true
+        } catch {
+          return false
+        }
+      },
+      { message: t('public.audit_form_url_invalid') }
+    ),
+    leadName: z.string().optional(),
+    leadEmail: z.string().email(t('public.audit_form_email_invalid')).optional().or(z.literal('')),
+    leadWhatsapp: z.string().optional(),
+  })
 
   const { register, handleSubmit, formState: { errors } } = useForm<AuditFormData>({
     resolver: zodResolver(auditSchema),
@@ -115,7 +122,7 @@ export default function AuditForm() {
             disabled={isScanning}
           >
             <Search className="h-5 w-5" strokeWidth={1.5} />
-            {isScanning ? 'Analizando...' : home.formButtonText || 'Auditar Mi Sitio Gratis'}
+            {isScanning ? t('public.audit_form_analyzing') : home.formButtonText || t('public.audit_form_button')}
           </Button>
 
           {/* Micro-copy */}

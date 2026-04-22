@@ -5,12 +5,12 @@
 require_once __DIR__ . '/bootstrap.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 $domain = trim($_GET['domain'] ?? '');
 if (empty($domain)) {
-    Response::error('El parámetro domain es obligatorio.');
+    Response::error(Translator::t('api.history.domain_required'));
 }
 
 try {
@@ -53,5 +53,5 @@ try {
     ]);
 } catch (Throwable $e) {
     Logger::error('Error en history: ' . $e->getMessage());
-    Response::error('Error al obtener historial.', 500);
+    Response::error(Translator::t('api.history.fetch_error'), 500);
 }

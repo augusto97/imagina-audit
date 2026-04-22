@@ -42,30 +42,34 @@ class PerformanceAnalyzer {
 
         $metrics[] = Scoring::createMetric(
             'pagespeed_mobile',
-            'PageSpeed Mobile',
+            Translator::t('performance.psi_mobile.name'),
             $this->mobileScore,
-            $this->mobileScore !== null ? "{$this->mobileScore}/100" : 'No disponible',
+            $this->mobileScore !== null
+                ? Translator::t('performance.psi.display.score', ['score' => $this->mobileScore])
+                : Translator::t('performance.psi.display.na'),
             $this->mobileScore ?? 50,
             $this->mobileScore !== null
-                ? "Google PageSpeed califica tu sitio móvil con {$this->mobileScore}/100."
-                : 'No fue posible obtener la puntuación de PageSpeed móvil.',
-            ($this->mobileScore !== null && $this->mobileScore < 70) ? 'Optimizar la velocidad de carga en dispositivos móviles.' : '',
-            'Optimizamos tu sitio para obtener scores de 90+ en PageSpeed.'
+                ? Translator::t('performance.psi_mobile.desc.ok', ['score' => $this->mobileScore])
+                : Translator::t('performance.psi_mobile.desc.na'),
+            ($this->mobileScore !== null && $this->mobileScore < 70) ? Translator::t('performance.psi_mobile.recommend') : '',
+            Translator::t('performance.psi_mobile.solution')
         );
 
         // Score PageSpeed Desktop
         $desktopScore = $desktopResult['score'] ?? null;
         $metrics[] = Scoring::createMetric(
             'pagespeed_desktop',
-            'PageSpeed Desktop',
+            Translator::t('performance.psi_desktop.name'),
             $desktopScore,
-            $desktopScore !== null ? "{$desktopScore}/100" : 'No disponible',
+            $desktopScore !== null
+                ? Translator::t('performance.psi.display.score', ['score' => $desktopScore])
+                : Translator::t('performance.psi.display.na'),
             $desktopScore ?? 50,
             $desktopScore !== null
-                ? "Google PageSpeed califica tu sitio desktop con {$desktopScore}/100."
-                : 'No fue posible obtener la puntuación de PageSpeed desktop.',
-            ($desktopScore !== null && $desktopScore < 70) ? 'Optimizar la velocidad de carga en escritorio.' : '',
-            'Configuramos cache, CDN y optimizaciones avanzadas de rendimiento.'
+                ? Translator::t('performance.psi_desktop.desc.ok', ['score' => $desktopScore])
+                : Translator::t('performance.psi_desktop.desc.na'),
+            ($desktopScore !== null && $desktopScore < 70) ? Translator::t('performance.psi_desktop.recommend') : '',
+            Translator::t('performance.psi_desktop.solution')
         );
 
         // LCP
@@ -75,14 +79,14 @@ class PerformanceAnalyzer {
             $lcpScore = $this->lcp <= 2500 ? 100 : ($this->lcp <= 4000 ? 60 : 20);
             $metrics[] = Scoring::createMetric(
                 'lcp',
-                'Largest Contentful Paint (LCP)',
+                Translator::t('performance.lcp.name'),
                 $this->lcp,
-                "{$lcpSeconds}s",
+                Translator::t('performance.lcp.display', ['seconds' => $lcpSeconds]),
                 $lcpScore,
-                "El contenido principal tarda {$lcpSeconds}s en cargar. " .
-                ($this->lcp <= 2500 ? 'Buen tiempo de carga.' : 'Se recomienda menos de 2.5 segundos.'),
-                $this->lcp > 2500 ? 'Optimizar imágenes, lazy loading y reducir recursos bloqueantes.' : '',
-                'Reducimos el LCP con cache, CDN, optimización de imágenes y código.'
+                Translator::t('performance.lcp.desc.prefix', ['seconds' => $lcpSeconds])
+                    . ($this->lcp <= 2500 ? Translator::t('performance.lcp.desc.good') : Translator::t('performance.lcp.desc.bad')),
+                $this->lcp > 2500 ? Translator::t('performance.lcp.recommend') : '',
+                Translator::t('performance.lcp.solution')
             );
         }
 
@@ -93,13 +97,13 @@ class PerformanceAnalyzer {
             $fcpScore = $fcp <= 1800 ? 100 : ($fcp <= 3000 ? 60 : 20);
             $metrics[] = Scoring::createMetric(
                 'fcp',
-                'First Contentful Paint (FCP)',
+                Translator::t('performance.fcp.name'),
                 $fcp,
-                "{$fcpSeconds}s",
+                Translator::t('performance.fcp.display', ['seconds' => $fcpSeconds]),
                 $fcpScore,
-                "El primer contenido visible aparece en {$fcpSeconds}s.",
-                $fcp > 1800 ? 'Reducir recursos bloqueantes y optimizar CSS crítico.' : '',
-                'Implementamos CSS crítico inline y optimización de carga.'
+                Translator::t('performance.fcp.desc', ['seconds' => $fcpSeconds]),
+                $fcp > 1800 ? Translator::t('performance.fcp.recommend') : '',
+                Translator::t('performance.fcp.solution')
             );
         }
 
@@ -107,16 +111,17 @@ class PerformanceAnalyzer {
         $cls = $mobileResult['cls'] ?? null;
         if ($cls !== null) {
             $clsScore = $cls <= 0.1 ? 100 : ($cls <= 0.25 ? 60 : 20);
+            $clsFormatted = number_format($cls, 3);
             $metrics[] = Scoring::createMetric(
                 'cls',
-                'Cumulative Layout Shift (CLS)',
+                Translator::t('performance.cls.name'),
                 $cls,
-                number_format($cls, 3),
+                Translator::t('performance.cls.display', ['value' => $clsFormatted]),
                 $clsScore,
-                "El desplazamiento visual acumulado es $cls. " .
-                ($cls <= 0.1 ? 'Buen valor.' : 'Se recomienda menos de 0.1.'),
-                $cls > 0.1 ? 'Definir dimensiones para imágenes y embeds. Evitar insertar contenido dinámico arriba.' : '',
-                'Eliminamos los shifts de layout para una experiencia visual estable.'
+                Translator::t('performance.cls.desc.prefix', ['value' => $clsFormatted])
+                    . ($cls <= 0.1 ? Translator::t('performance.cls.desc.good') : Translator::t('performance.cls.desc.bad')),
+                $cls > 0.1 ? Translator::t('performance.cls.recommend') : '',
+                Translator::t('performance.cls.solution')
             );
         }
 
@@ -127,14 +132,14 @@ class PerformanceAnalyzer {
             $tbtScore = $tbt <= 200 ? 100 : ($tbt <= 600 ? 60 : 20);
             $metrics[] = Scoring::createMetric(
                 'tbt',
-                'Total Blocking Time (TBT)',
+                Translator::t('performance.tbt.name'),
                 $tbt,
-                "{$tbtMs}ms",
+                Translator::t('performance.tbt.display', ['ms' => $tbtMs]),
                 $tbtScore,
-                "El tiempo de bloqueo total es {$tbtMs}ms. " .
-                ($tbt <= 200 ? 'Buen valor.' : 'Se recomienda menos de 200ms.'),
-                $tbt > 200 ? 'Reducir el JavaScript pesado y dividir tareas largas.' : '',
-                'Optimizamos el JavaScript y eliminamos scripts innecesarios.'
+                Translator::t('performance.tbt.desc.prefix', ['ms' => $tbtMs])
+                    . ($tbt <= 200 ? Translator::t('performance.tbt.desc.good') : Translator::t('performance.tbt.desc.bad')),
+                $tbt > 200 ? Translator::t('performance.tbt.recommend') : '',
+                Translator::t('performance.tbt.solution')
             );
         }
 
@@ -149,17 +154,22 @@ class PerformanceAnalyzer {
                 $oppDetails[] = $opp['title'] . ($opp['savings'] > 0 ? ' (-' . round($opp['savings'] / 1000, 1) . 's)' : '');
             }
             $oppScore = $oppCount <= 2 ? 80 : ($oppCount <= 4 ? 55 : 25);
-            $savingsText = $totalSavings > 0 ? round($totalSavings / 1000, 1) . 's de ahorro potencial' : '';
+            $savingsStr = $totalSavings > 0
+                ? Translator::t('performance.opp.display.savings', ['seconds' => round($totalSavings / 1000, 1)])
+                : '';
+            $suffix = $oppCount > 5
+                ? Translator::t('performance.opp.desc.suffix_more', ['count' => $oppCount - 5])
+                : Translator::t('performance.opp.desc.suffix_end');
 
             $metrics[] = Scoring::createMetric(
                 'pagespeed_opportunities',
-                'Oportunidades de mejora',
+                Translator::t('performance.opp.name'),
                 $oppCount,
-                "$oppCount oportunidades" . ($savingsText ? " · $savingsText" : ''),
+                Translator::t('performance.opp.display', ['count' => $oppCount, 'savings' => $savingsStr]),
                 $oppScore,
-                "Google detectó $oppCount oportunidades de optimización: " . implode('; ', array_slice($oppDetails, 0, 5)) . ($oppCount > 5 ? "... y " . ($oppCount - 5) . " más." : '.'),
-                'Aplicar las optimizaciones sugeridas por PageSpeed para mejorar la velocidad de carga.',
-                'Implementamos todas las optimizaciones recomendadas por Google PageSpeed.',
+                Translator::t('performance.opp.desc.prefix', ['count' => $oppCount, 'list' => implode('; ', array_slice($oppDetails, 0, 5))]) . $suffix,
+                Translator::t('performance.opp.recommend'),
+                Translator::t('performance.opp.solution'),
                 ['opportunities' => $opportunities]
             );
         }
@@ -167,16 +177,17 @@ class PerformanceAnalyzer {
         // TTFB propio
         $ttfb = $this->fetchTime;
         $ttfbScore = $ttfb <= 200 ? 100 : ($ttfb <= 500 ? 80 : ($ttfb <= 800 ? 50 : 20));
+        $ttfbMs = round($ttfb);
         $metrics[] = Scoring::createMetric(
             'ttfb',
-            'Tiempo de respuesta del servidor (TTFB)',
+            Translator::t('performance.ttfb.name'),
             $ttfb,
-            round($ttfb) . 'ms',
+            Translator::t('performance.ttfb.display', ['ms' => $ttfbMs]),
             $ttfbScore,
-            "El servidor responde en " . round($ttfb) . "ms. " .
-            ($ttfb <= 500 ? 'Buen tiempo.' : 'Se recomienda menos de 500ms.'),
-            $ttfb > 500 ? 'Mejorar el hosting, habilitar cache de servidor y optimizar consultas a base de datos.' : '',
-            'Recomendamos hosting optimizado y configuramos cache de servidor.'
+            Translator::t('performance.ttfb.desc.prefix', ['ms' => $ttfbMs])
+                . ($ttfb <= 500 ? Translator::t('performance.ttfb.desc.good') : Translator::t('performance.ttfb.desc.bad')),
+            $ttfb > 500 ? Translator::t('performance.ttfb.recommend') : '',
+            Translator::t('performance.ttfb.solution')
         );
 
         // Compresión
@@ -185,15 +196,17 @@ class PerformanceAnalyzer {
         $compressionScore = $hasCompression ? 100 : 30;
         $metrics[] = Scoring::createMetric(
             'compression',
-            'Compresión de contenido',
+            Translator::t('performance.comp.name'),
             $hasCompression,
-            $hasCompression ? strtoupper($encoding) : 'Sin compresión',
+            $hasCompression
+                ? Translator::t('performance.comp.display.ok', ['encoding' => strtoupper($encoding)])
+                : Translator::t('performance.comp.display.none'),
             $compressionScore,
             $hasCompression
-                ? "El contenido se sirve con compresión $encoding."
-                : 'El contenido no está comprimido. Esto aumenta el tiempo de descarga.',
-            $hasCompression ? '' : 'Habilitar compresión GZIP o Brotli en el servidor.',
-            'Configuramos compresión Brotli/GZIP para reducir el tamaño de transferencia.'
+                ? Translator::t('performance.comp.desc.ok', ['encoding' => $encoding])
+                : Translator::t('performance.comp.desc.none'),
+            $hasCompression ? '' : Translator::t('performance.comp.recommend'),
+            Translator::t('performance.comp.solution')
         );
 
         // Cache headers
@@ -232,26 +245,28 @@ class PerformanceAnalyzer {
         $hasCache = $hasCacheControl || $hasEtag || $hasExpires || $hasCachePlugin || $hasCacheComment;
 
         $cacheDetails = [];
-        if ($hasCacheControl) $cacheDetails[] = "Cache-Control: $cacheControl";
-        if ($hasEtag) $cacheDetails[] = 'ETag presente';
-        if ($hasExpires) $cacheDetails[] = 'Expires: ' . ($this->headers['expires'] ?? '');
-        if ($hasCachePlugin) $cacheDetails[] = 'Plugin de cache activo (headers de servidor)';
-        if ($hasCacheComment) $cacheDetails[] = 'Plugin de cache detectado en HTML';
+        if ($hasCacheControl) $cacheDetails[] = Translator::t('performance.cache.detail.cc', ['value' => $cacheControl]);
+        if ($hasEtag) $cacheDetails[] = Translator::t('performance.cache.detail.etag');
+        if ($hasExpires) $cacheDetails[] = Translator::t('performance.cache.detail.expires', ['value' => $this->headers['expires'] ?? '']);
+        if ($hasCachePlugin) $cacheDetails[] = Translator::t('performance.cache.detail.plugin_h');
+        if ($hasCacheComment) $cacheDetails[] = Translator::t('performance.cache.detail.plugin_html');
 
         $cacheScore = $hasCache ? 100 : 40;
-        $cacheDisplay = $hasCache ? implode(' · ', array_slice($cacheDetails, 0, 2)) : 'No configurado';
+        $cacheDisplay = $hasCache
+            ? Translator::t('performance.cache.display.ok', ['details' => implode(' · ', array_slice($cacheDetails, 0, 2))])
+            : Translator::t('performance.cache.display.none');
 
         $metrics[] = Scoring::createMetric(
             'cache_headers',
-            'Cache del navegador',
+            Translator::t('performance.cache.name'),
             $hasCache,
             $cacheDisplay,
             $cacheScore,
             $hasCache
-                ? 'Cache configurado: ' . implode('. ', $cacheDetails) . '. Los archivos se almacenan para cargas más rápidas.'
-                : 'No se detectaron headers de cache ni plugin de cache activo. El navegador descarga todo cada vez.',
-            $hasCache ? '' : 'Instalar un plugin de cache (WP Rocket, LiteSpeed Cache) y configurar headers Cache-Control.',
-            'Configuramos cache agresivo para archivos estáticos con expiración optimizada.',
+                ? Translator::t('performance.cache.desc.ok', ['details' => implode('. ', $cacheDetails)])
+                : Translator::t('performance.cache.desc.none'),
+            $hasCache ? '' : Translator::t('performance.cache.recommend'),
+            Translator::t('performance.cache.solution'),
             ['details' => $cacheDetails, 'hasCachePlugin' => $hasCachePlugin, 'hasCacheComment' => $hasCacheComment]
         );
 
@@ -260,14 +275,14 @@ class PerformanceAnalyzer {
 
         return [
             'id' => 'performance',
-            'name' => 'Rendimiento',
+            'name' => Translator::t('modules.performance.name'),
             'icon' => 'gauge',
             'score' => $score,
             'level' => Scoring::getLevel($score),
             'weight' => $defaults['weight_performance'],
             'metrics' => $metrics,
-            'summary' => "Tu sitio tiene una puntuación de rendimiento de $score/100.",
-            'salesMessage' => $defaults['sales_performance'],
+            'summary' => Translator::t('performance.summary', ['score' => $score]),
+            'salesMessage' => $defaults['sales_performance'] !== '' ? $defaults['sales_performance'] : Translator::t('modules.sales.performance'),
         ];
     }
 

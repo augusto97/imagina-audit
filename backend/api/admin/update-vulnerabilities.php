@@ -6,7 +6,7 @@ require_once dirname(__DIR__) . '/bootstrap.php';
 Auth::requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 set_time_limit(180);
@@ -21,5 +21,5 @@ try {
     ]);
 } catch (Throwable $e) {
     Logger::error('Error actualizando vulnerabilidades: ' . $e->getMessage());
-    Response::error('Error al actualizar: ' . $e->getMessage(), 500);
+    Response::error(Translator::t('admin_api.update_vulns.update_error', ['details' => $e->getMessage()]), 500);
 }

@@ -89,7 +89,7 @@ if ($method === 'GET') {
 // ─── POST actions ───────────────────────────────────────────────────
 
 if ($method !== 'POST') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 $action = $_GET['action'] ?? '';
@@ -101,7 +101,7 @@ $body = Response::getJsonBody();
 
 if ($action === 'setup') {
     if (twoFaGetSetting('admin_2fa_enabled') === '1') {
-        Response::error('El 2FA ya está habilitado. Desactívalo primero si quieres re-configurar.', 409);
+        Response::error(Translator::t('admin_auth.2fa.already_enabled_reconfigure'), 409);
     }
 
     $secret = Totp::generateSecret();
@@ -123,18 +123,18 @@ if ($action === 'setup') {
 
 if ($action === 'enable') {
     if (twoFaGetSetting('admin_2fa_enabled') === '1') {
-        Response::error('El 2FA ya está habilitado.', 409);
+        Response::error(Translator::t('admin_auth.2fa.already_enabled'), 409);
     }
 
     $secret = trim((string) ($body['secret'] ?? ''));
     $code = trim((string) ($body['code'] ?? ''));
 
     if (empty($secret) || empty($code)) {
-        Response::error('secret y code son obligatorios', 400);
+        Response::error(Translator::t('admin_auth.2fa.secret_and_code_required'), 400);
     }
 
     if (!Totp::verify($secret, $code)) {
-        Response::error('Código inválido. Revisa la hora de tu dispositivo y vuelve a intentarlo.', 401);
+        Response::error(Translator::t('admin_auth.2fa.invalid_totp'), 401);
     }
 
     // Generar recovery codes antes de guardar
@@ -164,11 +164,11 @@ if ($action === 'disable') {
     $code = trim((string) ($body['code'] ?? ''));
 
     if (empty($password) || empty($code)) {
-        Response::error('password y code son obligatorios', 400);
+        Response::error(Translator::t('admin_auth.2fa.password_and_code_required'), 400);
     }
 
     if (!twoFaVerifyPassword($password)) {
-        Response::error('Contraseña incorrecta', 401);
+        Response::error(Translator::t('admin_auth.2fa.password_incorrect'), 401);
     }
 
     // Aceptar TOTP o recovery code
@@ -177,7 +177,7 @@ if ($action === 'disable') {
     $recoveryValid = !$totpValid && twoFaConsumeRecoveryCode($code);
 
     if (!$totpValid && !$recoveryValid) {
-        Response::error('Código 2FA o recovery code inválido', 401);
+        Response::error(Translator::t('admin_auth.2fa.invalid_totp_or_recovery'), 401);
     }
 
     twoFaDeleteSetting('admin_2fa_enabled');
@@ -195,12 +195,12 @@ if ($action === 'disable') {
 
 if ($action === 'regenerate-recovery') {
     if (twoFaGetSetting('admin_2fa_enabled') !== '1') {
-        Response::error('2FA no está habilitado', 409);
+        Response::error(Translator::t('admin_auth.2fa.not_enabled'), 409);
     }
     $code = trim((string) ($body['code'] ?? ''));
     $secret = twoFaGetSetting('admin_2fa_secret') ?? '';
     if (empty($code) || !Totp::verify($secret, $code)) {
-        Response::error('Código TOTP inválido', 401);
+        Response::error(Translator::t('admin_auth.2fa.invalid_totp_only'), 401);
     }
 
     $recoveryCodes = Totp::generateRecoveryCodes(8);
@@ -210,4 +210,4 @@ if ($action === 'regenerate-recovery') {
     Response::success(['recoveryCodes' => $recoveryCodes]);
 }
 
-Response::error('Acción desconocida', 400);
+Response::error(Translator::t('admin_auth.2fa.unknown_action'), 400);

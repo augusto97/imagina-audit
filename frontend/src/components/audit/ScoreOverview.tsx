@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import ScoreGauge from './ScoreGauge'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -10,6 +11,7 @@ interface ScoreOverviewProps {
 }
 
 export default function ScoreOverview({ result }: ScoreOverviewProps) {
+  const { t } = useTranslation()
   const scrollToModule = (moduleId: string) => {
     const el = document.getElementById(`module-${moduleId}`)
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -26,7 +28,7 @@ export default function ScoreOverview({ result }: ScoreOverviewProps) {
           className="flex flex-col items-center gap-4"
         >
           <div className="text-center">
-            <p className="text-sm text-[var(--text-tertiary)]">Puntuación global de</p>
+            <p className="text-sm text-[var(--text-tertiary)]">{t('public.score_global_prefix')}</p>
             <h1 className="text-xl font-bold text-[var(--text-primary)] sm:text-2xl">{result.domain}</h1>
           </div>
 
@@ -34,13 +36,13 @@ export default function ScoreOverview({ result }: ScoreOverviewProps) {
 
           <div className="flex flex-wrap justify-center gap-2">
             {result.totalIssues.critical > 0 && (
-              <Badge variant="destructive">{result.totalIssues.critical} Críticos</Badge>
+              <Badge variant="destructive">{result.totalIssues.critical} {t('public.score_critical')}</Badge>
             )}
             {result.totalIssues.warning > 0 && (
-              <Badge variant="warning">{result.totalIssues.warning} Importantes</Badge>
+              <Badge variant="warning">{result.totalIssues.warning} {t('public.score_important')}</Badge>
             )}
             {result.totalIssues.good > 0 && (
-              <Badge variant="success">{result.totalIssues.good} Correctos</Badge>
+              <Badge variant="success">{result.totalIssues.good} {t('public.score_correct')}</Badge>
             )}
           </div>
         </motion.div>

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ExternalLink, Filter } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -33,6 +34,7 @@ import { PerformanceDetails } from './waterfall/PerformanceDetails'
  * Toda la presentación por sección está en `waterfall/`.
  */
 export default function WaterfallPage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const { fetchLeadDetail } = useAdmin()
   const [result, setResult] = useState<AuditResult | null>(null)
@@ -180,8 +182,8 @@ export default function WaterfallPage() {
       <div className="space-y-4">
         {id && <LeadReportNav auditId={id} domain={result?.domain} />}
         <div className="text-center py-16 text-gray-500">
-          <p className="text-lg font-medium">No hay datos de waterfall disponibles</p>
-          <p className="text-sm mt-1">Los datos se generan con la API de Google PageSpeed al ejecutar la auditoría.</p>
+          <p className="text-lg font-medium">{t('settings.waterfall_empty_title')}</p>
+          <p className="text-sm mt-1">{t('settings.waterfall_empty_hint')}</p>
         </div>
       </div>
     )
@@ -191,13 +193,13 @@ export default function WaterfallPage() {
     <div className="space-y-4">
       {id && <LeadReportNav auditId={id} domain={result.domain} />}
       <div>
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">Waterfall Chart</h2>
+        <h2 className="text-lg font-semibold text-[var(--text-primary)]">{t('settings.waterfall_title')}</h2>
         <div className="flex items-center gap-2 text-sm text-[var(--text-tertiary)] mt-0.5">
           <a href={result.url} target="_blank" rel="noreferrer" className="text-[var(--accent-primary)] hover:underline flex items-center gap-1">
             {result.domain} <ExternalLink className="h-3 w-3" />
           </a>
           <span>&middot;</span>
-          <span>{requests.length} requests</span>
+          <span>{t('settings.waterfall_requests', { count: requests.length })}</span>
           <span>&middot;</span>
           <span>{formatSize(totalSize)}</span>
           <span>&middot;</span>
@@ -209,20 +211,20 @@ export default function WaterfallPage() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 max-w-xs">
           <Filter className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Filtrar por URL..." className="pl-8 h-8 text-xs" />
+          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('settings.waterfall_search_placeholder')} className="pl-8 h-8 text-xs" />
         </div>
         <div className="flex gap-1">
-          {types.map(t => (
-            <button key={t} onClick={() => setFilterType(t)}
-              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${filterType === t ? 'text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'}`}
-              style={filterType === t ? { backgroundColor: t === 'All' ? '#404040' : (TYPE_COLORS[Object.keys(TYPE_LABELS).find(k => TYPE_LABELS[k] === t) || ''] || '#404040') } : {}}>
-              {t}
+          {types.map(type => (
+            <button key={type} onClick={() => setFilterType(type)}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${filterType === type ? 'text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'}`}
+              style={filterType === type ? { backgroundColor: type === 'All' ? '#404040' : (TYPE_COLORS[Object.keys(TYPE_LABELS).find(k => TYPE_LABELS[k] === type) || ''] || '#404040') } : {}}>
+              {type === 'All' ? t('settings.waterfall_origin_all') : type}
             </button>
           ))}
         </div>
         <div className="flex gap-1 border-l border-gray-200 pl-2">
-          {([['all', 'Todos'], ['local', 'Local'], ['external', 'Externo']] as const).map(([v, label]) => (
-            <button key={v} onClick={() => setFilterOrigin(v)}
+          {([['all', t('settings.waterfall_origin_all')], ['local', t('settings.waterfall_origin_local')], ['external', t('settings.waterfall_origin_external')]] as const).map(([v, label]) => (
+            <button key={v} onClick={() => setFilterOrigin(v as 'all' | 'local' | 'external')}
               className={`px-2.5 py-1 rounded text-xs font-medium cursor-pointer ${filterOrigin === v ? 'bg-gray-700 text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'}`}>
               {label}
             </button>
@@ -303,15 +305,15 @@ export default function WaterfallPage() {
                       <a href={req.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all text-[11px]">{req.url}</a>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5 text-gray-600">
-                      <div><span className="text-gray-400">Tipo:</span> <span className="font-medium">{req.resourceType}</span></div>
-                      <div><span className="text-gray-400">Status:</span> <span className="font-medium">{req.statusCode}</span></div>
-                      <div><span className="text-gray-400">Protocolo:</span> <span className="font-medium">{req.protocol || '—'}</span></div>
-                      <div><span className="text-gray-400">MIME:</span> <span className="font-medium">{req.mimeType || '—'}</span></div>
-                      <div><span className="text-gray-400">Tamaño:</span> <span className="font-medium">{formatSize(req.transferSize)}</span></div>
-                      <div><span className="text-gray-400">Sin comprimir:</span> <span className="font-medium">{formatSize(req.resourceSize)}</span></div>
-                      <div><span className="text-gray-400">Inicio:</span> <span className="font-medium">{fmtTime(req.startTime)}</span></div>
-                      <div><span className="text-gray-400">Fin:</span> <span className="font-medium">{fmtTime(req.endTime)}</span></div>
-                      <div><span className="text-gray-400">Duración:</span> <span className="font-medium text-gray-900">{fmtTime(duration)}</span></div>
+                      <div><span className="text-gray-400">{t('settings.waterfall_detail_type')}:</span> <span className="font-medium">{req.resourceType}</span></div>
+                      <div><span className="text-gray-400">{t('settings.waterfall_detail_status')}:</span> <span className="font-medium">{req.statusCode}</span></div>
+                      <div><span className="text-gray-400">{t('settings.waterfall_detail_protocol')}:</span> <span className="font-medium">{req.protocol || '—'}</span></div>
+                      <div><span className="text-gray-400">{t('settings.waterfall_detail_mime')}:</span> <span className="font-medium">{req.mimeType || '—'}</span></div>
+                      <div><span className="text-gray-400">{t('settings.waterfall_detail_size')}:</span> <span className="font-medium">{formatSize(req.transferSize)}</span></div>
+                      <div><span className="text-gray-400">{t('settings.waterfall_detail_uncompressed')}:</span> <span className="font-medium">{formatSize(req.resourceSize)}</span></div>
+                      <div><span className="text-gray-400">{t('settings.waterfall_detail_start')}:</span> <span className="font-medium">{fmtTime(req.startTime)}</span></div>
+                      <div><span className="text-gray-400">{t('settings.waterfall_detail_end')}:</span> <span className="font-medium">{fmtTime(req.endTime)}</span></div>
+                      <div><span className="text-gray-400">{t('settings.waterfall_detail_duration')}:</span> <span className="font-medium text-gray-900">{fmtTime(duration)}</span></div>
                     </div>
                   </div>
                 )}
@@ -322,7 +324,7 @@ export default function WaterfallPage() {
 
         {/* Footer */}
         <div className="grid grid-cols-[minmax(140px,1fr)_45px_55px_3fr] gap-0 bg-gray-50 border-t border-gray-200 text-xs font-medium text-gray-600">
-          <div className="px-3 py-2">{filtered.length} Requests</div>
+          <div className="px-3 py-2">{t('settings.waterfall_footer_requests', { count: filtered.length })}</div>
           <div className="px-1 py-2"></div>
           <div className="px-1 py-2 text-right">{formatSize(totalSize)}</div>
           <div className="px-3 py-2">{(totalDuration / 1000).toFixed(2)}s</div>

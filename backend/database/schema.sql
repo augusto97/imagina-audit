@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS audits (
     result_json TEXT NOT NULL,
     waterfall_json TEXT,
     is_pinned INTEGER NOT NULL DEFAULT 0,
+    lang TEXT NOT NULL DEFAULT 'en',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     ip_address TEXT
 );
@@ -26,6 +27,25 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Tabla de traducciones (overrides editados desde admin)
+-- La tupla (lang, namespace, key) es única. Si existe, gana sobre el bundle
+-- de archivos en backend/locales/{lang}/{namespace}.php.
+-- Si source='ai', significa que la traducción fue generada por un provider
+-- (ChatGPT/Claude/Google) y el admin podría no haberla revisado.
+CREATE TABLE IF NOT EXISTS translations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lang TEXT NOT NULL,
+    namespace TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'manual',  -- 'manual' | 'ai' | 'import'
+    ai_provider TEXT,                        -- 'chatgpt' | 'claude' | 'google' si source='ai'
+    reviewed INTEGER NOT NULL DEFAULT 0,     -- 1 si el admin confirmó la traducción AI
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(lang, namespace, key)
+);
+CREATE INDEX IF NOT EXISTS idx_translations_lang_ns ON translations(lang, namespace);
 
 -- Tabla de vulnerabilidades
 CREATE TABLE IF NOT EXISTS vulnerabilities (
@@ -89,6 +109,86 @@ CREATE TABLE IF NOT EXISTS audit_jobs (
     completed_at TEXT
 );
 
+-- Planes: cuotas de escaneo configurables por el admin.
+-- Cada usuario tiene un plan asignado (plan_id). El `monthly_limit` es la
+-- cantidad máxima de audits que ese user puede disparar en un mes calendario.
+-- Un monthly_limit = 0 significa cuota ilimitada (ej. plan interno del equipo).
+-- `max_projects` = 0 también significa ilimitado. Misma convención.
+CREATE TABLE IF NOT EXISTS plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    monthly_limit INTEGER NOT NULL DEFAULT 10,
+    max_projects INTEGER NOT NULL DEFAULT 0,
+    description TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Usuarios: cuentas creadas por el admin. No hay auto-registro — el admin
+-- los da de alta desde /admin/users y les comparte la password inicial.
+-- El user usa esas credenciales en /login (flujo separado de /admin/login).
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    name TEXT,
+    plan_id INTEGER,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_login_at TEXT,
+    FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE SET NULL
+);
+
+-- Rate limit propio para intentos de login de users (sin pisar el de admin)
+CREATE TABLE IF NOT EXISTS user_login_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ip_address TEXT NOT NULL,
+    email TEXT,
+    attempted_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Proyectos: 1 proyecto = 1 URL (modelo simple). El user agrupa su portfolio
+-- de sitios acá. Al lanzar un audit cuya URL coincida con project.url, se
+-- auto-atribuye vía audits.project_id. `share_token` nullable — se setea
+-- cuando el user activa el link público read-only para clientes.
+CREATE TABLE IF NOT EXISTS projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    domain TEXT NOT NULL,
+    notes TEXT,
+    icon TEXT,
+    color TEXT,
+    share_token TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Checklist vivo por proyecto. Se diferencia del `checklist_items` original
+-- (que sigue siendo por audit, snapshot inmutable) — acá mantenemos el
+-- estado de cada métrica a lo largo del tiempo. La reconciliación tras un
+-- audit nuevo es:
+--   * métrica pasó a 🟢 y el user no la tocó (user_modified=0) → status='done' auto
+--   * métrica pasó a 🟢 y el user la había cerrado a mano → queda 'done'
+--   * métrica sigue 🔴/🟡 y el user la había cerrado → se "re-abre" (status='open',
+--       user_modified=0) — el user la cierra de nuevo si quiere
+-- `user_modified=1` marca que el valor actual lo puso el user, no la reconciliación.
+CREATE TABLE IF NOT EXISTS project_checklist_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    metric_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    severity TEXT,
+    note TEXT,
+    user_modified INTEGER NOT NULL DEFAULT 0,
+    completed_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE(project_id, metric_id)
+);
+
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_audits_domain ON audits(domain);
 CREATE INDEX IF NOT EXISTS idx_audits_url ON audits(url);
@@ -103,3 +203,12 @@ CREATE INDEX IF NOT EXISTS idx_wp_snapshots_audit ON wp_snapshots(audit_id);
 CREATE INDEX IF NOT EXISTS idx_audit_jobs_status ON audit_jobs(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_jobs_started ON audit_jobs(started_at);
 CREATE INDEX IF NOT EXISTS idx_audits_pinned ON audits(is_pinned, created_at);
+CREATE INDEX IF NOT EXISTS idx_audits_user ON audits(user_id);
+CREATE INDEX IF NOT EXISTS idx_audits_project ON audits(project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan_id);
+CREATE INDEX IF NOT EXISTS idx_user_login_attempts ON user_login_attempts(ip_address, attempted_at);
+CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_projects_user_domain ON projects(user_id, domain);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_share_token ON projects(share_token) WHERE share_token IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_project_checklist_project ON project_checklist_items(project_id, status);

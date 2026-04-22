@@ -1,4 +1,5 @@
 import { ShieldCheck } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { SectionCard, IssueList, SeverityIcon } from './ui'
 import type { SnapshotReport } from '@/types/snapshotReport'
 
@@ -8,12 +9,19 @@ import type { SnapshotReport } from '@/types/snapshotReport'
  * del sitio — aquí los consolidamos para el reporte técnico.
  */
 export default function SecuritySection({ report }: { report: SnapshotReport }) {
+  const { t } = useTranslation()
   const s = report.security.summary
+
+  const renderValue = (v: unknown): string => {
+    if (typeof v === 'boolean') return v ? t('report.snap_yes') : t('report.snap_no')
+    if (v === null || v === undefined) return '—'
+    return String(v)
+  }
 
   return (
     <SectionCard
-      title="Seguridad (checks internos)"
-      subtitle={`${s.critical} críticos · ${s.warning} warnings · ${s.good} OK`}
+      title={t('report.snap_sec_title')}
+      subtitle={t('report.snap_sec_subtitle', { critical: s.critical, warning: s.warning, good: s.good })}
       icon={<ShieldCheck className="h-4 w-4 text-[var(--accent-primary)]" strokeWidth={1.75} />}
     >
       {/* Tabla de checks */}
@@ -22,9 +30,9 @@ export default function SecuritySection({ report }: { report: SnapshotReport }) 
           <thead className="bg-[var(--bg-secondary)] text-left text-[10px] uppercase tracking-wider text-[var(--text-tertiary)]">
             <tr>
               <th className="w-8 px-2 py-2" />
-              <th className="px-3 py-2">Verificación</th>
-              <th className="px-3 py-2">Estado</th>
-              <th className="px-3 py-2">Detalle</th>
+              <th className="px-3 py-2">{t('report.snap_sec_col_check')}</th>
+              <th className="px-3 py-2">{t('report.snap_sec_col_status')}</th>
+              <th className="px-3 py-2">{t('report.snap_sec_col_detail')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border-default)]">
@@ -51,15 +59,9 @@ export default function SecuritySection({ report }: { report: SnapshotReport }) 
 
       {/* Issues accionables */}
       <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-        Hallazgos accionables
+        {t('report.snap_sec_actionable')}
       </h4>
       <IssueList issues={report.security.issues} />
     </SectionCard>
   )
-}
-
-function renderValue(v: unknown): string {
-  if (typeof v === 'boolean') return v ? 'Sí' : 'No'
-  if (v === null || v === undefined) return '—'
-  return String(v)
 }

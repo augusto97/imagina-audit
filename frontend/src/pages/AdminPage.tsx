@@ -14,9 +14,13 @@ import Settings2FA from '@/components/admin/Settings2FA'
 import SettingsHomeCMS from '@/components/admin/SettingsHomeCMS'
 import SettingsMessages from '@/components/admin/SettingsMessages'
 import SettingsPlans from '@/components/admin/SettingsPlans'
+import AdminUsers from '@/components/admin/AdminUsers'
+import AdminUserPlans from '@/components/admin/AdminUserPlans'
+import AdminProjects from '@/components/admin/AdminProjects'
 import SettingsScoring from '@/components/admin/SettingsScoring'
 import SettingsQueue from '@/components/admin/SettingsQueue'
 import SettingsRetention from '@/components/admin/SettingsRetention'
+import SettingsTranslations from '@/components/admin/SettingsTranslations'
 import SystemHealth from '@/components/admin/SystemHealth'
 import VulnerabilityManager from '@/components/admin/VulnerabilityManager'
 import TechnicalReport from '@/components/admin/TechnicalReport'
@@ -60,6 +64,9 @@ export default function AdminPage() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="leads" element={<LeadsTable />} />
         <Route path="leads/:id" element={<LeadDetail />} />
+        <Route path="users" element={<AdminUsers />} />
+        <Route path="user-plans" element={<AdminUserPlans />} />
+        <Route path="projects" element={<AdminProjects />} />
         <Route path="leads/:id/report" element={<TechnicalReport />} />
         <Route path="leads/:id/internal" element={<SnapshotReport />} />
         <Route path="leads/:id/waterfall" element={<WaterfallPage />} />
@@ -73,6 +80,7 @@ export default function AdminPage() {
         <Route path="scoring" element={<SettingsScoring />} />
         <Route path="queue" element={<SettingsQueue />} />
         <Route path="retention" element={<SettingsRetention />} />
+        <Route path="translations" element={<SettingsTranslations />} />
         <Route path="health" element={<SystemHealth />} />
         <Route path="vulnerabilities" element={<VulnerabilityManager />} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />

@@ -383,7 +383,7 @@ class QueueManager {
             $waterfallJson = JsonStore::encode($perfData);
 
             $db->execute(
-                "INSERT INTO audits (id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_wordpress, scan_duration_ms, result_json, waterfall_json, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO audits (id, url, domain, lead_name, lead_email, lead_whatsapp, lead_company, global_score, global_level, is_wordpress, scan_duration_ms, result_json, waterfall_json, ip_address, user_id, project_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     $result['id'], $result['url'], $result['domain'],
                     $leadData['leadName'] ?? null, $leadData['leadEmail'] ?? null,
@@ -391,8 +391,25 @@ class QueueManager {
                     $result['globalScore'], $result['globalLevel'],
                     $result['isWordPress'] ? 1 : 0, $result['scanDurationMs'],
                     $resultJson, $waterfallJson, $ip,
+                    $leadData['userId'] ?? null,
+                    $leadData['projectId'] ?? null,
                 ]
             );
+
+            // Reconciliar checklist vivo también desde el drain worker. Mismo
+            // comportamiento que audit.php para que un audit encolado resulte
+            // en el mismo estado final del checklist que uno ejecutado inline.
+            if (!empty($leadData['projectId'])) {
+                try {
+                    Project::reconcileChecklist(
+                        $db,
+                        (int) $leadData['projectId'],
+                        Project::flattenMetrics($resultForStorage)
+                    );
+                } catch (Throwable $e) {
+                    Logger::warning('Project::reconcileChecklist falló en queue: ' . $e->getMessage());
+                }
+            }
         } catch (Throwable $e) {
             Logger::error('processJob error guardando: ' . $e->getMessage());
             self::markFailed($auditId, 'Error guardando el resultado.');

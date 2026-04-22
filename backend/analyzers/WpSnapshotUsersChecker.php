@@ -48,17 +48,20 @@ class WpSnapshotUsersChecker {
         if ($adminCount === 0) { $score = 60; $issues[] = 'Sin administrador visible (raro)'; }
 
         return Scoring::createMetric(
-            'users_roles', 'Usuarios y roles',
+            'users_roles',
+            Translator::t('wp_snapshot.users.name'),
             $total,
-            "$total usuarios · $adminCount admin" . ($adminCount !== 1 ? 's' : ''),
+            $adminCount === 1
+                ? Translator::t('wp_snapshot.users.display_one_admin', ['total' => $total, 'admins' => $adminCount])
+                : Translator::t('wp_snapshot.users.display_many_admin', ['total' => $total, 'admins' => $adminCount]),
             Scoring::clamp($score),
             $adminCount <= 1
-                ? "$total usuarios registrados con $adminCount administrador. Mínimo privilegio aplicado correctamente."
-                : "$total usuarios con $adminCount administradores. Cada admin adicional aumenta la superficie de ataque — basta con que uno tenga password débil o sea víctima de phishing.",
+                ? Translator::t('wp_snapshot.users.desc.ok', ['total' => $total, 'admins' => $adminCount])
+                : Translator::t('wp_snapshot.users.desc.too_many', ['total' => $total, 'admins' => $adminCount]),
             $adminCount > 3
-                ? 'Revisar la lista de admins en Usuarios → Todos los usuarios (filtro rol: Administrador). Bajar a Editor quienes no necesiten cambiar plugins/temas.'
-                : ($adminCount === 2 ? 'Revisar si los 2 admins son realmente necesarios.' : ''),
-            'Aplicamos principio de mínimo privilegio y activamos 2FA en todas las cuentas admin.',
+                ? Translator::t('wp_snapshot.users.recommend.many')
+                : ($adminCount === 2 ? Translator::t('wp_snapshot.users.recommend.two') : ''),
+            Translator::t('wp_snapshot.users.solution'),
             ['total' => $total, 'administrators' => $adminCount, 'rolesBreakdown' => $byRole]
         );
     }
@@ -74,15 +77,16 @@ class WpSnapshotUsersChecker {
         $enabled = (bool) ($appPw['value'] ?? false);
 
         return Scoring::createMetric(
-            'app_passwords', 'Application Passwords (REST API)',
+            'app_passwords',
+            Translator::t('wp_snapshot.apppw.name'),
             $enabled,
-            $enabled ? 'Habilitadas' : 'Deshabilitadas',
+            $enabled ? Translator::t('wp_snapshot.apppw.display.enabled') : Translator::t('wp_snapshot.apppw.display.disabled'),
             null,
             $enabled
-                ? 'Application Passwords están habilitadas. Permiten autenticar requests REST desde apps externas (mobile WP app, Zapier, etc.). Seguro si no se usan, pero si no las necesitas puedes desactivarlas para reducir superficie.'
-                : 'Application Passwords deshabilitadas. Reduce superficie de ataque sobre REST API.',
+                ? Translator::t('wp_snapshot.apppw.desc.enabled')
+                : Translator::t('wp_snapshot.apppw.desc.disabled'),
             '',
-            'Configuramos correctamente los métodos de autenticación según el uso real del sitio.',
+            Translator::t('wp_snapshot.apppw.solution'),
             ['enabled' => $enabled]
         );
     }

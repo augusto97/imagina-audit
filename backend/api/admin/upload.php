@@ -21,7 +21,7 @@ require_once dirname(__DIR__) . '/bootstrap.php';
 Auth::requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Método no permitido', 405);
+    Response::error(Translator::t('api.common.method_not_allowed'), 405);
 }
 
 $type = $_POST['type'] ?? '';
@@ -31,17 +31,17 @@ $validTypes = [
     'favicon'        => 'favicon_url',
 ];
 if (!isset($validTypes[$type])) {
-    Response::error('Tipo de asset inválido. Usa: logo, logo_collapsed o favicon.', 400);
+    Response::error(Translator::t('admin_api.upload.asset_type_invalid'), 400);
 }
 
 if (empty($_FILES['file']) || ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-    Response::error('No se recibió archivo o hubo un error de subida.', 400);
+    Response::error(Translator::t('admin_api.upload.no_file'), 400);
 }
 
 $file = $_FILES['file'];
 $maxBytes = 2 * 1024 * 1024; // 2 MB
 if ($file['size'] > $maxBytes) {
-    Response::error('Archivo demasiado grande. Máximo 2 MB.', 400);
+    Response::error(Translator::t('admin_api.upload.file_too_big'), 400);
 }
 
 // Validar MIME real del contenido, no solo el Content-Type del cliente
@@ -54,7 +54,7 @@ $allowed = [
 
 // Favicon también acepta .ico, pero nos limitamos a PNG (mismas browsers lo renderizan bien)
 if (!isset($allowed[$mime])) {
-    Response::error('Formato no permitido. Solo JPG y PNG.', 400);
+    Response::error(Translator::t('admin_api.upload.bad_format'), 400);
 }
 $ext = $allowed[$mime];
 
@@ -67,7 +67,7 @@ if (!is_dir($uploadsDir)) {
     @mkdir($uploadsDir, 0755, true);
 }
 if (!is_dir($uploadsDir) || !is_writable($uploadsDir)) {
-    Response::error('No se pudo acceder al directorio de uploads en el servidor.', 500);
+    Response::error(Translator::t('admin_api.upload.dir_error'), 500);
 }
 
 // Nombre seguro: type + hash random (evita colisiones y oculta info del uploader)
@@ -76,7 +76,7 @@ $filename = "$type-$hash.$ext";
 $destPath = $uploadsDir . '/' . $filename;
 
 if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-    Response::error('No se pudo mover el archivo subido.', 500);
+    Response::error(Translator::t('admin_api.upload.move_error'), 500);
 }
 @chmod($destPath, 0644);
 
@@ -107,7 +107,7 @@ try {
     );
 } catch (Throwable $e) {
     Logger::error('Error guardando URL de upload: ' . $e->getMessage());
-    Response::error('Archivo subido pero no se pudo registrar en la configuración.', 500);
+    Response::error(Translator::t('admin_api.upload.register_error'), 500);
 }
 
 Response::success([

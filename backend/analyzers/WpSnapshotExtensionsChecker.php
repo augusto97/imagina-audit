@@ -41,18 +41,20 @@ class WpSnapshotExtensionsChecker {
         $activeOutdated = count(array_filter($outdated, fn($p) => $p['active']));
         $score = Scoring::clamp(100 - ($activeOutdated * 10) - ((count($outdated) - $activeOutdated) * 4));
 
+        $outdatedCount = count($outdated);
         return Scoring::createMetric(
-            'plugins_outdated', 'Plugins desactualizados',
-            count($outdated),
-            count($outdated) === 0
-                ? "Todos los $total plugins al día"
-                : count($outdated) . " de $total con actualización pendiente",
+            'plugins_outdated',
+            Translator::t('wp_snapshot.pluginsout.name'),
+            $outdatedCount,
+            $outdatedCount === 0
+                ? Translator::t('wp_snapshot.pluginsout.display.ok', ['total' => $total])
+                : Translator::t('wp_snapshot.pluginsout.display.bad', ['outdated' => $outdatedCount, 'total' => $total]),
             $score,
-            count($outdated) === 0
-                ? "Todos los $total plugins están en su última versión."
-                : count($outdated) . " plugins tienen updates disponibles ($activeOutdated activos). Los plugins desactualizados son la principal causa de sitios WordPress hackeados.",
-            count($outdated) > 0 ? 'Actualizar desde WP Admin → Plugins. Hacer backup antes de actualizar plugins críticos (WooCommerce, Elementor, etc.).' : '',
-            'Actualizamos todos los plugins semanalmente con testing previo de compatibilidad.',
+            $outdatedCount === 0
+                ? Translator::t('wp_snapshot.pluginsout.desc.ok', ['total' => $total])
+                : Translator::t('wp_snapshot.pluginsout.desc.bad', ['outdated' => $outdatedCount, 'active' => $activeOutdated]),
+            $outdatedCount > 0 ? Translator::t('wp_snapshot.pluginsout.recommend') : '',
+            Translator::t('wp_snapshot.pluginsout.solution'),
             ['total' => $total, 'updateAvailable' => $updateAvailable, 'outdated' => $outdated]
         );
     }
@@ -76,15 +78,16 @@ class WpSnapshotExtensionsChecker {
         $score = $count === 0 ? 100 : ($count <= 2 ? 85 : ($count <= 5 ? 60 : 30));
 
         return Scoring::createMetric(
-            'plugins_inactive', 'Plugins inactivos',
+            'plugins_inactive',
+            Translator::t('wp_snapshot.pluginsinact.name'),
             $count,
-            $count === 0 ? 'Ninguno' : "$count plugins",
+            $count === 0 ? Translator::t('wp_snapshot.pluginsinact.display.ok') : Translator::t('wp_snapshot.pluginsinact.display.bad', ['count' => $count]),
             $score,
             $count === 0
-                ? 'No hay plugins inactivos. Correcto.'
-                : "$count plugins inactivos instalados. Aunque estén desactivados, sus archivos siguen en el servidor y pueden ser explotados si contienen vulnerabilidades.",
-            $count > 0 ? 'Eliminar los plugins que no se usan desde Plugins → Desactivados → Eliminar. Conservar solo los activos.' : '',
-            'Limpiamos plugins inactivos reduciendo superficie de ataque y tamaño del sitio.',
+                ? Translator::t('wp_snapshot.pluginsinact.desc.ok')
+                : Translator::t('wp_snapshot.pluginsinact.desc.bad', ['count' => $count]),
+            $count > 0 ? Translator::t('wp_snapshot.pluginsinact.recommend') : '',
+            Translator::t('wp_snapshot.pluginsinact.solution'),
             ['count' => $count, 'list' => $inactiveDetails]
         );
     }
@@ -99,15 +102,16 @@ class WpSnapshotExtensionsChecker {
         $score = $active <= 20 ? 80 : ($active <= 30 ? 60 : ($active <= 40 ? 40 : 20));
 
         return Scoring::createMetric(
-            'plugin_overload', 'Cantidad de plugins activos',
+            'plugin_overload',
+            Translator::t('wp_snapshot.overload.name'),
             $active,
-            "$active plugins activos",
+            Translator::t('wp_snapshot.overload.display', ['count' => $active]),
             $score,
-            "$active plugins activos. Cada plugin añade consultas a DB, código PHP y potencial de conflictos. La regla práctica: <20 plugins en la mayoría de sitios.",
+            Translator::t('wp_snapshot.overload.desc', ['count' => $active]),
             $active > 30
-                ? 'Auditar qué plugins son realmente necesarios. Combinar funcionalidades (muchos builders incluyen lo de varios plugins). Eliminar redundantes.'
-                : 'Revisar periódicamente si algún plugin se puede reemplazar por código en el tema o combinar con otros.',
-            'Auditamos el stack de plugins y recomendamos consolidación.',
+                ? Translator::t('wp_snapshot.overload.recommend.heavy')
+                : Translator::t('wp_snapshot.overload.recommend.normal'),
+            Translator::t('wp_snapshot.overload.solution'),
             ['activeCount' => $active, 'total' => $plugins['total_plugins'] ?? 0]
         );
     }
@@ -129,16 +133,17 @@ class WpSnapshotExtensionsChecker {
         $withoutAutoUpdate = array_values(array_filter($activeList, fn($p) => !($p['auto_update'] ?? false)));
         $withoutAutoUpdateList = array_map(fn($p) => $p['name'] ?? '?', $withoutAutoUpdate);
 
+        $params = ['withAuto' => $withAutoUpdate, 'total' => $total, 'pct' => round($pct)];
         return Scoring::createMetric(
-            'plugins_auto_update', 'Auto-update de plugins activos',
+            'plugins_auto_update',
+            Translator::t('wp_snapshot.pluginsauto.name'),
             $withAutoUpdate,
-            "$withAutoUpdate/$total con auto-update (" . round($pct) . "%)",
+            Translator::t('wp_snapshot.pluginsauto.display', $params),
             $score,
-            "$withAutoUpdate de $total plugins activos tienen actualización automática habilitada. " . ($pct >= 80 ? 'Buena práctica.' : 'Los que no tienen auto-update solo se actualizan manualmente.'),
-            $pct < 80
-                ? 'En Plugins → habilitar "Actualizaciones automáticas" para los plugins en los que confíes (Yoast, Elementor, WooCommerce, etc.).'
-                : '',
-            'Configuramos auto-updates selectivas con rollback automático si algo falla.',
+            Translator::t('wp_snapshot.pluginsauto.desc.prefix', $params)
+                . ($pct >= 80 ? Translator::t('wp_snapshot.pluginsauto.desc.good') : Translator::t('wp_snapshot.pluginsauto.desc.bad')),
+            $pct < 80 ? Translator::t('wp_snapshot.pluginsauto.recommend') : '',
+            Translator::t('wp_snapshot.pluginsauto.solution'),
             ['withAutoUpdate' => $withAutoUpdate, 'total' => $total, 'withoutAutoUpdate' => array_slice($withoutAutoUpdateList, 0, 15)]
         );
     }
@@ -158,13 +163,14 @@ class WpSnapshotExtensionsChecker {
         foreach ($dropins as $d) $items[] = ['type' => 'dropin', 'name' => $d['name'] ?? $d['file'] ?? '?', 'version' => $d['version'] ?? '', 'author' => $d['author'] ?? ''];
 
         return Scoring::createMetric(
-            'mu_plugins_dropins', 'MU-plugins y drop-ins',
+            'mu_plugins_dropins',
+            Translator::t('wp_snapshot.mudrop.name'),
             $total,
-            count($mu) . ' MU + ' . count($dropins) . ' drop-ins',
+            Translator::t('wp_snapshot.mudrop.display', ['mu' => count($mu), 'drop' => count($dropins)]),
             null,
-            "$total componentes instalados silenciosamente (MU-plugins y drop-ins). Estos se cargan automáticamente y pueden ser inyectados por hosting/backup plugins/ManageWP/etc. Merece la pena revisarlos uno a uno.",
-            'Revisar wp-content/mu-plugins/ y wp-content/*.php (drop-ins como object-cache.php, advanced-cache.php, db.php). Asegurarse de que cada uno es legítimo.',
-            'Auditamos MU-plugins y drop-ins para detectar malware y backdoors.',
+            Translator::t('wp_snapshot.mudrop.desc', ['total' => $total]),
+            Translator::t('wp_snapshot.mudrop.recommend'),
+            Translator::t('wp_snapshot.mudrop.solution'),
             ['mu' => $mu, 'dropins' => $dropins, 'items' => $items]
         );
     }
@@ -176,7 +182,7 @@ class WpSnapshotExtensionsChecker {
         $active = $themes['active_theme'] ?? [];
         if (empty($active)) return null;
 
-        $name = $active['name'] ?? 'Desconocido';
+        $name = $active['name'] ?? Translator::t('wp_snapshot.theme.unknown');
         $version = $active['version'] ?? '';
         $hasUpdate = (bool) ($active['has_update'] ?? false);
         $isChild = (bool) ($active['is_child_theme'] ?? false);
@@ -184,21 +190,26 @@ class WpSnapshotExtensionsChecker {
         $author = $active['author'] ?? '';
         $parent = $active['parent_theme'] ?? null;
 
-        $issues = [];
         $score = 100;
-        if ($hasUpdate) { $score -= 30; $issues[] = 'actualización disponible'; }
-        if (!$isChild) { $score -= 20; $issues[] = 'modificaciones directas al tema padre se perderán en updates'; }
+        if ($hasUpdate) { $score -= 30; }
+        if (!$isChild)  { $score -= 20; }
+
+        $childSuffix = $isChild ? Translator::t('wp_snapshot.theme.display.child') : '';
+        $updateNote = $hasUpdate ? Translator::t('wp_snapshot.theme.desc.update_note') : '';
 
         return Scoring::createMetric(
-            'theme_active', 'Tema activo',
+            'theme_active',
+            Translator::t('wp_snapshot.theme.name'),
             $name,
-            "$name $version" . ($isChild ? ' (child)' : ''),
+            Translator::t('wp_snapshot.theme.display', ['name' => $name, 'version' => $version, 'childSuffix' => $childSuffix]),
             Scoring::clamp($score),
             $isChild
-                ? "Usas child theme de $parent. Puedes personalizar sin perder cambios al actualizar el parent."
-                : "Usas tema $name directamente. Cualquier modificación al código se perderá al actualizar. " . ($hasUpdate ? "Además hay actualización disponible." : ''),
-            !$isChild ? 'Crear un child theme para personalizaciones sin riesgo de perderlas. En wp-content/themes crear carpeta con style.css (Template: ' . strtolower($name) . ') y functions.php.' : ($hasUpdate ? 'Actualizar el tema a la última versión.' : ''),
-            'Creamos child themes para personalizaciones seguras y actualizamos el tema semanalmente.',
+                ? Translator::t('wp_snapshot.theme.desc.child', ['parent' => $parent])
+                : Translator::t('wp_snapshot.theme.desc.no_child', ['name' => $name, 'updateNote' => $updateNote]),
+            !$isChild
+                ? Translator::t('wp_snapshot.theme.recommend.no_child', ['slug' => strtolower($name)])
+                : ($hasUpdate ? Translator::t('wp_snapshot.theme.recommend.update') : ''),
+            Translator::t('wp_snapshot.theme.solution'),
             ['name' => $name, 'version' => $version, 'author' => $author, 'isChild' => $isChild, 'parent' => $parent, 'isBlockTheme' => $isBlock, 'hasUpdate' => $hasUpdate]
         );
     }
@@ -223,13 +234,14 @@ class WpSnapshotExtensionsChecker {
         ], $inactiveList);
 
         return Scoring::createMetric(
-            'themes_inactive', 'Temas inactivos',
+            'themes_inactive',
+            Translator::t('wp_snapshot.themesinact.name'),
             $count,
-            "$count temas sin usar de $total",
+            Translator::t('wp_snapshot.themesinact.display', ['count' => $count, 'total' => $total]),
             $score,
-            "$count temas inactivos en disco. Aunque no se usen, su código sigue en el servidor y puede contener vulnerabilidades. Mantener solo el activo (+ su padre si es child + uno default como fallback).",
-            'Eliminar temas inactivos desde Apariencia → Temas → Detalles → Eliminar.',
-            'Limpiamos temas innecesarios reduciendo superficie de ataque.',
+            Translator::t('wp_snapshot.themesinact.desc', ['count' => $count]),
+            Translator::t('wp_snapshot.themesinact.recommend'),
+            Translator::t('wp_snapshot.themesinact.solution'),
             ['count' => $count, 'inactive' => $inactiveNames]
         );
     }

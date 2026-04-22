@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { GitCompareArrows, Loader2, Trophy, Minus, ArrowLeft } from 'lucide-react'
 import Layout from '@/components/layout/Layout'
 import ScoreGauge from '@/components/audit/ScoreGauge'
@@ -25,6 +26,7 @@ interface CompareData {
 }
 
 export default function ComparePage() {
+  const { t } = useTranslation()
   const [data, setData] = useState<CompareData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -40,7 +42,7 @@ export default function ComparePage() {
       const res = await api.post('/compare.php', { url1, url2 })
       setData(res.data.data)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al comparar los sitios'
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || t('public.compare_error')
       setError(msg)
     }
     setLoading(false)
@@ -53,29 +55,29 @@ export default function ComparePage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
             <GitCompareArrows className="mx-auto h-12 w-12 text-[var(--accent-primary)]" strokeWidth={1} />
             <h1 className="mt-4 text-3xl font-bold text-[var(--text-primary)]">
-              Compara Dos Sitios <span className="highlight-yellow">WordPress</span>
+              {t('public.compare_title_prefix')} <span className="highlight-yellow">{t('public.compare_title_highlight')}</span> {t('public.compare_title_suffix')}
             </h1>
-            <p className="mt-2 text-[var(--text-secondary)]">Descubre cuál está mejor optimizado en seguridad, velocidad y SEO</p>
+            <p className="mt-2 text-[var(--text-secondary)]">{t('public.compare_subtitle')}</p>
 
             <Card className="mx-auto mt-8 max-w-2xl shadow-lg">
               <CardContent className="p-6 sm:p-8">
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Sitio 1</label>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{t('public.compare_site_1')}</label>
                       <Input {...register('url1', { required: true })} placeholder="https://tusitio.com" disabled={loading} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Sitio 2</label>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{t('public.compare_site_2')}</label>
                       <Input {...register('url2', { required: true })} placeholder="https://competidor.com" disabled={loading} />
                     </div>
                   </div>
                   <Button type="submit" size="xl" className="w-full" disabled={loading}>
                     {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <GitCompareArrows className="h-5 w-5" strokeWidth={1.5} />}
-                    {loading ? 'Comparando... (puede tardar hasta 2 min)' : 'Comparar'}
+                    {loading ? t('public.compare_submitting') : t('public.compare_submit')}
                   </Button>
                   {error && <p className="text-sm text-red-500">{error}</p>}
-                  <p className="text-xs text-[var(--text-tertiary)]">El análisis puede tardar hasta 2 minutos</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">{t('public.compare_duration_hint')}</p>
                 </form>
               </CardContent>
             </Card>
@@ -89,14 +91,15 @@ export default function ComparePage() {
 }
 
 function CompareResults({ data, onReset }: { data: CompareData; onReset: () => void }) {
+  const { t } = useTranslation()
   const { audit1, audit2, comparison } = data
-  const winnerLabel = comparison.winner === 'url1' ? audit1.domain : comparison.winner === 'url2' ? audit2.domain : 'Empate'
+  const winnerLabel = comparison.winner === 'url1' ? audit1.domain : comparison.winner === 'url2' ? audit2.domain : t('public.compare_winner_tie')
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onReset}><ArrowLeft className="h-4 w-4" /> Nueva comparación</Button>
+        <Button variant="ghost" size="sm" onClick={onReset}><ArrowLeft className="h-4 w-4" /> {t('public.compare_new')}</Button>
       </div>
 
       {/* Score cara a cara */}
@@ -111,15 +114,15 @@ function CompareResults({ data, onReset }: { data: CompareData; onReset: () => v
               {comparison.winner === 'tie' ? (
                 <div className="flex flex-col items-center gap-1">
                   <Minus className="h-8 w-8 text-[var(--text-tertiary)]" />
-                  <Badge variant="secondary">Empate</Badge>
+                  <Badge variant="secondary">{t('public.compare_winner_tie')}</Badge>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-1">
                   <Trophy className="h-8 w-8 text-amber-500" strokeWidth={1.5} />
-                  <Badge variant="success">{winnerLabel} gana por {comparison.scoreDifference} pts</Badge>
+                  <Badge variant="success">{t('public.compare_winner_wins', { winner: winnerLabel, diff: comparison.scoreDifference })}</Badge>
                 </div>
               )}
-              <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">VS</p>
+              <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">{t('public.compare_vs')}</p>
             </div>
             <div className="text-center">
               <ScoreGauge score={audit2.globalScore} level={audit2.globalLevel} size="md" />
@@ -131,7 +134,7 @@ function CompareResults({ data, onReset }: { data: CompareData; onReset: () => v
 
       {/* Tabla por módulo */}
       <Card className="border-0 shadow-sm">
-        <CardHeader><CardTitle>Comparación por Módulo</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('public.compare_by_module')}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {comparison.moduleComparison.map((mod, i) => {
             const max = Math.max(mod.score1, mod.score2, 1)
@@ -163,10 +166,10 @@ function CompareResults({ data, onReset }: { data: CompareData; onReset: () => v
       {/* Links a informes individuales */}
       <div className="grid gap-4 sm:grid-cols-2">
         <a href={`/results/${audit1.id}`} target="_blank" rel="noreferrer">
-          <Button variant="outline" className="w-full">Ver informe completo — {audit1.domain}</Button>
+          <Button variant="outline" className="w-full">{t('public.compare_view_report', { domain: audit1.domain })}</Button>
         </a>
         <a href={`/results/${audit2.id}`} target="_blank" rel="noreferrer">
-          <Button variant="outline" className="w-full">Ver informe completo — {audit2.domain}</Button>
+          <Button variant="outline" className="w-full">{t('public.compare_view_report', { domain: audit2.domain })}</Button>
         </a>
       </div>
     </motion.div>

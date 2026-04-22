@@ -138,6 +138,50 @@ switch ($endpoint) {
         require __DIR__ . '/admin/retention-preview.php';
         break;
 
+    case 'admin/users':
+        require __DIR__ . '/admin/users.php';
+        break;
+
+    case 'admin/plans':
+        require __DIR__ . '/admin/plans.php';
+        break;
+
+    case 'admin/projects':
+        require __DIR__ . '/admin/projects.php';
+        break;
+
+    case 'user/login':
+        require __DIR__ . '/user/login.php';
+        break;
+
+    case 'user/logout':
+        require __DIR__ . '/user/logout.php';
+        break;
+
+    case 'user/session':
+        require __DIR__ . '/user/session.php';
+        break;
+
+    case 'user/audits':
+        require __DIR__ . '/user/audits.php';
+        break;
+
+    case 'user/projects':
+        require __DIR__ . '/user/projects.php';
+        break;
+
+    case 'user/project-checklist':
+        require __DIR__ . '/user/project-checklist.php';
+        break;
+
+    case 'user/project-share':
+        require __DIR__ . '/user/project-share.php';
+        break;
+
+    case 'shared/project':
+        require __DIR__ . '/shared/project.php';
+        break;
+
     default:
-        Response::error('Endpoint no encontrado', 404);
+        Response::error(Translator::t('api.common.endpoint_not_found'), 404);
 }
