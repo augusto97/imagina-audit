@@ -356,6 +356,59 @@ export function useAdmin() {
     await api.delete('/admin/languages.php', { params: { code } })
   }, [])
 
+  /**
+   * Descarga el pack JSON de un idioma disparando un download en el browser.
+   * Hacemos el fetch vía axios para mantener la cookie de sesión — un
+   * simple <a href> con la URL también funciona, pero perderíamos los
+   * headers de seguridad que el backend exige.
+   */
+  const exportLanguagePack = useCallback(async (code: string) => {
+    const res = await api.get('/admin/translations-export.php', {
+      params: { lang: code },
+      responseType: 'blob',
+    })
+    const blob = new Blob([res.data], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `imagina-audit-lang-${code}.json`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }, [])
+
+  const importLanguagePack = useCallback(async (body: {
+    payload: Record<string, unknown>
+    mode: 'fill_missing' | 'replace_all' | 'smart_merge'
+    dryRun: boolean
+  }) => {
+    const res = await api.post('/admin/translations-import.php', body)
+    return res.data.data as {
+      dryRun?: boolean
+      applied?: boolean
+      mode: string
+      lang: string
+      languageCreated?: boolean
+      totalInPack?: number
+      willAdd?: number
+      willChange?: number
+      willSkip?: number
+      added?: number
+      changed?: number
+      skipped?: number
+      truncated?: boolean
+      changes?: Array<{
+        namespace: string
+        key: string
+        currentValue: string | null
+        incomingValue: string
+        action: 'add' | 'change' | 'skip'
+        reason?: string
+      }>
+    }
+  }, [])
+
   return {
     fetchDashboard, fetchLeads, fetchLeadDetail, deleteLead, bulkLeads,
     fetchSettings, updateSettings, fetchQueueStatus,
@@ -370,5 +423,6 @@ export function useAdmin() {
     fetchUserPlans, createUserPlan, updateUserPlan, deleteUserPlan,
     fetchAdminProjects, deleteAdminProject,
     fetchAdminLanguages, createAdminLanguage, updateAdminLanguage, deleteAdminLanguage,
+    exportLanguagePack, importLanguagePack,
   }
 }

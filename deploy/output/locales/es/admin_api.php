@@ -84,6 +84,11 @@ return [
     'languages.delete_error'        => 'Error al eliminar el idioma.',
     'languages.cannot_delete_default' => 'No se puede eliminar el idioma por defecto.',
 
+    // ——— /admin/translations-import.php —————————————————————————
+    'translations_import.invalid_file' => 'Archivo inválido. Se esperaba un pack de idioma exportado desde Imagina Audit.',
+    'translations_import.invalid_mode' => 'Modo de import inválido.',
+    'translations_import.apply_error'  => 'No se pudo aplicar el import.',
+
     // ——— /admin/update-vulnerabilities.php ——————————————————————
     'update_vulns.update_error' => 'Error al actualizar: {{details}}',
 

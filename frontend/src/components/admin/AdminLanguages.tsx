@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { Loader2, Plus, Trash2, Globe2, Languages as LanguagesIcon, Wand2, CheckCircle2, XCircle, FileJson, Eye, EyeOff } from 'lucide-react'
+import { Loader2, Plus, Trash2, Globe2, Languages as LanguagesIcon, Wand2, CheckCircle2, XCircle, FileJson, Eye, EyeOff, Download, Upload, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,32 @@ import { Switch } from '@/components/ui/switch'
 import { useAdmin } from '@/hooks/useAdmin'
 import { useLanguagesStore } from '@/store/languagesStore'
 import { COMMON_LANGUAGE_NAMES } from '@/i18n'
+
+type ImportMode = 'fill_missing' | 'replace_all' | 'smart_merge'
+
+interface ImportPreview {
+  dryRun?: boolean
+  applied?: boolean
+  mode: string
+  lang: string
+  languageCreated?: boolean
+  totalInPack?: number
+  willAdd?: number
+  willChange?: number
+  willSkip?: number
+  added?: number
+  changed?: number
+  skipped?: number
+  truncated?: boolean
+  changes?: Array<{
+    namespace: string
+    key: string
+    currentValue: string | null
+    incomingValue: string
+    action: 'add' | 'change' | 'skip'
+    reason?: string
+  }>
+}
 
 interface AdminLanguage {
   code: string
@@ -51,7 +77,7 @@ interface FormValues {
  */
 export default function AdminLanguages() {
   const { t } = useTranslation()
-  const { fetchAdminLanguages, createAdminLanguage, updateAdminLanguage, deleteAdminLanguage } = useAdmin()
+  const { fetchAdminLanguages, createAdminLanguage, updateAdminLanguage, deleteAdminLanguage, exportLanguagePack, importLanguagePack } = useAdmin()
   const reloadPublic = useLanguagesStore(s => s.load)
   const [languages, setLanguages] = useState<AdminLanguage[]>([])
   const [defaultCode, setDefaultCode] = useState('en')
@@ -59,6 +85,7 @@ export default function AdminLanguages() {
   const [creating, setCreating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<AdminLanguage | null>(null)
   const [busyCode, setBusyCode] = useState<string | null>(null)
+  const [importFor, setImportFor] = useState<AdminLanguage | 'new' | null>(null)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -84,6 +111,18 @@ export default function AdminLanguages() {
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } }
       toast.error(axiosErr.response?.data?.error ?? t('admin_languages.toast_save_error'))
+    }
+    setBusyCode(null)
+  }
+
+  const handleExport = async (lang: AdminLanguage) => {
+    setBusyCode(lang.code)
+    try {
+      await exportLanguagePack(lang.code)
+      toast.success(t('admin_languages.toast_exported'))
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } }
+      toast.error(axiosErr.response?.data?.error ?? t('admin_languages.toast_export_error'))
     }
     setBusyCode(null)
   }
@@ -114,11 +153,34 @@ export default function AdminLanguages() {
           </h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">{t('admin_languages.subtitle')}</p>
         </div>
-        <Button onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4" />
-          {t('admin_languages.add')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportFor('new')}>
+            <Upload className="h-4 w-4" />
+            {t('admin_languages.import_pack')}
+          </Button>
+          <Button onClick={() => setCreating(true)}>
+            <Plus className="h-4 w-4" />
+            {t('admin_languages.add')}
+          </Button>
+        </div>
       </div>
+
+      {/* Info notice sobre cómo funciona el export/import + actualizaciones */}
+      <Card className="border-blue-200 bg-blue-50/40">
+        <CardContent className="pt-4 pb-4">
+          <div className="flex items-start gap-3">
+            <Info className="h-4 w-4 mt-0.5 text-blue-600 shrink-0" />
+            <div className="space-y-1 text-xs text-[var(--text-secondary)]">
+              <p className="font-semibold text-[var(--text-primary)]">{t('admin_languages.info_title')}</p>
+              <p>{t('admin_languages.info_line_storage')}</p>
+              <p>{t('admin_languages.info_line_share')}</p>
+              <p className="text-amber-700">
+                <strong>{t('admin_languages.info_update_strong')}</strong> {t('admin_languages.info_update_body')}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {loading ? (
         <Skeleton className="h-64 rounded-2xl" />
@@ -178,7 +240,7 @@ export default function AdminLanguages() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
                     {!isDefault && (
                       <Link to={`/admin/translations?lang=${lang.code}`}>
                         <Button variant="outline" size="sm">
@@ -187,11 +249,21 @@ export default function AdminLanguages() {
                         </Button>
                       </Link>
                     )}
+                    <Button variant="ghost" size="sm" onClick={() => handleExport(lang)} disabled={busyCode === lang.code}>
+                      <Download className="h-3.5 w-3.5" />
+                      {t('admin_languages.export')}
+                    </Button>
+                    {!isDefault && (
+                      <Button variant="ghost" size="sm" onClick={() => setImportFor(lang)}>
+                        <Upload className="h-3.5 w-3.5" />
+                        {t('admin_languages.import')}
+                      </Button>
+                    )}
                     {!isDefault && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-red-600 hover:text-red-700"
+                        className="text-red-600 hover:text-red-700 ml-auto"
                         onClick={() => setConfirmDelete(lang)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -216,6 +288,20 @@ export default function AdminLanguages() {
             await reloadPublic()
           }}
           createLanguage={createAdminLanguage}
+        />
+      )}
+
+      {/* Import dialog */}
+      {importFor && (
+        <ImportLanguageDialog
+          targetCode={importFor === 'new' ? null : importFor.code}
+          onClose={() => setImportFor(null)}
+          onDone={async () => {
+            setImportFor(null)
+            await reload()
+            await reloadPublic()
+          }}
+          importPack={importLanguagePack}
         />
       )}
 
@@ -349,6 +435,247 @@ function CreateLanguageDialog({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ImportLanguageDialog({
+  targetCode,
+  onClose,
+  onDone,
+  importPack,
+}: {
+  targetCode: string | null
+  onClose: () => void
+  onDone: () => Promise<void>
+  importPack: (body: { payload: Record<string, unknown>; mode: ImportMode; dryRun: boolean }) => Promise<ImportPreview>
+}) {
+  const { t } = useTranslation()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [payload, setPayload] = useState<Record<string, unknown> | null>(null)
+  const [filename, setFilename] = useState<string | null>(null)
+  const [parseError, setParseError] = useState<string | null>(null)
+  const [mode, setMode] = useState<ImportMode>('fill_missing')
+  const [preview, setPreview] = useState<ImportPreview | null>(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
+  const [applying, setApplying] = useState(false)
+
+  const onFilePick = async (file: File) => {
+    setFilename(file.name)
+    setParseError(null)
+    setPreview(null)
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text)
+      if (!parsed?.imaginaAudit || !parsed?.lang || !parsed?.namespaces) {
+        setParseError(t('admin_languages.import_invalid_file'))
+        setPayload(null)
+        return
+      }
+      if (targetCode && parsed.lang !== targetCode) {
+        setParseError(t('admin_languages.import_lang_mismatch', { file: parsed.lang, target: targetCode }))
+        setPayload(null)
+        return
+      }
+      setPayload(parsed)
+    } catch {
+      setParseError(t('admin_languages.import_parse_error'))
+      setPayload(null)
+    }
+  }
+
+  // Cada vez que cambia payload o mode, pedimos un nuevo preview.
+  useEffect(() => {
+    if (!payload) { setPreview(null); return }
+    let cancelled = false
+    ;(async () => {
+      setLoadingPreview(true)
+      try {
+        const res = await importPack({ payload, mode, dryRun: true })
+        if (!cancelled) setPreview(res)
+      } catch (err: unknown) {
+        if (!cancelled) {
+          const axiosErr = err as { response?: { data?: { error?: string } } }
+          toast.error(axiosErr.response?.data?.error ?? t('admin_languages.toast_import_error'))
+        }
+      }
+      if (!cancelled) setLoadingPreview(false)
+    })()
+    return () => { cancelled = true }
+  }, [payload, mode, importPack, t])
+
+  const apply = async () => {
+    if (!payload) return
+    setApplying(true)
+    try {
+      const res = await importPack({ payload, mode, dryRun: false })
+      toast.success(t('admin_languages.toast_imported', {
+        added: res.added ?? 0,
+        changed: res.changed ?? 0,
+        skipped: res.skipped ?? 0,
+      }))
+      await onDone()
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } }
+      toast.error(axiosErr.response?.data?.error ?? t('admin_languages.toast_import_error'))
+    }
+    setApplying(false)
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5 text-[var(--accent-primary)]" />
+            {targetCode
+              ? t('admin_languages.import_title_for', { code: targetCode.toUpperCase() })
+              : t('admin_languages.import_title_new')}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* File picker */}
+          <div>
+            <Label>{t('admin_languages.import_file_label')}</Label>
+            <label className="flex cursor-pointer items-center gap-3 mt-1 rounded-lg border-2 border-dashed border-[var(--border-default)] bg-white px-4 py-4 transition-colors hover:border-[var(--accent-primary)]">
+              <Upload className="h-4 w-4 text-[var(--text-tertiary)]" />
+              <div className="flex-1 text-xs">
+                {filename ? (
+                  <span className="text-emerald-700 font-medium">{filename}</span>
+                ) : (
+                  <span className="text-[var(--text-tertiary)]">{t('admin_languages.import_file_hint')}</span>
+                )}
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="application/json,.json"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) onFilePick(f)
+                }}
+                className="hidden"
+              />
+            </label>
+            {parseError && (
+              <p className="mt-2 text-[11px] text-red-600">{parseError}</p>
+            )}
+          </div>
+
+          {payload && !parseError && (
+            <>
+              {/* Mode selector */}
+              <div className="space-y-2">
+                <Label>{t('admin_languages.import_mode_label')}</Label>
+                <div className="space-y-1.5">
+                  {([
+                    ['fill_missing', 'import_mode_fill_title', 'import_mode_fill_body'],
+                    ['smart_merge', 'import_mode_smart_title', 'import_mode_smart_body'],
+                    ['replace_all', 'import_mode_replace_title', 'import_mode_replace_body'],
+                  ] as const).map(([value, title, body]) => (
+                    <label
+                      key={value}
+                      className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 transition-colors ${
+                        mode === value
+                          ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/5'
+                          : 'border-[var(--border-default)] hover:bg-[var(--bg-secondary)]'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="import-mode"
+                        value={value}
+                        checked={mode === value}
+                        onChange={() => setMode(value)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 text-xs">
+                        <p className="font-semibold text-[var(--text-primary)]">{t(`admin_languages.${title}`)}</p>
+                        <p className="text-[var(--text-tertiary)]">{t(`admin_languages.${body}`)}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Preview */}
+              <div className="space-y-2">
+                <Label>{t('admin_languages.import_preview_label')}</Label>
+                {loadingPreview ? (
+                  <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {t('admin_languages.import_preview_loading')}
+                  </div>
+                ) : preview ? (
+                  <>
+                    <div className="flex flex-wrap gap-2 text-[11px]">
+                      <Badge variant="secondary">{t('admin_languages.import_stat_in_pack', { count: preview.totalInPack ?? 0 })}</Badge>
+                      <Badge variant="success">{t('admin_languages.import_stat_add', { count: preview.willAdd ?? 0 })}</Badge>
+                      <Badge variant="warning">{t('admin_languages.import_stat_change', { count: preview.willChange ?? 0 })}</Badge>
+                      <Badge variant="outline">{t('admin_languages.import_stat_skip', { count: preview.willSkip ?? 0 })}</Badge>
+                    </div>
+                    {preview.languageCreated && (
+                      <p className="text-[11px] text-amber-700">{t('admin_languages.import_will_create_lang', { code: preview.lang })}</p>
+                    )}
+                    {preview.changes && preview.changes.length > 0 ? (
+                      <div className="max-h-64 overflow-y-auto rounded-md border border-[var(--border-default)] divide-y divide-[var(--border-default)] text-[11px]">
+                        {preview.changes.map((c, i) => (
+                          <div key={i} className="px-2 py-1.5 flex items-start gap-2">
+                            <Badge
+                              variant={c.action === 'add' ? 'success' : c.action === 'change' ? 'warning' : 'outline'}
+                              className="text-[9px] shrink-0"
+                            >
+                              {t(`admin_languages.import_action_${c.action}`)}
+                            </Badge>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-mono text-[10px] text-[var(--text-tertiary)] truncate">
+                                [{c.namespace}] {c.key}
+                              </p>
+                              {c.action === 'change' && (
+                                <p className="text-[10px]">
+                                  <span className="text-red-600 line-through">{c.currentValue}</span>{' '}
+                                  → <span className="text-emerald-700">{c.incomingValue}</span>
+                                </p>
+                              )}
+                              {c.action === 'add' && (
+                                <p className="text-[10px] text-emerald-700 truncate">{c.incomingValue}</p>
+                              )}
+                              {c.action === 'skip' && (
+                                <p className="text-[10px] text-[var(--text-tertiary)] italic">
+                                  {c.reason === 'reviewed'
+                                    ? t('admin_languages.import_skip_reviewed')
+                                    : t('admin_languages.import_skip_override')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-[var(--text-tertiary)]">{t('admin_languages.import_no_changes')}</p>
+                    )}
+                    {preview.truncated && (
+                      <p className="text-[10px] italic text-[var(--text-tertiary)]">{t('admin_languages.import_preview_truncated')}</p>
+                    )}
+                  </>
+                ) : null}
+              </div>
+            </>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={applying}>{t('common.cancel')}</Button>
+          <Button
+            onClick={apply}
+            disabled={!payload || !!parseError || applying || loadingPreview}
+          >
+            {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {t('admin_languages.import_apply')}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

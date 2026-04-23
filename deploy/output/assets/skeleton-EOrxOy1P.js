@@ -1,0 +1,1 @@
+import"./chunk-BEqpzyXh.js";import{m as e}from"./api-DBY5U3Kr.js";import{t,u as n}from"./utils-B5bo6mvZ.js";e();var r=n();function i({className:e,...n}){return(0,r.jsx)(`div`,{"data-slot":`skeleton`,className:t(`animate-pulse rounded-lg bg-[var(--bg-tertiary)]`,e),...n})}export{i as t};

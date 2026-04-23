@@ -158,6 +158,14 @@ switch ($endpoint) {
         require __DIR__ . '/admin/languages.php';
         break;
 
+    case 'admin/translations-export':
+        require __DIR__ . '/admin/translations-export.php';
+        break;
+
+    case 'admin/translations-import':
+        require __DIR__ . '/admin/translations-import.php';
+        break;
+
     case 'admin/projects':
         require __DIR__ . '/admin/projects.php';
         break;

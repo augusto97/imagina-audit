@@ -84,6 +84,11 @@ return [
     'languages.delete_error'        => 'Failed to delete the language.',
     'languages.cannot_delete_default' => 'The default language cannot be deleted.',
 
+    // ——— /admin/translations-import.php —————————————————————————
+    'translations_import.invalid_file' => 'Invalid file. Expected a language pack exported from Imagina Audit.',
+    'translations_import.invalid_mode' => 'Invalid import mode.',
+    'translations_import.apply_error'  => 'Failed to apply the import.',
+
     // ——— /admin/update-vulnerabilities.php ——————————————————————
     'update_vulns.update_error' => 'Update failed: {{details}}',
 
