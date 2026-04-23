@@ -23,15 +23,26 @@ require_once __DIR__ . '/../bootstrap.php';
 $db = Database::getInstance();
 $method = $_SERVER['REQUEST_METHOD'];
 
-// POST / DELETE son operaciones admin (subir o quitar snapshot). GET es
-// de lectura — lo abrimos al dueño del audit también (P5.10).
-if ($method === 'GET') {
-    $auditId = $_GET['audit_id'] ?? '';
-    if (empty($auditId)) Response::error(Translator::t('admin_api.common.audit_id_required'), 400);
-    AuditAccess::require((string) $auditId);
+// Los tres métodos aceptan admin o dueño del audit (P5.12).
+// - GET: leer snapshot
+// - POST: subir snapshot + re-ejecutar audit
+// - DELETE: quitar snapshot
+// Las mutaciones verifican CSRF contra la sesión activa (admin o user)
+// dentro de AuditAccess::require.
+$postBody = null;
+if ($method === 'POST') {
+    $postBody = Response::getJsonBody(10 * 1024 * 1024, 128);
+    $auditIdForAccess = (string) ($postBody['auditId'] ?? '');
+    if ($auditIdForAccess === '') {
+        Response::error(Translator::t('admin_api.snapshot.audit_id_required'), 400);
+    }
 } else {
-    Auth::requireAuth();
+    $auditIdForAccess = (string) ($_GET['audit_id'] ?? '');
+    if ($auditIdForAccess === '') {
+        Response::error(Translator::t('admin_api.common.audit_id_required'), 400);
+    }
 }
+AuditAccess::require($auditIdForAccess);
 
 // Auto-migration
 try {
@@ -71,12 +82,11 @@ if ($method === 'DELETE') {
 }
 
 if ($method === 'POST') {
-    // Snapshots del plugin wp-snapshot pueden ser grandes (29 métricas con listas
-    // de plugins, DB stats, etc.). Tope de 10MB + profundidad 128.
-    $body = Response::getJsonBody(10 * 1024 * 1024, 128);
-    $auditId = $body['auditId'] ?? '';
-
-    if (empty($auditId)) Response::error(Translator::t('admin_api.snapshot.audit_id_required'), 400);
+    // El body ya fue leído arriba (para validar ownership contra auditId).
+    // Reutilizamos en vez de re-leer php://input — no siempre se puede en
+    // todos los SAPIs.
+    $body = $postBody ?? [];
+    $auditId = (string) ($body['auditId'] ?? $auditIdForAccess);
 
     $jsonData = $body['jsonData'] ?? null;
     if (empty($jsonData)) Response::error(Translator::t('admin_api.snapshot.json_data_required'), 400);
@@ -171,6 +181,19 @@ if ($method === 'POST') {
                 "UPDATE audits SET global_score = ?, global_level = ?, scan_duration_ms = ?, result_json = ?, waterfall_json = ? WHERE id = ?",
                 [$reauditResult['globalScore'], $reauditResult['globalLevel'], $reauditResult['scanDurationMs'], $resultJson, $waterfallJson, $auditId]
             );
+
+            // Si el audit está atado a un proyecto, reconciliar checklist vivo
+            // con las métricas enriquecidas por el snapshot (wp-snapshot abre
+            // ~30 métricas extra que el analyzer público no puede ver).
+            $projectRow = $db->queryOne("SELECT project_id FROM audits WHERE id = ?", [$auditId]);
+            $projectIdOfAudit = $projectRow && $projectRow['project_id'] !== null ? (int) $projectRow['project_id'] : null;
+            if ($projectIdOfAudit !== null) {
+                try {
+                    Project::reconcileChecklist($db, $projectIdOfAudit, Project::flattenMetrics($resultForStorage));
+                } catch (Throwable $e) {
+                    Logger::warning('reconcileChecklist post-snapshot falló: ' . $e->getMessage());
+                }
+            }
 
             Logger::info("Re-audit con snapshot completada para audit $auditId: score {$reauditResult['globalScore']}");
         }

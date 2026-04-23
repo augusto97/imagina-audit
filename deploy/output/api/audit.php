@@ -58,47 +58,37 @@ $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 $isAdmin = Auth::checkAuth();
 $authUser = !$isAdmin ? UserAuth::currentUser() : null;
 
-// Rate limiting / cuota
+// Resolver parámetros de cuota / rate-limit sin aplicarlos todavía —
+// los aplicamos después del cache lookup, porque los cache hits no
+// consumen cuota ni slots de IP (son gratis: no corren scan).
 $maxPerHour = (int) env('RATE_LIMIT_MAX_PER_HOUR', '10');
 try {
     $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'rate_limit_max_per_hour'");
     if ($row && is_numeric($row['value'])) $maxPerHour = (int) $row['value'];
 } catch (Throwable $e) {}
 
+// Early-fail: si el user no tiene plan asignado no puede auditar (ni
+// cacheado tiene sentido porque no hay contexto donde registrarlo).
+if ($authUser) {
+    $plan = $authUser['plan'];
+    if (!$plan) {
+        Response::error(Translator::t('user_api.quota.no_plan'), 403);
+    }
+}
+
+// Detectar proyecto matchable ANTES del cache lookup — lo necesitamos
+// tanto para el flujo fresco como para atar un audit cacheado al proyecto
+// si hacía falta. Model A: match por URL exacta normalizada.
+$projectId = null;
+if ($authUser) {
+    $projectId = Project::findMatchingProject(Database::getInstance(), (int) $authUser['id'], $url);
+}
+
+// Housekeeping del rate limits, sin aplicar throttle todavía.
 try {
     $db = Database::getInstance();
     $db->execute("DELETE FROM rate_limits WHERE request_time < datetime('now', '-1 hour')");
-
-    if ($authUser) {
-        // User logged-in: cuota mensual según plan. Si no hay plan o está
-        // inactivo, rechazar antes de correr el scan.
-        $plan = $authUser['plan'];
-        if (!$plan) {
-            Response::error(Translator::t('user_api.quota.no_plan'), 403);
-        }
-        $quota = UserAuth::quota($authUser['id'], (int) $plan['monthlyLimit']);
-        if (!$quota['unlimited'] && $quota['remaining'] !== null && $quota['remaining'] <= 0) {
-            Response::error(Translator::t('user_api.quota.exceeded', [
-                'used'  => $quota['used'],
-                'limit' => $quota['limit'],
-            ]), 429);
-        }
-    } elseif (!$isAdmin) {
-        // Anónimo: throttle clásico por IP/hora.
-        $count = (int) $db->scalar(
-            "SELECT COUNT(*) FROM rate_limits WHERE ip_address = ? AND endpoint = 'audit'",
-            [$ip]
-        );
-        if ($count >= $maxPerHour) {
-            Response::error(Translator::t('api.audit.rate_limit'), 429);
-        }
-        // Solo los anónimos consumen un slot del rate-limit por IP.
-        $db->execute("INSERT INTO rate_limits (ip_address, endpoint) VALUES (?, 'audit')", [$ip]);
-    }
-    // Admin: sin límites.
-} catch (Throwable $e) {
-    Logger::error('Error en rate limiting: ' . $e->getMessage());
-}
+} catch (Throwable $e) { /* no crítico */ }
 
 // Cache lookup
 $forceRefresh = !empty($body['forceRefresh']);
@@ -111,11 +101,40 @@ try {
 try {
     if (!$forceRefresh) {
         $db = Database::getInstance();
-        // Filtramos por lang: un resultado cacheado en otro idioma NO sirve.
-        $cached = $db->queryOne(
-            "SELECT * FROM audits WHERE url = ? AND lang = ? AND created_at > datetime('now', '-' || ? || ' seconds') ORDER BY created_at DESC LIMIT 1",
-            [$url, $lang, $cacheTtl]
-        );
+        // Cache scope:
+        //   - Admin: cualquier audit (útil para QA / testing de features).
+        //   - User autenticado: solo audits propios o anónimos (NULL user_id).
+        //     Nunca devolvemos al user A un audit que hizo el user B — evita
+        //     leak de lead_email y otros datos sensibles entre cuentas.
+        //   - Anónimo: solo audits anónimos. Los que tienen dueño no se
+        //     sirven desde cache al público.
+        if ($isAdmin) {
+            $cached = $db->queryOne(
+                "SELECT * FROM audits
+                 WHERE url = ? AND lang = ?
+                   AND created_at > datetime('now', '-' || ? || ' seconds')
+                 ORDER BY created_at DESC LIMIT 1",
+                [$url, $lang, $cacheTtl]
+            );
+        } elseif ($authUser) {
+            $cached = $db->queryOne(
+                "SELECT * FROM audits
+                 WHERE url = ? AND lang = ?
+                   AND created_at > datetime('now', '-' || ? || ' seconds')
+                   AND (user_id = ? OR user_id IS NULL)
+                 ORDER BY created_at DESC LIMIT 1",
+                [$url, $lang, $cacheTtl, (int) $authUser['id']]
+            );
+        } else {
+            $cached = $db->queryOne(
+                "SELECT * FROM audits
+                 WHERE url = ? AND lang = ?
+                   AND created_at > datetime('now', '-' || ? || ' seconds')
+                   AND user_id IS NULL
+                 ORDER BY created_at DESC LIMIT 1",
+                [$url, $lang, $cacheTtl]
+            );
+        }
 
         if ($cached) {
             $result = JsonStore::decode($cached['result_json']);
@@ -131,6 +150,33 @@ try {
                 );
             }
 
+            // Atribuir cache hit al user actual y al proyecto si corresponde.
+            // Reclamamos audits anónimos (user_id era NULL) para que queden en
+            // el histórico del user, y seteamos project_id si el proyecto
+            // existía ahora pero no cuando se cacheó el audit.
+            if ($authUser) {
+                $cachedUserId = $cached['user_id'] !== null ? (int) $cached['user_id'] : null;
+                $cachedProjectId = $cached['project_id'] !== null ? (int) $cached['project_id'] : null;
+                $needsUserId = $cachedUserId === null;
+                $needsProjectId = $projectId !== null && $cachedProjectId === null;
+                if ($needsUserId || $needsProjectId) {
+                    $db->execute(
+                        "UPDATE audits SET user_id = COALESCE(user_id, ?), project_id = COALESCE(project_id, ?) WHERE id = ?",
+                        [(int) $authUser['id'], $projectId, $cached['id']]
+                    );
+                    // Si acabamos de atar el audit a un proyecto, reconciliamos
+                    // el checklist vivo para que el user lo vea actualizado al
+                    // volver al proyecto.
+                    if ($needsProjectId && $projectId !== null && is_array($result)) {
+                        try {
+                            Project::reconcileChecklist($db, $projectId, Project::flattenMetrics($result));
+                        } catch (Throwable $e) {
+                            Logger::warning('reconcileChecklist post-cache falló: ' . $e->getMessage());
+                        }
+                    }
+                }
+            }
+
             Response::success([
                 'cached' => true,
                 'auditId' => $cached['id'],
@@ -140,6 +186,36 @@ try {
     }
 } catch (Throwable $e) {
     Logger::error('Error consultando cache: ' . $e->getMessage());
+}
+
+// A partir de acá, sabemos que es cache miss y vamos a correr scan fresco.
+// Aplicamos throttle:
+//   - user: cuota mensual (free quota >= 1 o plan ilimitado)
+//   - anon: IP rate-limit, y consumimos un slot
+//   - admin: sin límites
+try {
+    if ($authUser) {
+        $plan = $authUser['plan']; // ya validamos que existe arriba
+        $quota = UserAuth::quota($authUser['id'], (int) $plan['monthlyLimit']);
+        if (!$quota['unlimited'] && $quota['remaining'] !== null && $quota['remaining'] <= 0) {
+            Response::error(Translator::t('user_api.quota.exceeded', [
+                'used'  => $quota['used'],
+                'limit' => $quota['limit'],
+            ]), 429);
+        }
+    } elseif (!$isAdmin) {
+        $db = Database::getInstance();
+        $count = (int) $db->scalar(
+            "SELECT COUNT(*) FROM rate_limits WHERE ip_address = ? AND endpoint = 'audit'",
+            [$ip]
+        );
+        if ($count >= $maxPerHour) {
+            Response::error(Translator::t('api.audit.rate_limit'), 429);
+        }
+        $db->execute("INSERT INTO rate_limits (ip_address, endpoint) VALUES (?, 'audit')", [$ip]);
+    }
+} catch (Throwable $e) {
+    Logger::error('Error aplicando throttle: ' . $e->getMessage());
 }
 
 // Circuit breaker: si esta URL acaba de fallar, devolvemos el mismo error
@@ -152,13 +228,8 @@ if ($recentError !== null && !$forceRefresh) {
 // Encolar o ejecutar directo
 $auditId = AuditOrchestrator::generateUuid();
 
-// Auto-attach: si el user logged-in ya tiene un proyecto con esta URL exacta,
-// el audit queda atado al proyecto. Model A = 1 proyecto = 1 URL, el match
-// es por URL normalizada (no por dominio) — ver Project::findMatchingProject.
-$projectId = null;
-if ($authUser) {
-    $projectId = Project::findMatchingProject(Database::getInstance(), (int) $authUser['id'], $url);
-}
+// $projectId ya se calculó arriba (antes del cache lookup) para que el
+// flujo cacheado también pudiera atar el audit al proyecto.
 
 $leadData = [
     'leadName' => $body['leadName'] ?? '',

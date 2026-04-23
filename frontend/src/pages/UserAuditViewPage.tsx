@@ -79,7 +79,6 @@ export default function UserAuditViewPage({ view }: Props) {
           <SnapshotReport
             key={id}
             fetcher={fetchAuditSnapshotReport}
-            hideUploader
             {...common}
           />
         )}
