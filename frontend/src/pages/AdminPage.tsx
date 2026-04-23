@@ -21,6 +21,7 @@ import SettingsScoring from '@/components/admin/SettingsScoring'
 import SettingsQueue from '@/components/admin/SettingsQueue'
 import SettingsRetention from '@/components/admin/SettingsRetention'
 import SettingsTranslations from '@/components/admin/SettingsTranslations'
+import AdminLanguages from '@/components/admin/AdminLanguages'
 import SystemHealth from '@/components/admin/SystemHealth'
 import VulnerabilityManager from '@/components/admin/VulnerabilityManager'
 import TechnicalReport from '@/components/admin/TechnicalReport'
@@ -81,6 +82,7 @@ export default function AdminPage() {
         <Route path="queue" element={<SettingsQueue />} />
         <Route path="retention" element={<SettingsRetention />} />
         <Route path="translations" element={<SettingsTranslations />} />
+        <Route path="languages" element={<AdminLanguages />} />
         <Route path="health" element={<SystemHealth />} />
         <Route path="vulnerabilities" element={<VulnerabilityManager />} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />

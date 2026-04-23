@@ -70,6 +70,14 @@ switch ($endpoint) {
         require __DIR__ . '/config.php';
         break;
 
+    case 'languages':
+        require __DIR__ . '/languages.php';
+        break;
+
+    case 'frontend-locales':
+        require __DIR__ . '/frontend-locales.php';
+        break;
+
     case 'health':
         require __DIR__ . '/health.php';
         break;
@@ -144,6 +152,10 @@ switch ($endpoint) {
 
     case 'admin/plans':
         require __DIR__ . '/admin/plans.php';
+        break;
+
+    case 'admin/languages':
+        require __DIR__ . '/admin/languages.php';
         break;
 
     case 'admin/projects':

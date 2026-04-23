@@ -41,11 +41,28 @@ if ($method === 'GET' && ($_GET['meta'] ?? '') === 'namespaces') {
         foreach (glob("$enDir/*.php") as $file) {
             $namespaces[] = basename($file, '.php');
         }
-        sort($namespaces);
     }
+    // Namespace especial 'frontend' — contiene las keys del bundle React.
+    // Se sirve desde backend/locales/{lang}/frontend.json (copiado del frontend
+    // source al build) para que el editor pueda modificar strings de UI sin
+    // tocar código ni rebuildear.
+    if (is_file("$enDir/frontend.json")) {
+        $namespaces[] = 'frontend';
+    }
+    sort($namespaces);
+
+    // Lista completa de idiomas registrados (no filtramos por is_active aquí
+    // porque el admin necesita ver todos los que existen para gestionar).
+    $languages = [];
+    try {
+        $rows = $db->query("SELECT code FROM languages ORDER BY sort_order, code");
+        foreach ($rows as $row) $languages[] = $row['code'];
+    } catch (Throwable $e) { /* tabla aún no creada */ }
+    if (empty($languages)) $languages = ['en', 'es'];
+
     Response::success([
         'namespaces' => $namespaces,
-        'languages' => Translator::SUPPORTED,
+        'languages' => $languages,
         'defaultLang' => Translator::DEFAULT_LANG,
     ]);
 }
@@ -53,24 +70,41 @@ if ($method === 'GET' && ($_GET['meta'] ?? '') === 'namespaces') {
 if ($method === 'GET') {
     $lang = strtolower(substr(trim($_GET['lang'] ?? ''), 0, 2));
     $namespace = trim($_GET['namespace'] ?? '');
-    if (!in_array($lang, Translator::SUPPORTED, true)) {
+    if (!in_array($lang, Translator::supported(), true)) {
         Response::error(Translator::t('admin_api.translations.lang_unsupported'), 400);
     }
     if (empty($namespace) || !preg_match('/^[a-z_][a-z0-9_]*$/i', $namespace)) {
         Response::error(Translator::t('admin_api.translations.namespace_invalid'), 400);
     }
 
-    // Base bundle (archivo PHP)
-    $baseFile = dirname(__DIR__, 2) . "/locales/$lang/$namespace.php";
-    $base = file_exists($baseFile) ? (require $baseFile) : [];
-    if (!is_array($base)) $base = [];
+    $base = [];
+    $source = [];
 
-    // Bundle en el idioma fuente (en) para mostrar siempre el string original
-    // como referencia — útil cuando el admin traduce a un idioma que aún no
-    // existe como archivo y el bundle base es []
-    $sourceFile = dirname(__DIR__, 2) . "/locales/" . Translator::DEFAULT_LANG . "/$namespace.php";
-    $source = file_exists($sourceFile) ? (require $sourceFile) : [];
-    if (!is_array($source)) $source = [];
+    if ($namespace === 'frontend') {
+        // Namespace especial: bundle del frontend (JSON flat dotted).
+        $sourceJsonFile = dirname(__DIR__, 2) . '/locales/' . Translator::DEFAULT_LANG . '/frontend.json';
+        if (is_file($sourceJsonFile)) {
+            $sourceRaw = json_decode(file_get_contents($sourceJsonFile), true);
+            if (is_array($sourceRaw)) $source = Languages::flattenBundle($sourceRaw);
+        }
+        $baseJsonFile = dirname(__DIR__, 2) . "/locales/$lang/frontend.json";
+        if (is_file($baseJsonFile)) {
+            $baseRaw = json_decode(file_get_contents($baseJsonFile), true);
+            if (is_array($baseRaw)) $base = Languages::flattenBundle($baseRaw);
+        }
+    } else {
+        // Namespace PHP tradicional.
+        $baseFile = dirname(__DIR__, 2) . "/locales/$lang/$namespace.php";
+        $base = file_exists($baseFile) ? (require $baseFile) : [];
+        if (!is_array($base)) $base = [];
+
+        // Bundle en el idioma fuente (en) para mostrar siempre el string original
+        // como referencia — útil cuando el admin traduce a un idioma que aún no
+        // existe como archivo y el bundle base es []
+        $sourceFile = dirname(__DIR__, 2) . "/locales/" . Translator::DEFAULT_LANG . "/$namespace.php";
+        $source = file_exists($sourceFile) ? (require $sourceFile) : [];
+        if (!is_array($source)) $source = [];
+    }
 
     // Overrides de la DB
     $rows = $db->query(
@@ -125,7 +159,7 @@ if ($method === 'PUT') {
     $aiProvider = $body['aiProvider'] ?? null;
     $reviewed = !empty($body['reviewed']) ? 1 : 0;
 
-    if (!in_array($lang, Translator::SUPPORTED, true)) {
+    if (!in_array($lang, Translator::supported(), true)) {
         Response::error(Translator::t('admin_api.translations.lang_unsupported'), 400);
     }
     if (empty($namespace) || empty($key)) {
@@ -160,7 +194,7 @@ if ($method === 'DELETE') {
     $namespace = trim($_GET['namespace'] ?? '');
     $key = trim($_GET['key'] ?? '');
 
-    if (!in_array($lang, Translator::SUPPORTED, true)) {
+    if (!in_array($lang, Translator::supported(), true)) {
         Response::error(Translator::t('admin_api.translations.lang_unsupported'), 400);
     }
 

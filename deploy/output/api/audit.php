@@ -46,7 +46,7 @@ try {
 // `audits.lang` para que el cache respete el idioma (pedir la misma URL en
 // otro idioma dispara un audit nuevo).
 $lang = strtolower(substr(trim($body['lang'] ?? ''), 0, 2));
-if (!in_array($lang, Translator::SUPPORTED, true)) {
+if (!in_array($lang, Translator::supported(), true)) {
     $lang = Translator::DEFAULT_LANG;
 }
 Translator::setLang($lang);

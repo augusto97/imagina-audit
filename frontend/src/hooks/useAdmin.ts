@@ -322,6 +322,40 @@ export function useAdmin() {
     } catch (err) { handleError(err) }
   }, [handleError])
 
+  // ─── Languages management (P6) ────────────────────────────────────
+  const fetchAdminLanguages = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/languages.php')
+      return res.data.data as {
+        languages: Array<{
+          code: string
+          name: string
+          nativeName: string
+          isActive: boolean
+          isPublic: boolean
+          sortOrder: number
+          createdAt: string
+          hasFrontendBundle: boolean
+        }>
+        default: string
+      }
+    } catch (err) { handleError(err) }
+  }, [handleError])
+
+  const createAdminLanguage = useCallback(async (body: { code: string; name?: string; nativeName?: string; isActive?: boolean; isPublic?: boolean; sortOrder?: number }) => {
+    const res = await api.post('/admin/languages.php', body)
+    return res.data.data
+  }, [])
+
+  const updateAdminLanguage = useCallback(async (body: { code: string; name?: string; nativeName?: string; isActive?: boolean; isPublic?: boolean; sortOrder?: number }) => {
+    const res = await api.put('/admin/languages.php', body)
+    return res.data.data
+  }, [])
+
+  const deleteAdminLanguage = useCallback(async (code: string) => {
+    await api.delete('/admin/languages.php', { params: { code } })
+  }, [])
+
   return {
     fetchDashboard, fetchLeads, fetchLeadDetail, deleteLead, bulkLeads,
     fetchSettings, updateSettings, fetchQueueStatus,
@@ -335,5 +369,6 @@ export function useAdmin() {
     fetchUsers, createUser, updateUser, deleteUser,
     fetchUserPlans, createUserPlan, updateUserPlan, deleteUserPlan,
     fetchAdminProjects, deleteAdminProject,
+    fetchAdminLanguages, createAdminLanguage, updateAdminLanguage, deleteAdminLanguage,
   }
 }

@@ -12,6 +12,19 @@ echo ""
 
 # 1. Compilar frontend
 echo "[1/3] Compilando frontend..."
+
+# Sincronizar los bundles JSON del frontend como base editable del backend.
+# La copia ocurre ANTES del build para que el bundle shippeado sea coherente
+# con lo que el editor de traducciones del admin ve como "source".
+for lang in en es; do
+  src="$PROJECT_DIR/frontend/src/i18n/locales/$lang.json"
+  dst="$PROJECT_DIR/backend/locales/$lang/frontend.json"
+  if [ -f "$src" ]; then
+    mkdir -p "$(dirname "$dst")"
+    cp "$src" "$dst"
+  fi
+done
+
 cd "$PROJECT_DIR/frontend"
 # --legacy-peer-deps: openapi-typescript pide TS 5.x pero usamos TS 6.x.
 # El mismatch de peer es inofensivo en dev — solo afecta a la instalación.

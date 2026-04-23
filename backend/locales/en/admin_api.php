@@ -75,6 +75,15 @@ return [
     'translations.namespace_and_key_required' => 'namespace and key are required',
     'translations.source_invalid'            => 'Invalid source',
 
+    // ——— /admin/languages.php ———————————————————————————————————
+    'languages.fetch_error'         => 'Failed to retrieve languages.',
+    'languages.code_invalid'        => 'Invalid language code (use 2-letter ISO 639-1, e.g. pt, fr, de).',
+    'languages.already_exists'      => 'This language already exists.',
+    'languages.not_found'           => 'Language not found.',
+    'languages.save_error'          => 'Failed to save the language.',
+    'languages.delete_error'        => 'Failed to delete the language.',
+    'languages.cannot_delete_default' => 'The default language cannot be deleted.',
+
     // ——— /admin/update-vulnerabilities.php ——————————————————————
     'update_vulns.update_error' => 'Update failed: {{details}}',
 

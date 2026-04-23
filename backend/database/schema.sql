@@ -190,6 +190,26 @@ CREATE TABLE IF NOT EXISTS project_checklist_items (
     UNIQUE(project_id, metric_id)
 );
 
+-- Tabla de idiomas activos. El admin puede crear/activar idiomas desde el
+-- panel. `is_public=1` hace que el idioma aparezca en el LanguageSwitcher
+-- del frontend público. `is_active=0` lo oculta por completo (temporal).
+-- Los bundles base viven en backend/locales/{code}/ (si existen) + DB
+-- overrides en la tabla `translations`. Para idiomas sin bundle base, las
+-- keys del idioma default (en) se usan como fallback.
+CREATE TABLE IF NOT EXISTS languages (
+    code TEXT PRIMARY KEY,                       -- 'en', 'es', 'pt', etc. (ISO 639-1)
+    name TEXT NOT NULL,                          -- 'English', 'Español'
+    native_name TEXT,                            -- Nombre en su propio idioma
+    is_active INTEGER NOT NULL DEFAULT 1,
+    is_public INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+-- Seeds iniciales (en y es son los bundles que vienen con la app)
+INSERT OR IGNORE INTO languages (code, name, native_name, is_active, is_public, sort_order) VALUES
+    ('en', 'English', 'English', 1, 1, 0),
+    ('es', 'Spanish', 'Español', 1, 1, 1);
+
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_audits_domain ON audits(domain);
 CREATE INDEX IF NOT EXISTS idx_audits_url ON audits(url);

@@ -24,11 +24,11 @@
 class Translator
 {
     public const DEFAULT_LANG = 'en';
-    public const SUPPORTED = ['en', 'es', 'pt', 'fr', 'de', 'it'];
 
     private static ?string $currentLang = null;
     private static array $cache = [];  // lang → namespace → flat array
     private static ?string $baseDir = null;
+    private static ?array $supportedCache = null;  // códigos activos en DB
 
     /**
      * Setea el idioma activo. Se normaliza y valida contra SUPPORTED.
@@ -37,7 +37,29 @@ class Translator
     public static function setLang(?string $lang): void
     {
         $lang = self::normalize($lang);
-        self::$currentLang = in_array($lang, self::SUPPORTED, true) ? $lang : self::DEFAULT_LANG;
+        self::$currentLang = in_array($lang, self::supported(), true) ? $lang : self::DEFAULT_LANG;
+    }
+
+    /**
+     * Lista de idiomas soportados. Lee de la tabla `languages` si existe;
+     * si la DB aún no está lista, degrada a ['en', 'es'] que son los bundles
+     * que siempre vienen con la app.
+     */
+    public static function supported(): array
+    {
+        if (self::$supportedCache !== null) return self::$supportedCache;
+        if (class_exists('Database')) {
+            try {
+                $db = Database::getInstance();
+                $rows = $db->query("SELECT code FROM languages WHERE is_active = 1 ORDER BY sort_order, code");
+                if (!empty($rows)) {
+                    self::$supportedCache = array_map(fn($r) => $r['code'], $rows);
+                    return self::$supportedCache;
+                }
+            } catch (Throwable $e) { /* tabla aún no creada */ }
+        }
+        self::$supportedCache = ['en', 'es'];
+        return self::$supportedCache;
     }
 
     /** Idioma activo (auto-detecta si no fue seteado). */
@@ -86,6 +108,7 @@ class Translator
     {
         self::$currentLang = null;
         self::$cache = [];
+        self::$supportedCache = null;
     }
 
     // ─── Private helpers ────────────────────────────────────────────────
@@ -175,18 +198,19 @@ class Translator
     /** Auto-detección desde query param → Accept-Language → default. */
     private static function detect(): string
     {
+        $supported = self::supported();
         // 1. Query param
         $fromQuery = $_GET['lang'] ?? null;
         if ($fromQuery) {
             $lang = self::normalize($fromQuery);
-            if (in_array($lang, self::SUPPORTED, true)) return $lang;
+            if (in_array($lang, $supported, true)) return $lang;
         }
         // 2. Accept-Language header (primer valor)
         $header = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
         if ($header) {
             $first = explode(',', $header)[0];
             $lang = self::normalize($first);
-            if (in_array($lang, self::SUPPORTED, true)) return $lang;
+            if (in_array($lang, $supported, true)) return $lang;
         }
         return self::DEFAULT_LANG;
     }
