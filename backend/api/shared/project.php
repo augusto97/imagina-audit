@@ -37,7 +37,7 @@ try {
 
     $audits = $db->query(
         "SELECT id, url, global_score, global_level, is_wordpress, scan_duration_ms, created_at
-         FROM audits WHERE project_id = ?
+         FROM audits WHERE project_id = ? AND is_deleted = 0
          ORDER BY created_at DESC LIMIT 20",
         [$project['id']]
     );

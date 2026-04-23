@@ -122,6 +122,8 @@ export default function SnapshotReport({ fetcher, basePath, backTo, hideUploader
         </Button>
       </div>
 
+      {!hideUploader && <SnapshotUploader auditId={id} onChange={load} />}
+
       <OverviewSection report={report} />
       <PluginsSection report={report} />
       <SecuritySection report={report} />

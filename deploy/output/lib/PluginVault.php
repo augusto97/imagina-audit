@@ -73,8 +73,13 @@ class PluginVault {
 
         $meta = self::getMetadata($slug);
         $filename = $meta['filename'] ?? '';
-        $absPath = $filename ? self::pluginDir($slug) . '/' . $filename : '';
-        $fileExists = $filename && is_file($absPath);
+        // Preferir latest.zip (estable) sobre el versionado — así el link
+        // público nunca queda apuntando a un archivo antiguo tras un refresh.
+        $dir = self::pluginDir($slug);
+        $latest = $dir . '/latest.zip';
+        $versioned = $filename ? $dir . '/' . $filename : '';
+        $absPath = is_file($latest) ? $latest : ($versioned && is_file($versioned) ? $versioned : '');
+        $fileExists = $absPath !== '';
 
         return [
             'slug'        => $slug,
@@ -90,7 +95,11 @@ class PluginVault {
             'sha256'      => $meta['sha256'] ?? null,
             'source'      => $meta['source'] ?? null,
             'fileExists'  => $fileExists,
-            'publicUrl'   => '/api/plugin-download.php?slug=' . urlencode($slug),
+            'absPath'     => $absPath,
+            'filename'    => $filename,
+            // Endpoint real (P5.14b). El admin panel o la UI del user lo
+            // usan como href directo.
+            'publicUrl'   => '/api/plugin-vault/download.php?slug=' . urlencode($slug),
         ];
     }
 

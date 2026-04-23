@@ -128,7 +128,13 @@
     "history_view": "View",
     "history_run_first": "Run your first audit",
     "history_load_more": "Load more",
-    "history_showing": "Showing {{shown}} of {{total}}"
+    "history_showing": "Showing {{shown}} of {{total}}",
+    "history_delete": "Delete",
+    "history_delete_title": "Delete audit",
+    "history_delete_body": "This hides the audit from your history. Your monthly scan quota is not refunded — the scan already ran.",
+    "history_delete_confirm": "Delete",
+    "history_delete_toast": "Audit deleted",
+    "history_delete_error": "Could not delete the audit."
   },
   "projects": {
     "title": "My projects",
@@ -1371,6 +1377,10 @@
     "uploader_delete_confirm": "Delete the snapshot for this audit?",
     "uploader_deleted": "Snapshot deleted",
     "uploader_delete_error": "Delete failed",
+    "uploader_replace": "Replace",
+    "uploader_replace_title": "Replace internal snapshot",
+    "uploader_plugin_download": "Download plugin (.zip)",
+    "uploader_plugin_download_hint": "Don't have it yet? Download the plugin here and install it on WP Admin.",
     "waterfall_title": "Waterfall Chart",
     "waterfall_requests": "{{count}} requests",
     "waterfall_search_placeholder": "Filter by URL…",

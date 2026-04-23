@@ -173,6 +173,10 @@ class Database {
             "ALTER TABLE audits ADD COLUMN project_id INTEGER",
             // Columna `max_projects` en plans — cupo de proyectos por plan (0=ilimitado)
             "ALTER TABLE plans ADD COLUMN max_projects INTEGER NOT NULL DEFAULT 0",
+            // Columna `is_deleted` para soft-delete desde el panel del user.
+            // La cuota mensual cuenta filas soft-deleted también — borrar un
+            // audit no libera un slot (el scan ya se ejecutó, consumió recursos).
+            "ALTER TABLE audits ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0",
         ];
         foreach ($migrations as $sql) {
             try { $this->pdo->exec($sql); } catch (Throwable $e) { /* columna ya existe */ }

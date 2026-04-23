@@ -128,7 +128,13 @@
     "history_view": "Ver",
     "history_run_first": "Correr mi primera auditoría",
     "history_load_more": "Cargar más",
-    "history_showing": "Mostrando {{shown}} de {{total}}"
+    "history_showing": "Mostrando {{shown}} de {{total}}",
+    "history_delete": "Eliminar",
+    "history_delete_title": "Eliminar auditoría",
+    "history_delete_body": "Esto oculta la auditoría de tu historial. Tu cuota mensual de escaneos NO se devuelve — el scan ya se ejecutó.",
+    "history_delete_confirm": "Eliminar",
+    "history_delete_toast": "Auditoría eliminada",
+    "history_delete_error": "No se pudo eliminar la auditoría."
   },
   "projects": {
     "title": "Mis proyectos",
@@ -1371,6 +1377,10 @@
     "uploader_delete_confirm": "¿Eliminar el snapshot de esta auditoría?",
     "uploader_deleted": "Snapshot eliminado",
     "uploader_delete_error": "Error al eliminar",
+    "uploader_replace": "Reemplazar",
+    "uploader_replace_title": "Reemplazar snapshot interno",
+    "uploader_plugin_download": "Descargar plugin (.zip)",
+    "uploader_plugin_download_hint": "¿Aún no lo tienes? Descarga el plugin aquí e instálalo en WP Admin.",
     "waterfall_title": "Waterfall Chart",
     "waterfall_requests": "{{count}} requests",
     "waterfall_search_placeholder": "Filtrar por URL…",

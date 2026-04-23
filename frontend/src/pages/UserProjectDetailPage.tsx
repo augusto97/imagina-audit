@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Loader2, ArrowLeft, Play, Globe, Clock, Share2, TrendingUp, TrendingDown, Minus, CheckCircle2, Circle, CircleDashed, AlertTriangle, AlertCircle, Package } from 'lucide-react'
+import { Loader2, ArrowLeft, Play, Globe, Clock, Share2, TrendingUp, TrendingDown, Minus, CheckCircle2, Circle, CircleDashed, AlertTriangle, AlertCircle, Package, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { useUser, type ProjectDetail, type ProjectChecklistItem } from '@/hooks/useUser'
 import { useAudit } from '@/hooks/useAudit'
 
@@ -13,13 +14,14 @@ export default function UserProjectDetailPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
-  const { isLoading, isAuthenticated, fetchProject, fetchProjectChecklist, updateChecklistItem, enableProjectShare, disableProjectShare } = useUser()
+  const { isLoading, isAuthenticated, fetchProject, fetchProjectChecklist, updateChecklistItem, enableProjectShare, disableProjectShare, deleteAudit } = useUser()
   const { startAudit: runAudit, status: auditStatus } = useAudit()
 
   const [detail, setDetail] = useState<ProjectDetail | null>(null)
   const [checklist, setChecklist] = useState<ProjectChecklistItem[]>([])
   const [loadingDetail, setLoadingDetail] = useState(true)
   const [shareBusy, setShareBusy] = useState(false)
+  const [confirmDeleteAudit, setConfirmDeleteAudit] = useState<{ id: string; domain?: string } | null>(null)
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) navigate('/login', { replace: true })
@@ -395,9 +397,19 @@ export default function UserProjectDetailPage() {
                           {new Date(a.createdAt).toLocaleString(i18n.language || 'en', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <Link to={`/account/audits/${a.id}`} className="text-xs text-[var(--accent-primary)] hover:underline">
-                            {t('account.history_view')}
-                          </Link>
+                          <div className="inline-flex items-center gap-2">
+                            <Link to={`/account/audits/${a.id}`} className="text-xs text-[var(--accent-primary)] hover:underline">
+                              {t('account.history_view')}
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteAudit(a)}
+                              className="text-[var(--text-tertiary)] hover:text-red-600 p-1"
+                              title={t('account.history_delete')}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -414,6 +426,35 @@ export default function UserProjectDetailPage() {
           </CardContent>
         </Card>
       </main>
+
+      <Dialog open={!!confirmDeleteAudit} onOpenChange={(open) => !open && setConfirmDeleteAudit(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('account.history_delete_title')}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-[var(--text-secondary)]">{t('account.history_delete_body')}</p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmDeleteAudit(null)}>{t('common.cancel')}</Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!confirmDeleteAudit) return
+                const auditId = confirmDeleteAudit.id
+                setConfirmDeleteAudit(null)
+                try {
+                  await deleteAudit(auditId)
+                  toast.success(t('account.history_delete_toast'))
+                  await load()
+                } catch {
+                  toast.error(t('account.history_delete_error'))
+                }
+              }}
+            >
+              {t('account.history_delete_confirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

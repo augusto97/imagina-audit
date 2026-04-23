@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS audits (
     waterfall_json TEXT,
     is_pinned INTEGER NOT NULL DEFAULT 0,
     lang TEXT NOT NULL DEFAULT 'en',
+    is_deleted INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     ip_address TEXT
 );
@@ -205,6 +206,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_jobs_started ON audit_jobs(started_at);
 CREATE INDEX IF NOT EXISTS idx_audits_pinned ON audits(is_pinned, created_at);
 CREATE INDEX IF NOT EXISTS idx_audits_user ON audits(user_id);
 CREATE INDEX IF NOT EXISTS idx_audits_project ON audits(project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_audits_user_live ON audits(user_id, is_deleted, created_at);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan_id);
 CREATE INDEX IF NOT EXISTS idx_user_login_attempts ON user_login_attempts(ip_address, attempted_at);

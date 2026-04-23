@@ -54,7 +54,7 @@ if ($method === 'GET') {
         // del último audit del proyecto. El user ve texto humano en vez del
         // metric_id técnico. Mapa lazy: una sola lectura del result_json.
         $latestAudit = $db->queryOne(
-            "SELECT result_json FROM audits WHERE project_id = ? ORDER BY created_at DESC LIMIT 1",
+            "SELECT result_json FROM audits WHERE project_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 1",
             [$projectId]
         );
         $metricMap = [];

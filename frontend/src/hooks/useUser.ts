@@ -154,6 +154,14 @@ export function useUser() {
     }
   }, [])
 
+  /**
+   * Soft-delete de un audit propio. El backend marca is_deleted=1 pero
+   * NO libera cupo de la cuota mensual — el scan ya consumió recursos.
+   */
+  const deleteAudit = useCallback(async (id: string) => {
+    await api.delete('/user/audits.php', { params: { id } })
+  }, [])
+
   // ─── Projects (P5) ──────────────────────────────────────────────
   const fetchProjects = useCallback(async (): Promise<ProjectsListResponse | null> => {
     try {
@@ -260,6 +268,7 @@ export function useUser() {
     logout,
     checkSession,
     fetchAudits,
+    deleteAudit,
     fetchProjects,
     fetchProject,
     createProject,
