@@ -29,16 +29,16 @@ if ($method === 'GET' && !isset($_GET['id'])) {
         $rows = $db->query(
             "SELECT p.id, p.name, p.url, p.domain, p.notes, p.icon, p.color,
                     p.share_token, p.created_at,
-                    (SELECT COUNT(*) FROM audits a WHERE a.project_id = p.id) AS audit_count,
+                    (SELECT COUNT(*) FROM audits a WHERE a.project_id = p.id AND a.is_deleted = 0) AS audit_count,
                     (SELECT COUNT(*) FROM project_checklist_items ci WHERE ci.project_id = p.id AND ci.status = 'open') AS open_count,
-                    (SELECT a.id           FROM audits a WHERE a.project_id = p.id ORDER BY a.created_at DESC LIMIT 1) AS latest_audit_id,
-                    (SELECT a.global_score FROM audits a WHERE a.project_id = p.id ORDER BY a.created_at DESC LIMIT 1) AS latest_score,
-                    (SELECT a.global_level FROM audits a WHERE a.project_id = p.id ORDER BY a.created_at DESC LIMIT 1) AS latest_level,
-                    (SELECT a.created_at   FROM audits a WHERE a.project_id = p.id ORDER BY a.created_at DESC LIMIT 1) AS latest_at
+                    (SELECT a.id           FROM audits a WHERE a.project_id = p.id AND a.is_deleted = 0 ORDER BY a.created_at DESC LIMIT 1) AS latest_audit_id,
+                    (SELECT a.global_score FROM audits a WHERE a.project_id = p.id AND a.is_deleted = 0 ORDER BY a.created_at DESC LIMIT 1) AS latest_score,
+                    (SELECT a.global_level FROM audits a WHERE a.project_id = p.id AND a.is_deleted = 0 ORDER BY a.created_at DESC LIMIT 1) AS latest_level,
+                    (SELECT a.created_at   FROM audits a WHERE a.project_id = p.id AND a.is_deleted = 0 ORDER BY a.created_at DESC LIMIT 1) AS latest_at
              FROM projects p
              WHERE p.user_id = ?
              ORDER BY COALESCE(
-                (SELECT a.created_at FROM audits a WHERE a.project_id = p.id ORDER BY a.created_at DESC LIMIT 1),
+                (SELECT a.created_at FROM audits a WHERE a.project_id = p.id AND a.is_deleted = 0 ORDER BY a.created_at DESC LIMIT 1),
                 p.created_at
              ) DESC",
             [$userId]
@@ -76,10 +76,10 @@ if ($method === 'GET' && isset($_GET['id'])) {
             Response::error(Translator::t('projects.not_owner'), 403);
         }
 
-        // Últimos 20 audits para timeline
+        // Últimos 20 audits para timeline (ignora los soft-deleted)
         $audits = $db->query(
             "SELECT id, url, domain, global_score, global_level, is_wordpress, scan_duration_ms, created_at
-             FROM audits WHERE project_id = ?
+             FROM audits WHERE project_id = ? AND is_deleted = 0
              ORDER BY created_at DESC LIMIT 20",
             [$id]
         );
@@ -193,7 +193,8 @@ if ($method === 'POST') {
         // PHP. Filtramos primero por domain para no traer de más.
         $candidates = $db->query(
             "SELECT id, url FROM audits
-             WHERE user_id = ? AND project_id IS NULL AND LOWER(domain) = ?",
+             WHERE user_id = ? AND project_id IS NULL AND LOWER(domain) = ?
+               AND is_deleted = 0",
             [$userId, $domain]
         );
         $matchIds = [];
@@ -212,7 +213,7 @@ if ($method === 'POST') {
             // Rearmar el checklist vivo a partir del último audit retroactivo
             // atado — así el user entra al proyecto y ya ve tareas.
             $latest = $db->queryOne(
-                "SELECT result_json FROM audits WHERE project_id = ? ORDER BY created_at DESC LIMIT 1",
+                "SELECT result_json FROM audits WHERE project_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 1",
                 [$newId]
             );
             if ($latest) {

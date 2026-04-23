@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Upload, Trash2, CheckCircle, Loader2, Database, FileCheck2 } from 'lucide-react'
+import { Upload, Trash2, CheckCircle, Loader2, Database, FileCheck2, Download, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import api from '@/lib/api'
+import { API_BASE_URL } from '@/lib/constants'
 
 interface SnapshotMetadata {
   source: 'url' | 'upload'
@@ -34,7 +35,10 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [progressStep, setProgressStep] = useState<ProgressStep>(null)
   const [selectedFile, setSelectedFile] = useState<{ name: string; size: number } | null>(null)
+  const [replaceMode, setReplaceMode] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const pluginDownloadUrl = `${API_BASE_URL}/plugin-vault/download.php?slug=wp-snapshot`
 
   const load = useCallback(async () => {
     try {
@@ -79,6 +83,7 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
       await load()
       onChange?.()
       setSelectedFile(null)
+      setReplaceMode(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
       setTimeout(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -102,7 +107,7 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
 
   if (loading) return null
 
-  if (existing) {
+  if (existing && !replaceMode) {
     const a = existing.analysis
     return (
       <Card className="mt-4">
@@ -131,10 +136,16 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
                 )}
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={deleteSnapshot} className="text-red-500 hover:text-red-700">
-              <Trash2 className="h-4 w-4" strokeWidth={1.5} />
-              {t('settings.uploader_remove')}
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={() => setReplaceMode(true)}>
+                <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
+                {t('settings.uploader_replace')}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={deleteSnapshot} className="text-red-500 hover:text-red-700">
+                <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                {t('settings.uploader_remove')}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -149,11 +160,28 @@ export default function SnapshotUploader({ auditId, onChange }: Props) {
             <Database className="h-5 w-5 text-blue-600" strokeWidth={1.5} />
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold text-sm text-gray-900">{t('settings.uploader_connect_title')}</h3>
+            <h3 className="font-semibold text-sm text-gray-900">
+              {replaceMode ? t('settings.uploader_replace_title') : t('settings.uploader_connect_title')}
+            </h3>
             <p className="text-xs text-gray-500 mt-1">
               {t('settings.uploader_connect_body_prefix')} <a href="https://github.com/mrabro/wp-snapshot" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">wp-snapshot</a> {t('settings.uploader_connect_body_suffix')}
             </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <a
+                href={pluginDownloadUrl}
+                className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+              >
+                <Download className="h-3 w-3" strokeWidth={2} />
+                {t('settings.uploader_plugin_download')}
+              </a>
+              <span className="text-[10px] text-gray-400">{t('settings.uploader_plugin_download_hint')}</span>
+            </div>
           </div>
+          {replaceMode && (
+            <Button variant="ghost" size="sm" onClick={() => { setReplaceMode(false); setSelectedFile(null) }}>
+              {t('common.cancel')}
+            </Button>
+          )}
         </div>
 
         <div>

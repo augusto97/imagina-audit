@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Languages, RotateCcw, Wand2, CheckCheck, AlertTriangle, Save } from 'lucide-react'
 import { toast } from 'sonner'
@@ -11,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useAdmin } from '@/hooks/useAdmin'
-import { LANGUAGE_NAMES, type SupportedLanguage } from '@/i18n'
+import { COMMON_LANGUAGE_NAMES, type SupportedLanguage } from '@/i18n'
 
 interface TranslationItem {
   key: string
@@ -44,9 +45,12 @@ type Provider = 'chatgpt' | 'claude' | 'google'
 export default function SettingsTranslations() {
   const { t } = useTranslation()
   const { fetchTranslationsMeta, fetchTranslations, updateTranslation, deleteTranslation, aiTranslate } = useAdmin()
+  const [searchParams] = useSearchParams()
 
   const [meta, setMeta] = useState<{ namespaces: string[]; languages: string[]; defaultLang: string } | null>(null)
-  const [targetLang, setTargetLang] = useState<SupportedLanguage>('es')
+  // Si entramos desde /admin/languages con ?lang=XX, arrancamos en ese idioma.
+  const initialLang = (searchParams.get('lang') ?? 'es').toLowerCase()
+  const [targetLang, setTargetLang] = useState<SupportedLanguage>(initialLang)
   const [namespace, setNamespace] = useState<string>('')
   const [items, setItems] = useState<TranslationItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -212,7 +216,7 @@ export default function SettingsTranslations() {
                 <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {meta.languages.filter(l => l !== meta.defaultLang).map(lang => (
-                    <SelectItem key={lang} value={lang}>{LANGUAGE_NAMES[lang as SupportedLanguage] ?? lang}</SelectItem>
+                    <SelectItem key={lang} value={lang}>{COMMON_LANGUAGE_NAMES[lang] ?? lang.toUpperCase()}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

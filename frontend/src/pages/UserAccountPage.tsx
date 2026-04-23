@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Loader2, LogOut, Plus, Gauge, ShieldCheck, ArrowRight, Globe, Folder } from 'lucide-react'
+import { Loader2, LogOut, Plus, Gauge, ShieldCheck, ArrowRight, Globe, Folder, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { useUser } from '@/hooks/useUser'
 import { useConfigStore } from '@/store/configStore'
 
@@ -21,8 +23,9 @@ interface UserAudit {
 export default function UserAccountPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
-  const { isLoading, isAuthenticated, user, quota, logout, fetchAudits } = useUser()
+  const { isLoading, isAuthenticated, user, quota, logout, fetchAudits, deleteAudit } = useUser()
   const { logoUrl, companyName } = useConfigStore((s) => s.config)
+  const [confirmDelete, setConfirmDelete] = useState<UserAudit | null>(null)
 
   const [audits, setAudits] = useState<UserAudit[]>([])
   const [page, setPage] = useState(1)
@@ -254,9 +257,19 @@ export default function UserAccountPage() {
                             })}
                           </td>
                           <td className="px-3 py-2 text-right">
-                            <Link to={`/account/audits/${a.id}`} className="text-xs text-[var(--accent-primary)] hover:underline inline-flex items-center gap-0.5">
-                              {t('account.history_view')} <ArrowRight className="h-3 w-3" />
-                            </Link>
+                            <div className="inline-flex items-center gap-2">
+                              <Link to={`/account/audits/${a.id}`} className="text-xs text-[var(--accent-primary)] hover:underline inline-flex items-center gap-0.5">
+                                {t('account.history_view')} <ArrowRight className="h-3 w-3" />
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDelete(a)}
+                                className="text-xs text-[var(--text-tertiary)] hover:text-red-600 p-1"
+                                title={t('account.history_delete')}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -277,6 +290,36 @@ export default function UserAccountPage() {
           </CardContent>
         </Card>
       </main>
+
+      {/* Confirm delete audit */}
+      <Dialog open={confirmDelete !== null} onOpenChange={(open) => !open && setConfirmDelete(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('account.history_delete_title')}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-[var(--text-secondary)]">{t('account.history_delete_body')}</p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmDelete(null)}>{t('projects.cancel')}</Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!confirmDelete) return
+                try {
+                  await deleteAudit(confirmDelete.id)
+                  toast.success(t('account.history_delete_toast'))
+                  setConfirmDelete(null)
+                  await loadPage(1)
+                } catch (err) {
+                  const e = err as { response?: { data?: { error?: string } } }
+                  toast.error(e?.response?.data?.error ?? t('account.history_delete_error'))
+                }
+              }}
+            >
+              {t('account.history_delete_confirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

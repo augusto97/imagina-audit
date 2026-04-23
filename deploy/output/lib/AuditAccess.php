@@ -29,15 +29,17 @@ class AuditAccess {
             Response::error(Translator::t('user_api.not_authenticated'), 401);
         }
 
-        // Si no es admin, verificar que el audit le pertenece.
+        // Si no es admin, verificar que el audit le pertenece y que no
+        // está soft-deleted. Los audits borrados desde el panel del user
+        // son invisibles para él — responden 404 como si no existieran.
         if (!$isAdmin) {
             try {
                 $db = Database::getInstance();
                 $row = $db->queryOne(
-                    "SELECT user_id FROM audits WHERE id = ?",
+                    "SELECT user_id, is_deleted FROM audits WHERE id = ?",
                     [$auditId]
                 );
-                if (!$row) {
+                if (!$row || (int) ($row['is_deleted'] ?? 0) === 1) {
                     Response::error(Translator::t('api.audit.not_found'), 404);
                 }
                 $ownerId = $row['user_id'] !== null ? (int) $row['user_id'] : null;

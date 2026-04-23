@@ -179,7 +179,7 @@ class Project {
     public static function lastAuditsDiff(Database $db, int $projectId): ?array {
         try {
             $rows = $db->query(
-                "SELECT id, result_json, global_score, created_at FROM audits WHERE project_id = ? ORDER BY created_at DESC LIMIT 2",
+                "SELECT id, result_json, global_score, created_at FROM audits WHERE project_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 2",
                 [$projectId]
             );
         } catch (Throwable $e) {

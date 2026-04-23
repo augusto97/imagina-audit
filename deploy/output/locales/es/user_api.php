@@ -12,7 +12,8 @@ return [
     'login.ip_blocked'           => 'Demasiados intentos. IP bloqueada por {{minutes}} minutos.',
 
     // ——— /api/user/audits.php ——————————————————————————————————
-    'audits.fetch_error' => 'Error al cargar tu historial de auditorías.',
+    'audits.fetch_error'  => 'Error al cargar tu historial de auditorías.',
+    'audits.delete_error' => 'Error al eliminar la auditoría.',
 
     // ——— Cuota en /api/audit.php (P4.4) ——————————————————————————
     'quota.exceeded'      => 'Has alcanzado tu cuota mensual ({{used}}/{{limit}}). Se reinicia a principios del próximo mes.',

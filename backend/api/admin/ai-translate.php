@@ -45,7 +45,7 @@ $items = $body['items'] ?? [];
 $persist = !array_key_exists('persist', $body) || !empty($body['persist']);
 $providerRequested = $body['provider'] ?? null;
 
-if (!in_array($targetLang, Translator::SUPPORTED, true)) {
+if (!in_array($targetLang, Translator::supported(), true)) {
     Response::error(Translator::t('admin_api.ai_translate.lang_not_supported'), 400);
 }
 if ($sourceLang === $targetLang) {

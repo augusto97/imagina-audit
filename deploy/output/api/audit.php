@@ -46,7 +46,7 @@ try {
 // `audits.lang` para que el cache respete el idioma (pedir la misma URL en
 // otro idioma dispara un audit nuevo).
 $lang = strtolower(substr(trim($body['lang'] ?? ''), 0, 2));
-if (!in_array($lang, Translator::SUPPORTED, true)) {
+if (!in_array($lang, Translator::supported(), true)) {
     $lang = Translator::DEFAULT_LANG;
 }
 Translator::setLang($lang);
@@ -112,7 +112,7 @@ try {
             $cached = $db->queryOne(
                 "SELECT * FROM audits
                  WHERE url = ? AND lang = ?
-                   AND created_at > datetime('now', '-' || ? || ' seconds')
+                   AND created_at > datetime('now', '-' || ? || ' seconds') AND is_deleted = 0
                  ORDER BY created_at DESC LIMIT 1",
                 [$url, $lang, $cacheTtl]
             );
@@ -120,7 +120,7 @@ try {
             $cached = $db->queryOne(
                 "SELECT * FROM audits
                  WHERE url = ? AND lang = ?
-                   AND created_at > datetime('now', '-' || ? || ' seconds')
+                   AND created_at > datetime('now', '-' || ? || ' seconds') AND is_deleted = 0
                    AND (user_id = ? OR user_id IS NULL)
                  ORDER BY created_at DESC LIMIT 1",
                 [$url, $lang, $cacheTtl, (int) $authUser['id']]
@@ -129,7 +129,7 @@ try {
             $cached = $db->queryOne(
                 "SELECT * FROM audits
                  WHERE url = ? AND lang = ?
-                   AND created_at > datetime('now', '-' || ? || ' seconds')
+                   AND created_at > datetime('now', '-' || ? || ' seconds') AND is_deleted = 0
                    AND user_id IS NULL
                  ORDER BY created_at DESC LIMIT 1",
                 [$url, $lang, $cacheTtl]

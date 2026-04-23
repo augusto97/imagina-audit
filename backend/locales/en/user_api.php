@@ -12,7 +12,8 @@ return [
     'login.ip_blocked'           => 'Too many attempts. IP blocked for {{minutes}} minutes.',
 
     // ——— /api/user/audits.php ——————————————————————————————————
-    'audits.fetch_error' => 'Failed to load your audit history.',
+    'audits.fetch_error'  => 'Failed to load your audit history.',
+    'audits.delete_error' => 'Failed to delete the audit.',
 
     // ——— Quota enforcement in /api/audit.php (P4.4) ——————————————
     'quota.exceeded'        => 'You have reached your monthly quota ({{used}}/{{limit}}). It resets at the start of next month.',

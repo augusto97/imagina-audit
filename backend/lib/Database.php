@@ -173,10 +173,29 @@ class Database {
             "ALTER TABLE audits ADD COLUMN project_id INTEGER",
             // Columna `max_projects` en plans — cupo de proyectos por plan (0=ilimitado)
             "ALTER TABLE plans ADD COLUMN max_projects INTEGER NOT NULL DEFAULT 0",
+            // Columna `is_deleted` para soft-delete desde el panel del user.
+            // La cuota mensual cuenta filas soft-deleted también — borrar un
+            // audit no libera un slot (el scan ya se ejecutó, consumió recursos).
+            "ALTER TABLE audits ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0",
+        ];
+        // Seed de idiomas iniciales — protegido por INSERT OR IGNORE, se
+        // repite cada boot pero solo inserta la primera vez. Evita tener una
+        // instalación con 0 idiomas y una UI que no responde.
+        $seedLanguages = [
+            ['en', 'English', 'English', 0],
+            ['es', 'Spanish', 'Español', 1],
         ];
         foreach ($migrations as $sql) {
             try { $this->pdo->exec($sql); } catch (Throwable $e) { /* columna ya existe */ }
         }
+        try {
+            $stmt = $this->pdo->prepare(
+                "INSERT OR IGNORE INTO languages (code, name, native_name, is_active, is_public, sort_order) VALUES (?, ?, ?, 1, 1, ?)"
+            );
+            foreach ($seedLanguages as [$code, $name, $native, $order]) {
+                $stmt->execute([$code, $name, $native, $order]);
+            }
+        } catch (Throwable $e) { /* tabla aún no creada; schema.sql la creará después */ }
     }
 
     /**
