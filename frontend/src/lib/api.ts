@@ -48,18 +48,38 @@ api.interceptors.request.use((config) => {
 })
 
 /**
- * Recupera el token CSRF desde /admin/session.php. Se usa cuando el backend
- * rechaza un request con 403 CSRF (sesión renovada en segundo plano, pestaña
- * dejada abierta, etc.) — refrescamos y reintentamos una vez.
+ * Recupera el token CSRF para la sesión activa. Usamos este fallback cuando
+ * el backend rechaza un request con 403 CSRF (sesión renovada en segundo
+ * plano, pestaña dejada abierta, etc.) y hay que reintentar una vez.
+ *
+ * Decide qué endpoint consultar a partir del URL que falló:
+ *   - /admin/*  → /admin/session.php (token admin o, en dual-auth, user)
+ *   - /user/*   → /user/session.php (token user)
+ * Admin y user guardan sus tokens en stores separados para que coexistan.
  */
-async function refreshCsrfToken(): Promise<string | null> {
+async function refreshCsrfToken(forUrl: string): Promise<string | null> {
+  const isUserSurface = forUrl.includes('/user/')
+  const hasAdminSession = !!useAuthStore.getState().csrfToken
+  // Para /admin/* probamos primero el refresh admin si ya existía un token.
+  // Si no había token admin (el caller era user dual-auth) vamos a /user/.
+  const useUserEndpoint = isUserSurface || !hasAdminSession
+
   try {
-    const res = await axios.get(`${API_BASE_URL}/admin/session.php`, {
+    const path = useUserEndpoint ? '/user/session.php' : '/admin/session.php'
+    const res = await axios.get(`${API_BASE_URL}${path}`, {
       withCredentials: true,
       timeout: 10000,
     })
     const token = res.data?.data?.csrfToken ?? null
-    useAuthStore.getState().setCsrfToken(token)
+    if (useUserEndpoint) {
+      useUserAuthStore.getState().setSession({
+        user: res.data?.data?.user ?? useUserAuthStore.getState().user,
+        quota: res.data?.data?.quota ?? useUserAuthStore.getState().quota,
+        csrfToken: token,
+      })
+    } else {
+      useAuthStore.getState().setCsrfToken(token)
+    }
     return token
   } catch {
     return null
@@ -82,7 +102,7 @@ api.interceptors.response.use(
 
     if (isCsrfError && !config.__csrfRetried) {
       config.__csrfRetried = true
-      const fresh = await refreshCsrfToken()
+      const fresh = await refreshCsrfToken(config.url ?? '')
       if (fresh) {
         config.headers = config.headers ?? {}
         config.headers['X-CSRF-Token'] = fresh
