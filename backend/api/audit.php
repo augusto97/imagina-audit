@@ -100,6 +100,14 @@ try {
     Logger::error('Error en rate limiting: ' . $e->getMessage());
 }
 
+// Detectar proyecto matchable ANTES del cache lookup — lo necesitamos
+// tanto para el flujo fresco como para atar un audit cacheado al proyecto
+// si hacía falta. Model A: match por URL exacta normalizada.
+$projectId = null;
+if ($authUser) {
+    $projectId = Project::findMatchingProject(Database::getInstance(), (int) $authUser['id'], $url);
+}
+
 // Cache lookup
 $forceRefresh = !empty($body['forceRefresh']);
 $cacheTtl = (int) env('CACHE_TTL_SECONDS', '86400');
@@ -111,11 +119,31 @@ try {
 try {
     if (!$forceRefresh) {
         $db = Database::getInstance();
-        // Filtramos por lang: un resultado cacheado en otro idioma NO sirve.
-        $cached = $db->queryOne(
-            "SELECT * FROM audits WHERE url = ? AND lang = ? AND created_at > datetime('now', '-' || ? || ' seconds') ORDER BY created_at DESC LIMIT 1",
-            [$url, $lang, $cacheTtl]
-        );
+        // Cache scope:
+        //   - User autenticado: solo audits propios o anónimos (user_id IS NULL).
+        //     Nunca devolvemos al user A un audit que hizo el user B, aunque
+        //     sea de la misma URL (evita leak de datos entre cuentas).
+        //   - Anónimo: solo audits anónimos (NULL). Los audits con dueño no
+        //     se sirven desde cache al público.
+        if ($authUser) {
+            $cached = $db->queryOne(
+                "SELECT * FROM audits
+                 WHERE url = ? AND lang = ?
+                   AND created_at > datetime('now', '-' || ? || ' seconds')
+                   AND (user_id = ? OR user_id IS NULL)
+                 ORDER BY created_at DESC LIMIT 1",
+                [$url, $lang, $cacheTtl, (int) $authUser['id']]
+            );
+        } else {
+            $cached = $db->queryOne(
+                "SELECT * FROM audits
+                 WHERE url = ? AND lang = ?
+                   AND created_at > datetime('now', '-' || ? || ' seconds')
+                   AND user_id IS NULL
+                 ORDER BY created_at DESC LIMIT 1",
+                [$url, $lang, $cacheTtl]
+            );
+        }
 
         if ($cached) {
             $result = JsonStore::decode($cached['result_json']);
@@ -129,6 +157,33 @@ try {
                     "UPDATE audits SET lead_name = COALESCE(NULLIF(?, ''), lead_name), lead_email = COALESCE(NULLIF(?, ''), lead_email), lead_whatsapp = COALESCE(NULLIF(?, ''), lead_whatsapp), lead_company = COALESCE(NULLIF(?, ''), lead_company) WHERE id = ?",
                     [$leadName, $leadEmail, $leadWhatsapp, $leadCompany, $cached['id']]
                 );
+            }
+
+            // Atribuir cache hit al user actual y al proyecto si corresponde.
+            // Reclamamos audits anónimos (user_id era NULL) para que queden en
+            // el histórico del user, y seteamos project_id si el proyecto
+            // existía ahora pero no cuando se cacheó el audit.
+            if ($authUser) {
+                $cachedUserId = $cached['user_id'] !== null ? (int) $cached['user_id'] : null;
+                $cachedProjectId = $cached['project_id'] !== null ? (int) $cached['project_id'] : null;
+                $needsUserId = $cachedUserId === null;
+                $needsProjectId = $projectId !== null && $cachedProjectId === null;
+                if ($needsUserId || $needsProjectId) {
+                    $db->execute(
+                        "UPDATE audits SET user_id = COALESCE(user_id, ?), project_id = COALESCE(project_id, ?) WHERE id = ?",
+                        [(int) $authUser['id'], $projectId, $cached['id']]
+                    );
+                    // Si acabamos de atar el audit a un proyecto, reconciliamos
+                    // el checklist vivo para que el user lo vea actualizado al
+                    // volver al proyecto.
+                    if ($needsProjectId && $projectId !== null && is_array($result)) {
+                        try {
+                            Project::reconcileChecklist($db, $projectId, Project::flattenMetrics($result));
+                        } catch (Throwable $e) {
+                            Logger::warning('reconcileChecklist post-cache falló: ' . $e->getMessage());
+                        }
+                    }
+                }
             }
 
             Response::success([
@@ -152,13 +207,8 @@ if ($recentError !== null && !$forceRefresh) {
 // Encolar o ejecutar directo
 $auditId = AuditOrchestrator::generateUuid();
 
-// Auto-attach: si el user logged-in ya tiene un proyecto con esta URL exacta,
-// el audit queda atado al proyecto. Model A = 1 proyecto = 1 URL, el match
-// es por URL normalizada (no por dominio) — ver Project::findMatchingProject.
-$projectId = null;
-if ($authUser) {
-    $projectId = Project::findMatchingProject(Database::getInstance(), (int) $authUser['id'], $url);
-}
+// $projectId ya se calculó arriba (antes del cache lookup) para que el
+// flujo cacheado también pudiera atar el audit al proyecto.
 
 $leadData = [
     'leadName' => $body['leadName'] ?? '',

@@ -23,21 +23,25 @@ api.interceptors.request.use((config) => {
   const method = (config.method ?? 'get').toLowerCase()
   const isMutation = ['post', 'put', 'delete', 'patch'].includes(method)
 
-  // CSRF del admin sólo para /admin/*; CSRF del user sólo para /user/*
-  // mutaciones. Son dos tokens distintos porque las sesiones son independientes.
+  // CSRF en mutaciones:
+  //   - /user/*  → token del user.
+  //   - /admin/* → token del admin si existe; si el caller es un user que
+  //     accede a un endpoint dual-auth (ej. /admin/snapshot.php para subir
+  //     el snapshot de su propio audit), caemos al token de user. El
+  //     backend (AuditAccess::require) valida el token correcto según la
+  //     sesión activa.
   if (isMutation) {
+    const adminToken = useAuthStore.getState().csrfToken
+    const userToken = useUserAuthStore.getState().csrfToken
+    let chosen: string | null = null
     if (url.includes('/admin/')) {
-      const token = useAuthStore.getState().csrfToken
-      if (token) {
-        config.headers = config.headers ?? {}
-        config.headers['X-CSRF-Token'] = token
-      }
+      chosen = adminToken || userToken
     } else if (url.includes('/user/')) {
-      const token = useUserAuthStore.getState().csrfToken
-      if (token) {
-        config.headers = config.headers ?? {}
-        config.headers['X-CSRF-Token'] = token
-      }
+      chosen = userToken
+    }
+    if (chosen) {
+      config.headers = config.headers ?? {}
+      config.headers['X-CSRF-Token'] = chosen
     }
   }
   return config
