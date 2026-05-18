@@ -16,6 +16,7 @@ require_once dirname(__DIR__) . '/config/env.php';
 spl_autoload_register(function (string $class) {
     $paths = [
         dirname(__DIR__) . '/lib/' . $class . '.php',
+        dirname(__DIR__) . '/lib/db/' . $class . '.php',
         dirname(__DIR__) . '/analyzers/' . $class . '.php',
     ];
 

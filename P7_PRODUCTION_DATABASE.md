@@ -328,34 +328,16 @@ backend/
 
 ---
 
-## 9. Preguntas abiertas — necesito que confirmes antes de empezar
+## 9. Decisiones confirmadas (2026-05-18)
 
-1. **¿MySQL/MariaDB solo, o también PostgreSQL?**
-   Recomiendo solo MySQL/MariaDB para esta fase. PostgreSQL queda como
-   P8 si surge demanda real.
-
-2. **¿Mantenemos SQLite como opción dev/fallback, o lo eliminamos?**
-   Recomiendo mantenerlo como opt-in. Útil para demos, tests, hosting
-   muy básico sin MySQL.
-
-3. **¿Setup wizard obligatorio en primera carga o el admin edita
-   `.env` a mano?**
-   Recomiendo wizard — el target de CodeCanyon no quiere editar archivos
-   por SSH.
-
-4. **¿Backups automáticos por cron o solo manuales desde el panel?**
-   Recomiendo ambos: manual siempre disponible, cron opcional con
-   retención configurable.
-
-5. **Versión mínima objetivo de MySQL/MariaDB.**
-   Propongo: MySQL 5.7+ / MariaDB 10.3+. Cubre 99% de hostings cPanel
-   actuales. Si quieres soportar versiones más viejas, perdemos `JSON`
-   nativo y volvemos a TEXT.
-
-6. **¿Plazo o prioridad de cada fase?**
-   Las 6 fases pueden hacerse en orden estricto (1 sprint cada una). Si
-   quieres acelerar, F1+F2+F3 son críticas; F4+F5+F6 son "nice for
-   shipping pero no bloqueantes para que MySQL funcione".
+| # | Pregunta                                          | Decisión final                       |
+|---|---------------------------------------------------|--------------------------------------|
+| 1 | ¿Qué drivers SQL soportamos?                      | **MySQL / MariaDB** (PostgreSQL queda para P8) |
+| 2 | ¿Mantenemos SQLite como fallback?                 | **Sí**, opt-in vía `DB_DRIVER=sqlite` |
+| 3 | ¿Setup wizard o `.env` a mano?                    | **Wizard** en `/setup`               |
+| 4 | ¿Backups manual / cron?                           | **Ambos** — manual desde panel + cron opcional |
+| 5 | Versión mínima MySQL/MariaDB                      | **MySQL 5.7+ / MariaDB 10.3+** (PHP ya es 8+ baseline) |
+| 6 | Orden de fases                                    | **F1 → F2 → F3 → F4 → F5 → F6** secuencial |
 
 ---
 
