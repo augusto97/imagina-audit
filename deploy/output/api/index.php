@@ -91,6 +91,18 @@ switch ($endpoint) {
         require __DIR__ . '/setup.php';
         break;
 
+    case 'setup/status':
+        require __DIR__ . '/setup/status.php';
+        break;
+
+    case 'setup/test-db':
+        require __DIR__ . '/setup/test-db.php';
+        break;
+
+    case 'setup/install':
+        require __DIR__ . '/setup/install.php';
+        break;
+
     case 'admin/login':
         require __DIR__ . '/admin/login.php';
         break;
