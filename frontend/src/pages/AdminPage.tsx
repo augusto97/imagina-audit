@@ -23,6 +23,7 @@ import SettingsRetention from '@/components/admin/SettingsRetention'
 import SettingsTranslations from '@/components/admin/SettingsTranslations'
 import AdminLanguages from '@/components/admin/AdminLanguages'
 import AdminDatabaseMigration from '@/components/admin/AdminDatabaseMigration'
+import AdminBackups from '@/components/admin/AdminBackups'
 import SystemHealth from '@/components/admin/SystemHealth'
 import VulnerabilityManager from '@/components/admin/VulnerabilityManager'
 import TechnicalReport from '@/components/admin/TechnicalReport'
@@ -85,6 +86,7 @@ export default function AdminPage() {
         <Route path="translations" element={<SettingsTranslations />} />
         <Route path="languages" element={<AdminLanguages />} />
         <Route path="database" element={<AdminDatabaseMigration />} />
+        <Route path="backups" element={<AdminBackups />} />
         <Route path="health" element={<SystemHealth />} />
         <Route path="vulnerabilities" element={<VulnerabilityManager />} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />

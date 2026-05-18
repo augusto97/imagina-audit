@@ -144,22 +144,28 @@ class Database {
     // ─── Public API (sin cambios funcionales vs pre-P7) ───────────────
 
     public function query(string $sql, array $params = []): array {
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll();
+        return $this->traced($sql, $params, function () use ($sql, $params) {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll();
+        });
     }
 
     public function queryOne(string $sql, array $params = []): ?array {
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
-        $result = $stmt->fetch();
-        return $result !== false ? $result : null;
+        return $this->traced($sql, $params, function () use ($sql, $params) {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            $result = $stmt->fetch();
+            return $result !== false ? $result : null;
+        });
     }
 
     public function execute(string $sql, array $params = []): int {
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->rowCount();
+        return $this->traced($sql, $params, function () use ($sql, $params) {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->rowCount();
+        });
     }
 
     public function lastInsertId(): string {
@@ -167,9 +173,57 @@ class Database {
     }
 
     public function scalar(string $sql, array $params = []): mixed {
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchColumn();
+        return $this->traced($sql, $params, function () use ($sql, $params) {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchColumn();
+        });
+    }
+
+    /**
+     * Wrapper que mide tiempo de cada query y loguea las lentas. El
+     * umbral se controla con SLOW_QUERY_THRESHOLD_MS en .env (default
+     * 200ms). El log va a backend/logs/slow-queries.log vía Logger.
+     */
+    private function traced(string $sql, array $params, callable $fn): mixed
+    {
+        $start = microtime(true);
+        try {
+            return $fn();
+        } finally {
+            $elapsedMs = (microtime(true) - $start) * 1000;
+            $threshold = function_exists('env') ? (int) env('SLOW_QUERY_THRESHOLD_MS', '200') : 200;
+            if ($threshold > 0 && $elapsedMs >= $threshold && class_exists('Logger')) {
+                $sanitized = $this->sanitizeParams($params);
+                Logger::warning(sprintf(
+                    'SLOW QUERY %dms — %s | params: %s',
+                    (int) $elapsedMs,
+                    trim(preg_replace('/\s+/', ' ', $sql) ?? $sql),
+                    json_encode($sanitized, JSON_UNESCAPED_UNICODE)
+                ));
+            }
+        }
+    }
+
+    /**
+     * Sanitiza params para el log: trunca valores largos y enmascara
+     * claves que parezcan sensibles (password, token, hash). Esto
+     * evita filtrar credenciales en los logs de slow queries.
+     */
+    private function sanitizeParams(array $params): array
+    {
+        $out = [];
+        foreach ($params as $k => $v) {
+            $key = is_string($k) ? strtolower($k) : (string) $k;
+            if (is_string($v) && preg_match('/pass|token|hash|secret|key/i', $key)) {
+                $out[$k] = '***';
+            } elseif (is_string($v) && strlen($v) > 200) {
+                $out[$k] = substr($v, 0, 200) . '…';
+            } else {
+                $out[$k] = $v;
+            }
+        }
+        return $out;
     }
 
     public function getPdo(): PDO { return $this->pdo; }

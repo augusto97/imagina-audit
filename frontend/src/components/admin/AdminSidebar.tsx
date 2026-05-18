@@ -36,6 +36,7 @@ const NAV_SECTIONS = [
       { to: '/admin/languages',    icon: Globe2,             labelKey: 'nav.languages' },
       { to: '/admin/translations', icon: Languages,          labelKey: 'nav.translations' },
       { to: '/admin/database',     icon: Database,           labelKey: 'nav.database' },
+      { to: '/admin/backups',      icon: Archive,            labelKey: 'nav.backups' },
       { to: '/admin/health',       icon: Activity,           labelKey: 'nav.health' },
     ],
   },

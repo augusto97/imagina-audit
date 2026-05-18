@@ -16,10 +16,23 @@ $checks = [
 
 // Verificar conexión a la DB
 $dbOk = false;
+$dbDriver = null;
+$dbPingMs = null;
+$migrationsPending = null;
 try {
     $db = Database::getInstance();
+    $start = microtime(true);
     $db->scalar("SELECT 1");
+    $dbPingMs = (int) ((microtime(true) - $start) * 1000);
     $dbOk = true;
+    $dbDriver = $db->driver();
+    if (class_exists('Migrator')) {
+        try {
+            $migrator = new Migrator($db);
+            $migrator->bootstrap();
+            $migrationsPending = count($migrator->pending());
+        } catch (Throwable $e) { /* ignore */ }
+    }
 } catch (Throwable $e) {
     // DB no disponible
 }
@@ -47,5 +60,10 @@ http_response_code($allOk ? 200 : 503);
 Response::success([
     'status' => $allOk ? 'healthy' : 'degraded',
     'checks' => $checks,
+    'db' => [
+        'driver' => $dbDriver,
+        'pingMs' => $dbPingMs,
+        'migrationsPending' => $migrationsPending,
+    ],
     'timestamp' => date('c'),
 ]);
