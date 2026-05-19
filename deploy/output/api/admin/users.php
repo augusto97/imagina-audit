@@ -46,16 +46,17 @@ if ($method === 'GET') {
     }
 
     try {
+        $startOfMonth = $db->startOfMonth();
         $rows = $db->query(
             "SELECT u.id, u.email, u.name, u.plan_id, u.is_active, u.created_at, u.last_login_at,
                     p.name AS plan_name, p.monthly_limit AS plan_limit,
                     (SELECT COUNT(*) FROM audits a WHERE a.user_id = u.id
-                         AND a.created_at >= datetime('now', 'start of month')) AS month_used
+                         AND a.created_at >= ?) AS month_used
              FROM users u
              LEFT JOIN plans p ON p.id = u.plan_id
              WHERE $where
              ORDER BY u.created_at DESC",
-            $params
+            array_merge([$startOfMonth], $params)
         );
         $users = array_map(fn($r) => [
             'id' => (int) $r['id'],

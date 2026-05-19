@@ -179,8 +179,8 @@ class UserAuth {
         try {
             $db = Database::getInstance();
             return (int) $db->scalar(
-                "SELECT COUNT(*) FROM audits WHERE user_id = ? AND created_at >= datetime('now', 'start of month')",
-                [$userId]
+                "SELECT COUNT(*) FROM audits WHERE user_id = ? AND created_at >= ?",
+                [$userId, $db->startOfMonth()]
             );
         } catch (Throwable $e) {
             return 0;

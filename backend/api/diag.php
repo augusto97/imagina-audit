@@ -164,7 +164,8 @@ addCheck($checks, 'url_rewrite', 'URL rewriting del backend',
 try {
     $db = Database::getInstance();
     $staleRunning = (int) $db->scalar(
-        "SELECT COUNT(*) FROM audit_jobs WHERE status = 'running' AND started_at < datetime('now', '-5 minutes')"
+        "SELECT COUNT(*) FROM audit_jobs WHERE status = 'running' AND started_at < ?",
+        [$db->nowMinus(300)]
     );
     $totalJobs = (int) $db->scalar("SELECT COUNT(*) FROM audit_jobs");
     if ($totalJobs === 0) {

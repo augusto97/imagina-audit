@@ -301,6 +301,27 @@ class Database {
     public function now(): string { return $this->dialect->now(); }
 
     /**
+     * Timestamp (formato MySQL/SQLite) de "ahora - N segundos". Reemplaza
+     * el patrón legacy `datetime('now', '-X seconds')` que era SQLite-only.
+     * El caller bindea el resultado como parámetro normal.
+     *
+     *   "WHERE created_at > ?", [$db->nowMinus(3600)]
+     */
+    public function nowMinus(int $seconds): string {
+        return date('Y-m-d H:i:s', time() - $seconds);
+    }
+
+    /** Timestamp del inicio del mes calendario actual (UTC). */
+    public function startOfMonth(): string {
+        return date('Y-m-01 00:00:00');
+    }
+
+    /** Fecha de hoy en formato YYYY-MM-DD. Útil para comparar columnas DATE. */
+    public function today(): string {
+        return date('Y-m-d');
+    }
+
+    /**
      * Normaliza un valor a booleano binario que ambos drivers entienden
      * (0/1). Útil para columnas declaradas como TINYINT/INTEGER booleanas.
      */

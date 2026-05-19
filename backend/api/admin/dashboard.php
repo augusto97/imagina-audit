@@ -17,12 +17,17 @@ try {
     $db = Database::getInstance();
 
     // ─── Audits: totales y segmentación ──────────────────────────────
+    $today = $db->today();
+    $weekAgo = $db->nowMinus(7 * 86400);
+    $monthAgo = $db->nowMinus(30 * 86400);
+    $hourAgo = $db->nowMinus(3600);
+
     $totalAudits    = (int) $db->scalar("SELECT COUNT(*) FROM audits");
-    $auditsToday    = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE date(created_at) = date('now')");
-    $auditsThisWeek = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE created_at >= date('now', '-7 days')");
-    $auditsThisMonth = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE created_at >= date('now', '-30 days')");
+    $auditsToday    = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE created_at >= ?", ["$today 00:00:00"]);
+    $auditsThisWeek = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE created_at >= ?", [$weekAgo]);
+    $auditsThisMonth = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE created_at >= ?", [$monthAgo]);
     $averageScore   = round((float) ($db->scalar("SELECT AVG(global_score) FROM audits") ?? 0), 1);
-    $averageScore7d = round((float) ($db->scalar("SELECT AVG(global_score) FROM audits WHERE created_at >= date('now', '-7 days')") ?? 0), 1);
+    $averageScore7d = round((float) ($db->scalar("SELECT AVG(global_score) FROM audits WHERE created_at >= ?", [$weekAgo]) ?? 0), 1);
 
     $totalLeads = (int) $db->scalar(
         "SELECT COUNT(*) FROM audits WHERE (lead_email IS NOT NULL AND lead_email != '') OR (lead_whatsapp IS NOT NULL AND lead_whatsapp != '')"
@@ -50,12 +55,15 @@ try {
 
     // ─── Trend: conteos diarios de los últimos 30 días ──────────────
     // Rellena con ceros los días sin datos para graficar una línea continua.
+    // DATE(created_at) funciona en ambos drivers (MySQL: DATE() built-in;
+    // SQLite: date() built-in case-insensitive).
     $rawTrend = $db->query(
-        "SELECT date(created_at) AS d, COUNT(*) AS c, ROUND(AVG(global_score), 1) AS avg_score
+        "SELECT DATE(created_at) AS d, COUNT(*) AS c, ROUND(AVG(global_score), 1) AS avg_score
          FROM audits
-         WHERE created_at >= date('now', '-30 days')
-         GROUP BY date(created_at)
-         ORDER BY d ASC"
+         WHERE created_at >= ?
+         GROUP BY DATE(created_at)
+         ORDER BY d ASC",
+        [$monthAgo]
     );
     $trendByDay = [];
     foreach ($rawTrend as $r) {
@@ -105,12 +113,13 @@ try {
     if (!empty($recurring)) {
         $domains = array_column($recurring, 'domain');
         $placeholders = implode(',', array_fill(0, count($domains), '?'));
+        // MySQL exige alias en derived tables; SQLite lo acepta opcional.
         $trendRows = $db->query(
             "SELECT domain, global_score, rn FROM (
                 SELECT domain, global_score,
                        ROW_NUMBER() OVER (PARTITION BY domain ORDER BY created_at DESC) AS rn
                 FROM audits WHERE domain IN ($placeholders)
-            ) WHERE rn <= 2",
+            ) AS ranked WHERE rn <= 2",
             $domains
         );
         $scoresByDomain = [];
@@ -138,8 +147,8 @@ try {
         $queue['running']           = QueueManager::runningCount();
         $queue['queued']            = QueueManager::queuedCount();
         $queue['maxConcurrent']     = QueueManager::getMaxConcurrent();
-        $queue['failedLastHour']    = (int) $db->scalar("SELECT COUNT(*) FROM audit_jobs WHERE status = 'failed' AND completed_at > datetime('now', '-1 hour')");
-        $queue['completedLastHour'] = (int) $db->scalar("SELECT COUNT(*) FROM audit_jobs WHERE status = 'completed' AND completed_at > datetime('now', '-1 hour')");
+        $queue['failedLastHour']    = (int) $db->scalar("SELECT COUNT(*) FROM audit_jobs WHERE status = 'failed' AND completed_at > ?", [$hourAgo]);
+        $queue['completedLastHour'] = (int) $db->scalar("SELECT COUNT(*) FROM audit_jobs WHERE status = 'completed' AND completed_at > ?", [$hourAgo]);
     } catch (Throwable $e) { /* tabla quizá no existe aún */ }
 
     // ─── Integraciones (snapshots conectados, vulnerabilidades) ──────

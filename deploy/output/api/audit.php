@@ -87,7 +87,7 @@ if ($authUser) {
 // Housekeeping del rate limits, sin aplicar throttle todavía.
 try {
     $db = Database::getInstance();
-    $db->execute("DELETE FROM rate_limits WHERE request_time < datetime('now', '-1 hour')");
+    $db->execute("DELETE FROM rate_limits WHERE request_time < ?", [$db->nowMinus(3600)]);
 } catch (Throwable $e) { /* no crítico */ }
 
 // Cache lookup
@@ -108,31 +108,32 @@ try {
         //     leak de lead_email y otros datos sensibles entre cuentas.
         //   - Anónimo: solo audits anónimos. Los que tienen dueño no se
         //     sirven desde cache al público.
+        $cacheThreshold = $db->nowMinus($cacheTtl);
         if ($isAdmin) {
             $cached = $db->queryOne(
                 "SELECT * FROM audits
                  WHERE url = ? AND lang = ?
-                   AND created_at > datetime('now', '-' || ? || ' seconds') AND is_deleted = 0
+                   AND created_at > ? AND is_deleted = 0
                  ORDER BY created_at DESC LIMIT 1",
-                [$url, $lang, $cacheTtl]
+                [$url, $lang, $cacheThreshold]
             );
         } elseif ($authUser) {
             $cached = $db->queryOne(
                 "SELECT * FROM audits
                  WHERE url = ? AND lang = ?
-                   AND created_at > datetime('now', '-' || ? || ' seconds') AND is_deleted = 0
+                   AND created_at > ? AND is_deleted = 0
                    AND (user_id = ? OR user_id IS NULL)
                  ORDER BY created_at DESC LIMIT 1",
-                [$url, $lang, $cacheTtl, (int) $authUser['id']]
+                [$url, $lang, $cacheThreshold, (int) $authUser['id']]
             );
         } else {
             $cached = $db->queryOne(
                 "SELECT * FROM audits
                  WHERE url = ? AND lang = ?
-                   AND created_at > datetime('now', '-' || ? || ' seconds') AND is_deleted = 0
+                   AND created_at > ? AND is_deleted = 0
                    AND user_id IS NULL
                  ORDER BY created_at DESC LIMIT 1",
-                [$url, $lang, $cacheTtl]
+                [$url, $lang, $cacheThreshold]
             );
         }
 

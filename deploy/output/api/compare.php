@@ -37,7 +37,7 @@ try {
 $isAdmin = Auth::checkAuth();
 try {
     $db = Database::getInstance();
-    $db->execute("DELETE FROM rate_limits WHERE request_time < datetime('now', '-1 hour')");
+    $db->execute("DELETE FROM rate_limits WHERE request_time < ?", [$db->nowMinus(3600)]);
     if (!$isAdmin) {
         $count = (int) $db->scalar(
             "SELECT COUNT(*) FROM rate_limits WHERE ip_address = ? AND endpoint = 'compare'",
@@ -61,8 +61,8 @@ function getOrRunAudit(string $url): array {
 
     // Verificar cache
     $cached = $db->queryOne(
-        "SELECT result_json FROM audits WHERE url = ? AND created_at > datetime('now', '-' || ? || ' seconds') ORDER BY created_at DESC LIMIT 1",
-        [$url, $cacheTtl]
+        "SELECT result_json FROM audits WHERE url = ? AND created_at > ? ORDER BY created_at DESC LIMIT 1",
+        [$url, $db->nowMinus($cacheTtl)]
     );
 
     if ($cached) {

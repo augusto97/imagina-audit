@@ -70,9 +70,9 @@ class QueueManager {
             $row = $db->queryOne(
                 "SELECT error_message FROM audit_jobs
                  WHERE url = ? AND status = 'failed'
-                 AND completed_at > datetime('now', ?)
+                 AND completed_at > ?
                  ORDER BY completed_at DESC LIMIT 1",
-                [$url, "-$windowMin minutes"]
+                [$url, $db->nowMinus($windowMin * 60)]
             );
             if ($row && !empty($row['error_message'])) {
                 return $row['error_message'];
@@ -93,8 +93,8 @@ class QueueManager {
             return (int) $db->scalar(
                 "SELECT COUNT(*) FROM audit_jobs
                  WHERE url = ? AND status = 'failed'
-                 AND completed_at > datetime('now', ?)",
-                [$url, "-$windowMinutes minutes"]
+                 AND completed_at > ?",
+                [$url, $db->nowMinus($windowMinutes * 60)]
             );
         } catch (Throwable $e) {
             return 0;

@@ -40,11 +40,11 @@ try {
     $db->initSchema();
 
     // Rate limits (ventana de 1 hora)
-    $stats['rate_limits'] = $db->execute("DELETE FROM rate_limits WHERE request_time < datetime('now', '-1 hour')");
+    $stats['rate_limits'] = $db->execute("DELETE FROM rate_limits WHERE request_time < ?", [$db->nowMinus(3600)]);
 
     // Login attempts (ventana de 15 minutos)
     try {
-        $stats['login_attempts'] = $db->execute("DELETE FROM login_attempts WHERE attempted_at < datetime('now', '-15 minutes')");
+        $stats['login_attempts'] = $db->execute("DELETE FROM login_attempts WHERE attempted_at < ?", [$db->nowMinus(900)]);
     } catch (Throwable $e) {
         // Tabla podría no existir aún si nadie ha intentado loguearse
     }
@@ -59,8 +59,8 @@ try {
             $stats['audit_jobs'] = $db->execute(
                 "DELETE FROM audit_jobs
                  WHERE status IN ('completed', 'failed')
-                 AND completed_at < datetime('now', ?)",
-                ["-$retentionDays days"]
+                 AND completed_at < ?",
+                [$db->nowMinus($retentionDays * 86400)]
             );
         }
     } catch (Throwable $e) {
@@ -85,9 +85,9 @@ try {
             $days = $months * 30;
             $stats['audits_retention'] = $db->execute(
                 "DELETE FROM audits
-                 WHERE created_at < datetime('now', ?)
+                 WHERE created_at < ?
                  AND is_pinned = 0",
-                ["-$days days"]
+                [$db->nowMinus($days * 86400)]
             );
             if ($stats['audits_retention'] > 0) {
                 Logger::info("Retención: eliminados {$stats['audits_retention']} informes >$months meses");

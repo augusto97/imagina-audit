@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Loader2, Database, Server, HardDrive, ShieldCheck, CheckCircle2, AlertCircle,
@@ -44,7 +43,6 @@ interface AdminConfig {
 
 export default function SetupPage() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
 
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [statusChecking, setStatusChecking] = useState(true)
@@ -130,9 +128,12 @@ export default function SetupPage() {
         payload.sqlitePath = db.sqlitePath
       }
       await api.post('/setup/install.php', payload)
-      // Pequeño delay para que el usuario vea el success state antes de
-      // navegar al login.
-      setTimeout(() => navigate('/admin/login', { replace: true }), 1200)
+      // Hard navigation — el SetupGate del App cachea installed=false del
+      // primer mount. Necesitamos un full reload para que vuelva a leer
+      // /setup/status y vea installed=true. Si usamos navigate() de
+      // react-router, SetupGate redirige de vuelta a /setup con su cache
+      // viejo y entramos en loop.
+      setTimeout(() => { window.location.href = '/admin/login' }, 1200)
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } }
       setInstallError(axiosErr.response?.data?.error ?? 'Install failed')
@@ -156,7 +157,7 @@ export default function SetupPage() {
             <ShieldCheck className="h-12 w-12 text-emerald-600 mx-auto" />
             <h1 className="text-xl font-bold">{t('setup.already_installed_title')}</h1>
             <p className="text-sm text-[var(--text-secondary)]">{t('setup.already_installed_body')}</p>
-            <Button onClick={() => navigate('/admin/login', { replace: true })}>
+            <Button onClick={() => { window.location.href = '/admin/login' }}>
               {t('setup.go_to_login')}
             </Button>
           </CardContent>

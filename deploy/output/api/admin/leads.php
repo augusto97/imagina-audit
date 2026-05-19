@@ -54,10 +54,12 @@ switch ($filter) {
         $where .= " AND a.global_score >= 30 AND a.global_score < 50";
         break;
     case 'this_week':
-        $where .= " AND a.created_at >= date('now', '-7 days')";
+        $where .= " AND a.created_at >= ?";
+        $params[] = $db->nowMinus(7 * 86400);
         break;
     case 'this_month':
-        $where .= " AND a.created_at >= date('now', '-30 days')";
+        $where .= " AND a.created_at >= ?";
+        $params[] = $db->nowMinus(30 * 86400);
         break;
 }
 
@@ -143,7 +145,7 @@ try {
         'wordpress'     => (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE is_wordpress = 1"),
         'pinned'        => 0,
         'withSnapshot'  => 0,
-        'thisWeek'      => (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE created_at >= date('now', '-7 days')"),
+        'thisWeek'      => (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE created_at >= ?", [$db->nowMinus(7 * 86400)]),
     ];
     try { $summary['pinned'] = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE is_pinned = 1"); } catch (Throwable $e) {}
     try { $summary['withSnapshot'] = (int) $db->scalar("SELECT COUNT(DISTINCT audit_id) FROM wp_snapshots"); } catch (Throwable $e) {}
