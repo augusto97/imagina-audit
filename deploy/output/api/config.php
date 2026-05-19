@@ -22,7 +22,7 @@ $defaults = require dirname(__DIR__) . '/config/defaults.php';
 $settings = [];
 try {
     $db = Database::getInstance();
-    $rows = $db->query("SELECT key, value FROM settings");
+    $rows = $db->query("SELECT `key`, value FROM settings");
     foreach ($rows as $row) {
         $settings[$row['key']] = $row['value'];
     }

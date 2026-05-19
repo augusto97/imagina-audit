@@ -89,7 +89,7 @@ export default function AdminPage() {
         <Route path="backups" element={<AdminBackups />} />
         <Route path="health" element={<SystemHealth />} />
         <Route path="vulnerabilities" element={<VulnerabilityManager />} />
-        <Route path="*" element={<Navigate to="dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Routes>
       </ErrorBoundary>
     </AdminLayout>

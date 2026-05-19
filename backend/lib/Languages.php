@@ -157,7 +157,7 @@ class Languages
         // Overrides de la DB (dotted keys)
         try {
             $db = Database::getInstance();
-            $rows = $db->query("SELECT key, value FROM translations WHERE lang = ? AND namespace = 'frontend'", [$code]);
+            $rows = $db->query("SELECT `key`, value FROM translations WHERE lang = ? AND namespace = 'frontend'", [$code]);
             foreach ($rows as $row) {
                 self::setDotted($merged, $row['key'], $row['value']);
             }

@@ -36,7 +36,7 @@
  *        willChange: N,     // keys existentes que se reemplazan
  *        willSkip: N,       // keys protegidas (reviewed o fill_missing)
  *        changes: [         // muestra hasta 50 (para evitar response gigante)
- *          { namespace, key, currentValue, incomingValue, action: 'add'|'change'|'skip', reason? }
+ *          { namespace, `key`, currentValue, incomingValue, action: 'add'|'change'|'skip', reason? }
  *        ]
  *     }
  *   - En apply real: { applied: true, added, changed, skipped }
@@ -89,7 +89,7 @@ $db = Database::getInstance();
 
 // Snapshot de lo que ya hay en la DB, para decidir qué es "nuevo" vs "reemplazo"
 $existingRows = $db->query(
-    "SELECT namespace, key, value, source, reviewed FROM translations WHERE lang = ?",
+    "SELECT namespace, `key`, value, source, reviewed FROM translations WHERE lang = ?",
     [$code]
 );
 $existingMap = []; // "namespace|key" → fila
@@ -103,7 +103,7 @@ $willSkip = 0;
 $changes = []; // Acumulador para el preview
 $maxDetailedChanges = 100;
 
-$toApply = []; // [{namespace, key, value}]
+$toApply = []; // [{namespace, `key`, value}]
 
 foreach ($payload['namespaces'] as $namespace => $keys) {
     if (!is_string($namespace) || !preg_match('/^[a-z_][a-z0-9_]*$/i', $namespace)) continue;

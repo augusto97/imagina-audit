@@ -245,6 +245,13 @@ try {
         'cronHealth'        => $cronHealth,
     ]);
 } catch (Throwable $e) {
-    Logger::error('Error en dashboard: ' . $e->getMessage());
-    Response::error(Translator::t('admin_api.dashboard.stats_error'), 500);
+    Logger::error('Error en dashboard: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    // El admin está autenticado (Auth::requireAuth() ya pasó). Exponemos el
+    // mensaje real para que pueda diagnosticar sin SSH. APP_DEBUG=true
+    // además incluye file/line/trace.
+    $msg = Translator::t('admin_api.dashboard.stats_error') . ': ' . $e->getMessage();
+    if (function_exists('env') && env('APP_DEBUG', 'false') === 'true') {
+        $msg .= ' @ ' . basename($e->getFile()) . ':' . $e->getLine();
+    }
+    Response::error($msg, 500);
 }

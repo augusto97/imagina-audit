@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $defaults = require dirname(__DIR__, 2) . '/config/defaults.php';
 
         // Leer todas las settings de la DB
-        $rows = $db->query("SELECT key, value FROM settings");
+        $rows = $db->query("SELECT `key`, value FROM settings");
         $dbSettings = [];
         foreach ($rows as $row) {
             $dbSettings[$row['key']] = $row['value'];

@@ -37,9 +37,9 @@ if (!$lang) {
 
 $db = Database::getInstance();
 $rows = $db->query(
-    "SELECT namespace, key, value, source, ai_provider, reviewed, updated_at
+    "SELECT namespace, `key`, value, source, ai_provider, reviewed, updated_at
      FROM translations WHERE lang = ?
-     ORDER BY namespace, key",
+     ORDER BY namespace, `key`",
     [$code]
 );
 
