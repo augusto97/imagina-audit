@@ -50,7 +50,7 @@ class Mailer {
             $db = Database::getInstance();
             $keys = ['smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_encryption', 'smtp_from_email', 'smtp_from_name'];
             $placeholders = implode(',', array_fill(0, count($keys), '?'));
-            $rows = $db->query("SELECT key, value FROM settings WHERE key IN ($placeholders)", $keys);
+            $rows = $db->query("SELECT `key`, value FROM settings WHERE `key` IN ($placeholders)", $keys);
 
             foreach ($rows as $row) {
                 $field = str_replace('smtp_', '', $row['key']);

@@ -95,16 +95,13 @@ try {
 
     // Borrar archivo anterior (si existía) para no acumular basura.
     // Extraemos solo el nombre de archivo para evitar path traversal.
-    $oldUrl = (string) $db->scalar("SELECT value FROM settings WHERE key = ?", [$settingKey]);
+    $oldUrl = (string) $db->scalar("SELECT value FROM settings WHERE `key` = ?", [$settingKey]);
     if ($oldUrl !== '' && preg_match('#/uploads/([^/]+)$#', $oldUrl, $oldMatch)) {
         $oldPath = $uploadsDir . '/' . $oldMatch[1];
         if (is_file($oldPath)) @unlink($oldPath);
     }
 
-    $db->execute(
-        "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
-        [$settingKey, $publicUrl]
-    );
+    $db->setting($settingKey, $publicUrl);
 } catch (Throwable $e) {
     Logger::error('Error guardando URL de upload: ' . $e->getMessage());
     Response::error(Translator::t('admin_api.upload.register_error'), 500);

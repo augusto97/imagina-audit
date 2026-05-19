@@ -31,13 +31,13 @@ try {
 $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 $maxPerHour = (int) env('RATE_LIMIT_MAX_PER_HOUR', '10');
 try {
-    $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'rate_limit_max_per_hour'");
+    $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE `key` = 'rate_limit_max_per_hour'");
     if ($row && is_numeric($row['value'])) $maxPerHour = (int) $row['value'];
 } catch (Throwable $e) { /* usar valor de .env */ }
 $isAdmin = Auth::checkAuth();
 try {
     $db = Database::getInstance();
-    $db->execute("DELETE FROM rate_limits WHERE request_time < datetime('now', '-1 hour')");
+    $db->execute("DELETE FROM rate_limits WHERE request_time < ?", [$db->nowMinus(3600)]);
     if (!$isAdmin) {
         $count = (int) $db->scalar(
             "SELECT COUNT(*) FROM rate_limits WHERE ip_address = ? AND endpoint = 'compare'",
@@ -61,8 +61,8 @@ function getOrRunAudit(string $url): array {
 
     // Verificar cache
     $cached = $db->queryOne(
-        "SELECT result_json FROM audits WHERE url = ? AND created_at > datetime('now', '-' || ? || ' seconds') ORDER BY created_at DESC LIMIT 1",
-        [$url, $cacheTtl]
+        "SELECT result_json FROM audits WHERE url = ? AND created_at > ? ORDER BY created_at DESC LIMIT 1",
+        [$url, $db->nowMinus($cacheTtl)]
     );
 
     if ($cached) {

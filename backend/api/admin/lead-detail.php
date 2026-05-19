@@ -19,6 +19,9 @@ try {
     }
 
     $result = JsonStore::decode($audit['result_json']) ?? [];
+    // Re-evaluar scores con la config de scoring ACTUAL (la del admin
+    // puede haber cambiado pesos/cap/disabled desde que se hizo el scan).
+    $result = Scoring::recalculate($result);
     // Agregar datos del lead al resultado
     $result['leadName'] = $audit['lead_name'];
     $result['leadEmail'] = $audit['lead_email'];

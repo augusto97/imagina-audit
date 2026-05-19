@@ -22,6 +22,7 @@ $days = $months * 30;
 
 try {
     $db = Database::getInstance();
+    $cutoff = $db->nowMinus($days * 86400);
 
     $total = (int) $db->scalar("SELECT COUNT(*) FROM audits");
     $pinned = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE is_pinned = 1");
@@ -29,14 +30,10 @@ try {
     // Audits más viejos que el umbral — excluyendo los pinned
     $toDelete = (int) $db->scalar(
         "SELECT COUNT(*) FROM audits
-         WHERE created_at < datetime('now', ?)
+         WHERE created_at < ?
          AND is_pinned = 0",
-        ["-$days days"]
+        [$cutoff]
     );
-
-    // Fecha de corte (informativa)
-    $cutoffRow = $db->queryOne("SELECT datetime('now', ?) AS cutoff", ["-$days days"]);
-    $cutoffDate = $cutoffRow['cutoff'] ?? null;
 
     // Estimación de espacio liberado (sumando tamaño de result_json + waterfall_json)
     $sizeRow = $db->queryOne(
@@ -44,11 +41,12 @@ try {
             COALESCE(SUM(LENGTH(result_json)), 0) AS result_bytes,
             COALESCE(SUM(LENGTH(waterfall_json)), 0) AS waterfall_bytes
          FROM audits
-         WHERE created_at < datetime('now', ?)
+         WHERE created_at < ?
          AND is_pinned = 0",
-        ["-$days days"]
+        [$cutoff]
     );
     $estimatedBytes = (int) ($sizeRow['result_bytes'] ?? 0) + (int) ($sizeRow['waterfall_bytes'] ?? 0);
+    $cutoffDate = $cutoff;
 
     Response::success([
         'months' => $months,

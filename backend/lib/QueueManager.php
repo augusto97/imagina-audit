@@ -37,7 +37,7 @@ class QueueManager {
         $max = (int) ($defaults['audit_max_concurrent'] ?? self::DEFAULT_MAX_CONCURRENT);
         try {
             $db = Database::getInstance();
-            $row = $db->queryOne("SELECT value FROM settings WHERE key = 'audit_max_concurrent'");
+            $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'audit_max_concurrent'");
             if ($row && is_numeric($row['value'])) {
                 $max = max(1, (int) $row['value']);
             }
@@ -70,9 +70,9 @@ class QueueManager {
             $row = $db->queryOne(
                 "SELECT error_message FROM audit_jobs
                  WHERE url = ? AND status = 'failed'
-                 AND completed_at > datetime('now', ?)
+                 AND completed_at > ?
                  ORDER BY completed_at DESC LIMIT 1",
-                [$url, "-$windowMin minutes"]
+                [$url, $db->nowMinus($windowMin * 60)]
             );
             if ($row && !empty($row['error_message'])) {
                 return $row['error_message'];
@@ -93,8 +93,8 @@ class QueueManager {
             return (int) $db->scalar(
                 "SELECT COUNT(*) FROM audit_jobs
                  WHERE url = ? AND status = 'failed'
-                 AND completed_at > datetime('now', ?)",
-                [$url, "-$windowMinutes minutes"]
+                 AND completed_at > ?",
+                [$url, $db->nowMinus($windowMinutes * 60)]
             );
         } catch (Throwable $e) {
             return 0;
@@ -128,8 +128,9 @@ class QueueManager {
         $max = self::getMaxConcurrent();
 
         if ($running < $max) {
+            $now = $db->now();
             $db->execute(
-                "INSERT INTO audit_jobs (audit_id, url, lead_data_json, status, ip_address, started_at) VALUES (?, ?, ?, 'running', ?, datetime('now'))",
+                "INSERT INTO audit_jobs (audit_id, url, lead_data_json, status, ip_address, started_at) VALUES (?, ?, ?, 'running', ?, $now)",
                 [$auditId, $url, $leadJson, $ip]
             );
             return ['status' => 'running', 'position' => 0];
@@ -141,6 +142,110 @@ class QueueManager {
         );
         $position = self::getPosition($auditId);
         return ['status' => 'queued', 'position' => $position];
+    }
+
+    /**
+     * Encola el job SIEMPRE como 'queued' (nunca 'running'), sin intentar
+     * arrancarlo inline. Pensado para arquitectura queue-only donde el
+     * scan corre exclusivamente en un drain worker (cron o kick async),
+     * NO en el mismo proceso PHP que recibió el POST /audit.
+     *
+     * Beneficio: el worker que atiende /audit responde en milisegundos y
+     * queda libre. El admin / dashboard / otros endpoints no compiten con
+     * un scan de 30-45s por la misma sesión PHP o por workers escasos.
+     */
+    public static function enqueue(string $auditId, string $url, array $leadData, string $ip): array {
+        $db = Database::getInstance();
+        $leadJson = json_encode($leadData, JSON_UNESCAPED_UNICODE);
+
+        self::reapStaleRunning();
+
+        $db->execute(
+            "INSERT INTO audit_jobs (audit_id, url, lead_data_json, status, ip_address) VALUES (?, ?, ?, 'queued', ?)",
+            [$auditId, $url, $leadJson, $ip]
+        );
+        $position = self::getPosition($auditId);
+        return ['status' => 'queued', 'position' => $position];
+    }
+
+    /**
+     * Dispara el drain de la cola en background — fire-and-forget. Lo
+     * llama /api/audit después de encolar para que el scan arranque casi
+     * al instante, sin esperar al cron de fallback (~1 min de latencia).
+     *
+     * Estrategia:
+     *   1. Si shell_exec está habilitado → spawn `php cron/drain-queue.php`
+     *      en background con redirect a /dev/null. Es lo más rápido y
+     *      barato (no usa worker web).
+     *   2. Fallback: curl HTTP a /cron/drain-queue.php?token=X con timeout
+     *      muy bajo. La conexión se cierra rápido pero el server-side
+     *      mantiene el script vivo gracias a `ignore_user_abort(true)`.
+     *   3. Si todo falla, el cron seguirá drenando — solo perdemos
+     *      inmediatez.
+     */
+    public static function kickDrain(): void {
+        // Intento 1: shell_exec en background. El más limpio.
+        if (function_exists('shell_exec') && !self::isFunctionDisabled('shell_exec')) {
+            $script = dirname(__DIR__) . '/cron/drain-queue.php';
+            if (is_file($script)) {
+                $cmd = sprintf('php %s > /dev/null 2>&1 &', escapeshellarg($script));
+                @shell_exec($cmd);
+                return;
+            }
+        }
+
+        // Intento 2: curl HTTP self-call con timeout 1s.
+        if (function_exists('curl_init')) {
+            $token = self::ensureCronToken(); // auto-genera si no existe
+            if ($token === '') return;
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $url = "$scheme://$host/cron/drain-queue.php?token=" . urlencode($token);
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT_MS => 500,
+                CURLOPT_TIMEOUT_MS => 1000,
+                CURLOPT_NOSIGNAL => true,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => 0,
+            ]);
+            @curl_exec($ch);
+            @curl_close($ch);
+        }
+    }
+
+    /**
+     * Resuelve el token de cron — del .env si está, si no de la tabla
+     * settings, si no genera uno aleatorio y lo persiste en settings.
+     * Esto desbloquea instalaciones donde el admin no configuró
+     * CRON_SECRET_TOKEN: la cola se procesa igual.
+     *
+     * El drain-queue.php usa el mismo helper para validar el token.
+     */
+    public static function ensureCronToken(): string {
+        $envToken = function_exists('env') ? env('CRON_SECRET_TOKEN', '') : '';
+        if ($envToken !== '' && $envToken !== 'cambiar-este-token') {
+            return $envToken;
+        }
+        try {
+            $db = Database::getInstance();
+            $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'cron_secret_token'");
+            if ($row && !empty($row['value'])) return (string) $row['value'];
+
+            // Generar uno nuevo + persistir en settings
+            $token = bin2hex(random_bytes(16));
+            $db->setting('cron_secret_token', $token);
+            return $token;
+        } catch (Throwable $e) {
+            return '';
+        }
+    }
+
+    /** Detecta si una función PHP está en `disable_functions`. */
+    private static function isFunctionDisabled(string $name): bool {
+        $disabled = explode(',', (string) ini_get('disable_functions'));
+        return in_array($name, array_map('trim', $disabled), true);
     }
 
     /**
@@ -169,8 +274,10 @@ class QueueManager {
 
     public static function markCompleted(string $auditId): void {
         try {
-            Database::getInstance()->execute(
-                "UPDATE audit_jobs SET status = 'completed', completed_at = datetime('now') WHERE audit_id = ?",
+            $db = Database::getInstance();
+            $now = $db->now();
+            $db->execute(
+                "UPDATE audit_jobs SET status = 'completed', completed_at = $now WHERE audit_id = ?",
                 [$auditId]
             );
         } catch (Throwable $e) {
@@ -180,8 +287,10 @@ class QueueManager {
 
     public static function markFailed(string $auditId, string $error): void {
         try {
-            Database::getInstance()->execute(
-                "UPDATE audit_jobs SET status = 'failed', completed_at = datetime('now'), error_message = ? WHERE audit_id = ?",
+            $db = Database::getInstance();
+            $now = $db->now();
+            $db->execute(
+                "UPDATE audit_jobs SET status = 'failed', completed_at = $now, error_message = ? WHERE audit_id = ?",
                 [mb_substr($error, 0, 500), $auditId]
             );
         } catch (Throwable $e) {
@@ -221,10 +330,14 @@ class QueueManager {
             // falla de nuevo. No queremos retry eterno de URLs problemáticas.
             $defaults = require dirname(__DIR__) . '/config/defaults.php';
             $maxAttempts = (int) ($defaults['audit_max_attempts'] ?? 3);
+            $now = $db->now();
             if (((int) $job['attempts']) >= $maxAttempts) {
+                // CONCAT funciona en MySQL y SQLite (vía sqlite_compat); para
+                // evitar la dependencia, computamos el mensaje en PHP.
+                $msg = 'Abandonado tras ' . (int) $job['attempts'] . ' intentos.';
                 $db->execute(
-                    "UPDATE audit_jobs SET status = 'failed', error_message = 'Abandonado tras ' || attempts || ' intentos.', completed_at = datetime('now') WHERE id = ?",
-                    [$job['id']]
+                    "UPDATE audit_jobs SET status = 'failed', error_message = ?, completed_at = $now WHERE id = ?",
+                    [$msg, $job['id']]
                 );
                 $pdo->commit();
                 AuditProgress::failed($job['audit_id'], 'El análisis falló repetidamente y fue abandonado. Contacta a soporte si persiste.');
@@ -234,7 +347,7 @@ class QueueManager {
             }
 
             $db->execute(
-                "UPDATE audit_jobs SET status = 'running', started_at = datetime('now'), attempts = attempts + 1 WHERE id = ?",
+                "UPDATE audit_jobs SET status = 'running', started_at = $now, attempts = attempts + 1 WHERE id = ?",
                 [$job['id']]
             );
             $pdo->commit();
@@ -255,16 +368,22 @@ class QueueManager {
         try {
             $db = Database::getInstance();
             $stale = self::getStaleSeconds();
+            $now = $db->now();
+            // Threshold computado en PHP — evita dialect-specific date math
+            // (SQLite: datetime('now', '-N seconds'); MySQL: DATE_SUB(NOW(), INTERVAL N SECOND)).
+            $threshold = date('Y-m-d H:i:s', time() - $stale);
             $count = $db->execute(
-                "UPDATE audit_jobs SET status = 'failed', error_message = 'Job huérfano: proceso PHP murió antes de completar el audit.', completed_at = datetime('now') WHERE status = 'running' AND started_at IS NOT NULL AND started_at < datetime('now', ?)",
-                ["-$stale seconds"]
+                "UPDATE audit_jobs SET status = 'failed', error_message = 'Job huérfano: proceso PHP murió antes de completar el audit.', completed_at = $now WHERE status = 'running' AND started_at IS NOT NULL AND started_at < ?",
+                [$threshold]
             );
             if ($count > 0) {
                 Logger::warning("Reaped $count stale audit jobs");
                 // Marcar también el AuditProgress de estos jobs como 'failed'
                 // para que el frontend deje de hacer polling indefinidamente
+                $recentThreshold = date('Y-m-d H:i:s', time() - 60);
                 $staleJobs = $db->query(
-                    "SELECT audit_id FROM audit_jobs WHERE status = 'failed' AND error_message LIKE 'Job huérfano%' AND completed_at > datetime('now', '-1 minute')"
+                    "SELECT audit_id FROM audit_jobs WHERE status = 'failed' AND error_message LIKE 'Job huérfano%' AND completed_at > ?",
+                    [$recentThreshold]
                 );
                 foreach ($staleJobs as $j) {
                     AuditProgress::failed($j['audit_id'], 'El análisis tardó demasiado y fue cancelado. Intenta nuevamente.');
@@ -423,7 +542,7 @@ class QueueManager {
             $leadWhatsapp = trim($leadData['leadWhatsapp'] ?? '');
             if ($leadEmail || $leadWhatsapp) {
                 $db = Database::getInstance();
-                $notifRow = $db->queryOne("SELECT value FROM settings WHERE key = 'lead_notification_email'");
+                $notifRow = $db->queryOne("SELECT value FROM settings WHERE `key` = 'lead_notification_email'");
                 $notifEmail = $notifRow['value'] ?? '';
                 if (!empty($notifEmail) && filter_var($notifEmail, FILTER_VALIDATE_EMAIL)) {
                     $score = $result['globalScore'];

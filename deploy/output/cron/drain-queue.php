@@ -22,24 +22,47 @@
  * Si todo está fluyendo bien, este cron sale rápido sin hacer nada.
  */
 
+// Bootstrap mínimo ANTES de validar token: necesitamos QueueManager
+// para resolver el token (puede vivir en settings, no solo en .env).
+require_once dirname(__DIR__) . '/config/env.php';
+spl_autoload_register(function (string $class) {
+    $paths = [
+        dirname(__DIR__) . '/lib/' . $class . '.php',
+        dirname(__DIR__) . '/lib/db/' . $class . '.php',
+        dirname(__DIR__) . '/analyzers/' . $class . '.php',
+    ];
+    foreach ($paths as $p) { if (file_exists($p)) { require_once $p; return; } }
+});
+
 if (php_sapi_name() !== 'cli') {
-    $token = $_GET['token'] ?? '';
-    $expectedToken = getenv('CRON_SECRET_TOKEN') ?: 'cambiar-este-token';
-    if ($token !== $expectedToken) {
+    $token = (string) ($_GET['token'] ?? '');
+    // Resolvemos el token esperado: .env > settings (auto-generado).
+    // Esto permite que kickDrain HTTP funcione aunque el admin no haya
+    // configurado CRON_SECRET_TOKEN manualmente — QueueManager genera y
+    // persiste uno la primera vez.
+    $expected = '';
+    try { $expected = QueueManager::ensureCronToken(); } catch (Throwable $e) { /* fallback abajo */ }
+    if ($expected === '') $expected = getenv('CRON_SECRET_TOKEN') ?: 'cambiar-este-token';
+    if (!hash_equals($expected, $token)) {
         http_response_code(403);
         die('Acceso denegado');
     }
 }
 
-require_once dirname(__DIR__) . '/config/env.php';
-spl_autoload_register(function (string $class) {
-    $paths = [dirname(__DIR__) . '/lib/' . $class . '.php', dirname(__DIR__) . '/analyzers/' . $class . '.php'];
-    foreach ($paths as $p) { if (file_exists($p)) { require_once $p; return; } }
-});
-
 // Margen generoso — 4 min, para procesar ~5-6 audits seguidos si hace falta
 set_time_limit(240);
 ini_set('memory_limit', '256M');
+
+// CRÍTICO para HTTP kicks: cuando /api/audit nos llama con curl + timeout
+// muy bajo, el cliente cierra la conexión casi inmediato. Sin esto PHP
+// mataría el script al detectar el cliente desconectado, abortando el scan.
+ignore_user_abort(true);
+
+// Cerrar la sesión PHP del request entrante (si la había) para no
+// retener el lock mientras drenamos jobs largos.
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
 
 try {
     Database::getInstance()->initSchema();

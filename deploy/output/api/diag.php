@@ -85,16 +85,25 @@ foreach ($writables as $key => $path) {
 try {
     $db = Database::getInstance();
     $db->initSchema();
-    $tableCount = (int) $db->scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'");
-    addCheck($checks, 'db_connection', 'Base de datos SQLite', 'ok',
+    $driver = $db->driver();
+    $driverLabel = $driver === 'mysql' ? 'MySQL/MariaDB' : 'SQLite';
+
+    // Listado de tablas cross-driver: SHOW TABLES (MySQL) vs sqlite_master (SQLite).
+    if ($driver === 'mysql') {
+        $rows = $db->query("SHOW TABLES");
+        $tableNames = array_map(fn($r) => reset($r), $rows);
+    } else {
+        $rows = $db->query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'");
+        $tableNames = array_column($rows, 'name');
+    }
+    $tableCount = count($tableNames);
+    addCheck($checks, 'db_connection', "Base de datos $driverLabel", 'ok',
         "Operativa — $tableCount tablas",
-        ['tables' => $tableCount]
+        ['driver' => $driver, 'tables' => $tableCount]
     );
 
     // Check tablas críticas
     $requiredTables = ['audits', 'settings', 'audit_jobs', 'rate_limits', 'vulnerabilities'];
-    $foundTables = $db->query("SELECT name FROM sqlite_master WHERE type = 'table'");
-    $tableNames = array_column($foundTables, 'name');
     $missingTables = array_diff($requiredTables, $tableNames);
     addCheck($checks, 'db_schema', 'Esquema de BD',
         empty($missingTables) ? 'ok' : 'fail',
@@ -102,15 +111,24 @@ try {
         ['required' => $requiredTables, 'missing' => array_values($missingTables)]
     );
 
-    // Check is_pinned column (migración)
+    // Check is_pinned column — verifica que la migración 0001_initial corrió.
+    // PRAGMA table_info (SQLite) vs INFORMATION_SCHEMA.COLUMNS (MySQL).
     $hasIsPinned = false;
-    $cols = $db->query("PRAGMA table_info(audits)");
-    foreach ($cols as $c) {
-        if ($c['name'] === 'is_pinned') { $hasIsPinned = true; break; }
+    if ($driver === 'mysql') {
+        $row = $db->queryOne(
+            "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'audits' AND COLUMN_NAME = 'is_pinned'"
+        );
+        $hasIsPinned = $row !== null;
+    } else {
+        $cols = $db->query("PRAGMA table_info(audits)");
+        foreach ($cols as $c) {
+            if ($c['name'] === 'is_pinned') { $hasIsPinned = true; break; }
+        }
     }
     addCheck($checks, 'db_migration', 'Migraciones aplicadas',
         $hasIsPinned ? 'ok' : 'warn',
-        $hasIsPinned ? 'Columna is_pinned presente' : 'Migración pendiente — recarga la página para aplicar',
+        $hasIsPinned ? 'Columna is_pinned presente' : 'Migración pendiente — corre `php database/migrate.php up`',
         []
     );
 } catch (Throwable $e) {
@@ -141,7 +159,7 @@ foreach ($envKeys as $key => $critical) {
 // Check también en DB (el setup wizard guarda ahí en vez de .env)
 if (!$hasAdminHash) {
     try {
-        $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'admin_password_hash'");
+        $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE `key` = 'admin_password_hash'");
         if ($row && !empty($row['value'])) $hasAdminHash = true;
     } catch (Throwable $e) {}
 }
@@ -164,7 +182,8 @@ addCheck($checks, 'url_rewrite', 'URL rewriting del backend',
 try {
     $db = Database::getInstance();
     $staleRunning = (int) $db->scalar(
-        "SELECT COUNT(*) FROM audit_jobs WHERE status = 'running' AND started_at < datetime('now', '-5 minutes')"
+        "SELECT COUNT(*) FROM audit_jobs WHERE status = 'running' AND started_at < ?",
+        [$db->nowMinus(300)]
     );
     $totalJobs = (int) $db->scalar("SELECT COUNT(*) FROM audit_jobs");
     if ($totalJobs === 0) {

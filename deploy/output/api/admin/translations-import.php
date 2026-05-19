@@ -36,7 +36,7 @@
  *        willChange: N,     // keys existentes que se reemplazan
  *        willSkip: N,       // keys protegidas (reviewed o fill_missing)
  *        changes: [         // muestra hasta 50 (para evitar response gigante)
- *          { namespace, key, currentValue, incomingValue, action: 'add'|'change'|'skip', reason? }
+ *          { namespace, `key`, currentValue, incomingValue, action: 'add'|'change'|'skip', reason? }
  *        ]
  *     }
  *   - En apply real: { applied: true, added, changed, skipped }
@@ -89,7 +89,7 @@ $db = Database::getInstance();
 
 // Snapshot de lo que ya hay en la DB, para decidir qué es "nuevo" vs "reemplazo"
 $existingRows = $db->query(
-    "SELECT namespace, key, value, source, reviewed FROM translations WHERE lang = ?",
+    "SELECT namespace, `key`, value, source, reviewed FROM translations WHERE lang = ?",
     [$code]
 );
 $existingMap = []; // "namespace|key" → fila
@@ -103,7 +103,7 @@ $willSkip = 0;
 $changes = []; // Acumulador para el preview
 $maxDetailedChanges = 100;
 
-$toApply = []; // [{namespace, key, value}]
+$toApply = []; // [{namespace, `key`, value}]
 
 foreach ($payload['namespaces'] as $namespace => $keys) {
     if (!is_string($namespace) || !preg_match('/^[a-z_][a-z0-9_]*$/i', $namespace)) continue;
@@ -199,24 +199,28 @@ if ($dryRun) {
 
 // Aplicación real — insertamos/actualizamos vía upsert.
 // Envuelto en transacción para que un error a mitad no deje la DB mediopatida.
-$pdo = $db->getPdo();
-$pdo->beginTransaction();
 try {
-    $upsert = $pdo->prepare(
-        "INSERT INTO translations (lang, namespace, key, value, source, ai_provider, reviewed)
-         VALUES (?, ?, ?, ?, 'import', NULL, 1)
-         ON CONFLICT(lang, namespace, key) DO UPDATE SET
-            value = excluded.value,
-            source = 'import',
-            reviewed = 1,
-            updated_at = datetime('now')"
-    );
-    foreach ($toApply as $row) {
-        $upsert->execute([$code, $row['namespace'], $row['key'], $row['value']]);
-    }
-    $pdo->commit();
+    $db->transaction(function ($db) use ($code, $toApply) {
+        $now = date('Y-m-d H:i:s');
+        foreach ($toApply as $row) {
+            $db->upsert(
+                'translations',
+                [
+                    'lang' => $code,
+                    'namespace' => $row['namespace'],
+                    'key' => $row['key'],
+                    'value' => $row['value'],
+                    'source' => 'import',
+                    'ai_provider' => null,
+                    'reviewed' => 1,
+                    'updated_at' => $now,
+                ],
+                ['lang', 'namespace', 'key'],
+                ['value', 'source', 'reviewed', 'updated_at']
+            );
+        }
+    });
 } catch (Throwable $e) {
-    $pdo->rollBack();
     Logger::error('translations-import falló: ' . $e->getMessage());
     Response::error(Translator::t('admin_api.translations_import.apply_error'), 500);
 }

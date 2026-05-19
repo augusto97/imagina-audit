@@ -131,27 +131,28 @@ if ($method === 'PUT') {
             [$projectId, $metricId]
         );
 
+        $now = $db->now();
         if (!$existing) {
             // El user está cerrando una métrica que aún no está en el checklist
             // (ej. quiere marcar ignored una métrica good antes de que regrese).
             // Lo insertamos con user_modified=1.
             $db->execute(
-                "INSERT INTO project_checklist_items (project_id, metric_id, status, note, user_modified, completed_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, datetime('now'))",
+                "INSERT INTO project_checklist_items (project_id, metric_id, status, note, user_modified, completed_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, $now)",
                 [
                     $projectId,
                     $metricId,
                     $status !== '' ? $status : 'open',
                     $note,
-                    $status === 'done' ? date('c') : null,
+                    $status === 'done' ? date('Y-m-d H:i:s') : null,
                 ]
             );
         } else {
-            $fields = ['user_modified = 1', 'updated_at = datetime(\'now\')'];
+            $fields = ["user_modified = 1", "updated_at = $now"];
             $params = [];
             if ($status !== '') {
                 $fields[] = 'status = ?';
                 $params[] = $status;
-                $fields[] = 'completed_at = ' . ($status === 'done' ? 'datetime(\'now\')' : 'NULL');
+                $fields[] = 'completed_at = ' . ($status === 'done' ? $now : 'NULL');
             }
             if ($note !== null) {
                 $fields[] = 'note = ?';

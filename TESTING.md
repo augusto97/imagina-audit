@@ -28,6 +28,9 @@ Coverage (requiere Xdebug o pcov):
 | `tests/Unit/UrlValidatorTest.php` | Normalización de URL, rechazo de IPs privadas/reservadas/metadata AWS, resolución de URLs relativas |
 | `tests/Unit/LoggerTest.php` | Enmascarado de emails, rutas del servidor, tokens largos, claves sensibles (password, token, api_key) |
 | `tests/Unit/FetcherTest.php` | Validación anti-SSRF por URL (via reflection), resolución de redirects relativos y bloqueo de esquemas peligrosos |
+| `tests/Unit/DialectTest.php` | Emisión de upsert + tipos por driver (MySQL `ON DUPLICATE KEY` / SQLite `ON CONFLICT`), `now()`, `autoIncrementPk()`, nombres canónicos |
+| `tests/Unit/DatabaseTest.php` | initSchema vía Migrator, helpers `setting()` / `settingIfMissing()` / `upsert()` / `transaction()` / `now()` / `bool()` / `json()`, rollback en throw, idempotencia |
+| `tests/Unit/MigratorTest.php` | Aplicación en orden, idempotencia, rollback LIFO con error si falta `.down.sql`, preprocesado de placeholders y bloques condicionales por driver |
 
 ### Cómo añadir un test nuevo
 

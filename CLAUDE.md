@@ -3,6 +3,201 @@
 
 ---
 
+## 0. SESSION HANDOFF — Estado actual del proyecto (2026-05-19, v2.2.1)
+
+> Esta sección la mantiene Claude al final de cada conversación larga para
+> que la siguiente sesión retome sin reconstruir contexto. Reemplazar
+> contenido completo en cada update — NO acumular logs aquí.
+
+### Versión actual
+
+- **v2.2.1** — zip publicado en la rama `release` como `imagina-audit-v2.2.1.zip`.
+- Rama de trabajo: `claude/analyze-wordpress-audit-app-D9hQR`.
+
+### Modelo de release
+
+- **Rama `release`** es orphan (sin historia compartida). Solo contiene
+  `imagina-audit-v{X.Y.Z}.zip` + `README.md` con changelog.
+- Para nueva versión: `bash deploy/build.sh` → `cd deploy/output && zip -rq /tmp/release.zip .` →
+  `git checkout release` → `git mv` el zip viejo al nombre nuevo → `cp` el nuevo →
+  actualizar README.md → commit → push → `git checkout` rama de trabajo.
+- `install.php` guarda la versión en `data/.installed` JSON.
+
+### Stack realmente desplegado (P7 completo)
+
+- **DB cross-driver:** SQLite (default fallback) o MySQL 5.7+/MariaDB 10.3+
+  vía `DB_DRIVER` en `.env`. Wizard `/setup` lo configura automáticamente
+  en primera carga.
+- **Migrator versionado:** `backend/database/migrations/NNNN_*.sql`.
+  Tabla `schema_migrations` trackea estado. CLI: `php backend/database/migrate.php up/status/rollback`.
+- **3 migraciones aplicadas:** `0001_initial`, `0002_admin_login_attempts`,
+  `0003_json_columns_to_blob` (esta última crítica: cambia `JSON` →
+  `LONGBLOB` porque JsonStore::encode emite gzip binary).
+- **Setup wizard `/setup`** — 3 pasos (DB + admin + review). Idempotente:
+  si `data/.installed` existe O (DB conectada + admin existe + migraciones
+  aplicadas), considera la app instalada y auto-recrea el flag.
+- **Migración SQLite → MySQL desde panel:** `/admin/database`. CLI:
+  `php backend/database/migrate-from-sqlite.php`.
+- **Slow query log:** `SLOW_QUERY_THRESHOLD_MS` (default 200ms) → logs/.
+- **Retry con backoff:** `Database::traced()` retrying en transient errors
+  (MySQL 2006/2013/1205/1213, SQLite BUSY/LOCKED). Sentinel object para
+  distinguir "null válido" de "loop sin éxito".
+- **Backup/restore:** `/admin/backups` + cron `cron/backup.php`.
+  `Backup.php` driver-aware (mysqldump si disponible, sino PHP-side).
+
+### Queue queue-only (v2.0.8)
+
+- `audit.php` SIEMPRE encola, **nunca ejecuta inline**. Responde 202 en ms.
+- `drain-queue.php` corre el scan completo (orchestrator + save + email).
+- Kick async: `QueueManager::kickDrain()` intenta `shell_exec`, fallback a
+  `curl` HTTP a `/cron/drain-queue.php?token=X`.
+- `QueueManager::ensureCronToken()` **auto-genera** el token en settings si
+  falta — kicks HTTP funcionan en installs frescas sin editar `.env`.
+- **Cron recomendado:** `* * * * * php /path/audit/cron/drain-queue.php`.
+- Panel de rescate manual en `/admin/queue` (4 botones: drain-now,
+  reset-running, clear-failures all/by URL, delete-job).
+- `session_write_close()` se llama JUSTO después de Auth::checkAuth() —
+  antes de ese fix, el lock de sesión bloqueaba todo el admin durante un scan.
+
+### Scoring restructurado (v2.1.0 + v2.2.0)
+
+Antes los scores salían inflados (sitios con problemas reales puntuaban 85
+"good"). Recalibrado a "scoring honesto":
+
+1. **Umbrales:** Excellent ≥92, Good ≥80, Warning ≥60, Critical <40.
+2. **Per-metric weights** (en defaults.php → `scoring_metric_weights`):
+   SSL 3×, LCP 3×, X-Powered-By 0.5×, etc.
+3. **Critical-cap por módulo:** si hay ≥1 métrica crítica, el módulo no
+   sale del cap (security=50, wordpress=55, performance=65...).
+4. **Exponential penalty:** 0/1/2/3/4+ críticos → 0/-3/-8/-15/-25 al global.
+5. **Disabled metrics/modules:** admin puede excluir métricas o módulos
+   completos del cálculo desde `/admin/scoring`.
+
+Todo configurable desde **`/admin/scoring`** (UI con sliders + toggles +
+acordeones por módulo + preview en vivo recalculando un audit reciente).
+
+**Re-evaluación automática:** `audit-status.php` y `admin/lead-detail.php`
+corren `Scoring::recalculate()` al leer — audits viejos muestran el score
+nuevo coherente con la config actual.
+
+Catálogo de métricas: `backend/data/metrics-catalog.json` (estático, ~70
+métricas en 8 módulos) + merge con métricas vistas en audits recientes.
+
+### Sistema de traducciones (P6)
+
+- **Backend strings:** `backend/locales/{lang}/{namespace}.php` arrays flat.
+  Editables desde `/admin/translations` (overrides en tabla `translations`).
+- **Frontend strings:** `frontend/src/i18n/locales/{lang}.json` (bundleados
+  en build) + override dinámico vía `/api/frontend-locales?lang=X` que
+  mezcla base JSON + DB overrides (namespace `frontend`).
+- **Idiomas dinámicos:** tabla `languages` con flags `is_active` /
+  `is_public`. UI en `/admin/languages` para crear/editar/eliminar.
+- **Export/import packs:** botones en cada card de idioma con 3 modos de
+  merge (`fill_missing` / `smart_merge` / `replace_all`) + preview.
+- **AI translate pipeline:** Claude/ChatGPT/Google providers (config en
+  settings). Botones per-key y bulk en `/admin/translations`.
+
+### Reglas críticas (no romper)
+
+1. **Toda nueva query DB cross-driver.** Sin `INSERT OR IGNORE/REPLACE`,
+   sin `datetime('now')`, sin `AUTOINCREMENT` literal. Usar
+   `$db->upsert()`, `$db->setting()`, `$db->now()`, `$db->nowMinus()`,
+   `$db->startOfMonth()`. Backticks en `\`key\`` (palabra reservada MySQL).
+2. **Migraciones inmutables una vez en producción.** Para corregir, nueva.
+3. **Anti-patterns conocidos (ya removidos, no reintroducir):**
+   - `sqlite_master` o `PRAGMA table_info` sin branch por driver (diag.php).
+   - `ROW_NUMBER() OVER` (no soportado en MySQL 5.7).
+   - Columnas `JSON` para blobs gzip — usar `LONGBLOB`.
+   - `Auth::checkAuth()` sin `session_write_close()` después en endpoints
+     que tarden >1s.
+   - `isset($var)` para detectar success cuando la función puede retornar
+     null válido — usar sentinel object.
+4. **Foreign keys siempre ON.** `BIGINT` (signed) en PK/FK para que matchee.
+5. **Transacciones explícitas en mutaciones multi-tabla** (`$db->transaction(fn)`).
+
+### Bugs resueltos en las últimas 8 versiones (referencia rápida)
+
+| Ver | Bug | Causa raíz |
+|-----|-----|-----------|
+| v2.0.1 | Error 1005 FK al crear users | `BIGINT UNSIGNED` PK vs `BIGINT` FK no matcheaba |
+| v2.0.2 | `key` reservado en MySQL + URL loop /admin/login/dashboard/dashboard | Faltaron backticks + Navigate con path relativo |
+| v2.0.3 | Setup reaparecía cada upload | `.installed` se borraba en re-upload; ahora check de "instalado funcional" (DB+admin) |
+| v2.0.4 | Dashboard 500 "Query failed without exception" | `isset(null)` es false en mi retry wrapper — sentinel object |
+| v2.0.5 | /admin/health "Table sqlite_master doesn't exist" en MySQL | diag.php usaba sqlite_master sin branch driver |
+| v2.0.6 | /admin/vulnerabilities vacío + Refresh API daba 0/0 | Seed JSON nunca cargaba (eliminé seed.php) + updater sin audits = 0 plugins. Auto-seed + baseline. |
+| v2.0.7 | "Error guardando el resultado" mid-scan en MySQL | Columnas `JSON` rechazan blobs gzip. Migración 0003 → LONGBLOB. |
+| v2.0.8 | Admin bloqueado durante scan | Session lock + scan inline. Ahora queue-only + session_write_close post-auth. |
+| v2.1.0 | Scores inflados (85=good) | 4 palancas nuevas: thresholds, per-metric weights, critical-cap, exponential penalty. |
+| v2.2.0 | Tunables de scoring sin UI | Admin page `/admin/scoring` con sliders + toggles + preview. |
+| v2.2.1 | Audits congelados en cola; URL "blacklisted" | `CRON_SECRET_TOKEN` no autogenerado → kick HTTP 403. Cache `audit_jobs failed` retenía URLs. Auto-token + panel de rescate. |
+
+### Pendiente cuando se retome la conversación
+
+1. **Auditoría de traducciones** (la que iba a hacer Sonnet 4.6):
+   - `frontend/src/i18n/locales/en.json` vs `es.json` — listar gaps + añadir ES.
+   - `backend/locales/en/*.php` vs `backend/locales/es/*.php` — lo mismo.
+   - Grep en `frontend/src/components/admin/**/*.tsx` por strings hardcodeadas
+     en JSX (no usan `t('...')`). Especial atención a archivos modificados
+     en P7-v2.2.1: `DashboardPage.tsx` (tiene "Dashboard error", "Retry"
+     hardcoded), `SettingsScoring.tsx`, `SettingsQueue.tsx` (panel rescue
+     usa `t()` pero el componente padre puede tener huecos),
+     `AdminLanguages.tsx`, `AdminBackups.tsx`, `AdminDatabaseMigration.tsx`,
+     `SetupPage.tsx`, `AdminLogin.tsx`.
+   - Después de cada batch: `cd frontend && npx tsc --noEmit`.
+   - Al final: `bash deploy/build.sh` + commit `i18n: complete ES translations`
+     + push a `claude/analyze-wordpress-audit-app-D9hQR`.
+   - **NO actualizar release ni bumpear versión** — el user lo hace al juntar
+     varios cambios para el próximo zip.
+
+2. **Tests automatizados contra MySQL real en CI** — los tests existentes
+   (`tests/Unit/{Dialect,Database,Migrator}Test.php`) corren contra SQLite.
+   Idealmente CI corre la suite contra los dos drivers.
+
+3. **Métricas y módulos del catálogo** — `data/metrics-catalog.json` tiene
+   ~70 métricas hardcodeadas. Validar que coincidan con las que emiten los
+   analyzers reales. Cualquier desfase saldrá en `/admin/scoring` como
+   "métrica detectada en audits" sin entrar en el catálogo estático.
+
+4. **Documentación al comprador** — `deploy/DEPLOY.md` cubre install
+   básico. Falta una sección "qué hacer si la cola se atasca" apuntando
+   a `/admin/queue` rescue panel y al cron de `drain-queue.php`.
+
+### Comandos útiles para retomar
+
+```bash
+# Estado actual
+git log --oneline -10
+git status
+
+# Build + zip release
+bash deploy/build.sh
+cd deploy/output && zip -rq /tmp/release.zip . && cd ..
+
+# Tests backend (requiere composer install)
+cd backend && composer install && ./vendor/bin/phpunit
+
+# Typecheck frontend
+cd frontend && npx tsc --noEmit
+
+# Smoke test del migrator
+DB_DRIVER=sqlite DB_SQLITE_PATH=/tmp/test.db php backend/database/migrate.php status
+```
+
+### Archivos clave para orientarse
+
+- `P7_PRODUCTION_DATABASE.md` — plan original de migración a MySQL (ahora
+  cumplido y con decisiones confirmadas en sección 9).
+- `backend/lib/Database.php` — wrapper cross-driver con helpers
+  (now, nowMinus, startOfMonth, today, setting, settingIfMissing, upsert,
+  transaction, bool, json, retry-with-backoff).
+- `backend/lib/Scoring.php` — todo el sistema de scoring con `recalculate()`
+  para re-evaluar audits al leer.
+- `backend/lib/QueueManager.php` — queue + drain + kickDrain + ensureCronToken.
+- `backend/config/defaults.php` — todos los settings con sus defaults (los
+  que ven en admin son overrides DB sobre estos).
+
+---
+
 ## 1. VISIÓN DEL PROYECTO
 
 ### ¿Qué es?
@@ -43,17 +238,34 @@ Convencer a prospectos de contratar los planes de soporte mensual de Imagina WP 
 
 ### Backend (PHP — corre en hosting compartido)
 - **Lenguaje:** PHP 8.0+
-- **Extensiones requeridas:** cURL, DOM (DOMDocument), JSON, OpenSSL, mbstring — todas vienen por defecto en hosting compartido
-- **Sin framework.** PHP vanilla con una estructura organizada de clases/archivos. No necesita Composer ni dependencias externas.
-- **Base de datos:** SQLite (un solo archivo .db dentro del hosting, sin necesidad de MySQL). Se usa para almacenar auditorías, leads y configuración. PHP tiene SQLite integrado (extensión pdo_sqlite, habilitada por defecto).
+- **Extensiones requeridas:** cURL, DOM (DOMDocument), JSON, OpenSSL, mbstring, pdo_mysql o pdo_sqlite (según driver elegido) — todas vienen por defecto en hosting compartido
+- **Sin framework, sin ORM.** PHP vanilla con PDO directo + un wrapper cross-driver. No necesita Composer ni dependencias externas en producción.
+- **Base de datos (P7):** soporta **dos drivers** que se eligen vía `DB_DRIVER` en `.env`:
+  - **MySQL/MariaDB** (recomendado para producción). Versiones mínimas: MySQL 5.7+ / MariaDB 10.3+. Universal en hosting cPanel; permite JSON nativo, concurrencia real y backups con `mysqldump`.
+  - **SQLite** (fallback). Single-file, ideal para dev, demos o hostings sin MySQL. Mantiene la promesa "drop & go" inicial.
+  El admin elige el driver en el wizard de instalación (`/setup`); el `.env` se escribe automáticamente. La capa de abstracción vive en `backend/lib/Database.php` + `backend/lib/db/{SqliteDialect,MysqlDialect}.php`.
+- **Schema:** versionado con migraciones en `backend/database/migrations/NNNN_descripcion.sql`. El runner `backend/lib/Migrator.php` (CLI: `backend/database/migrate.php`) las aplica en orden y trackea estado en la tabla `schema_migrations`. SQL cross-driver vía placeholders (`{{AUTO_PK}}`, `{{NOW}}`, `{{JSON}}`, `{{BOOL}}`, …) y bloques condicionales (`--{mysql} … --{/mysql}`).
 - **Cache:** Archivos JSON en disco (carpeta /cache/) con TTL de 24 horas. Sin Redis ni Memcached.
-- **Autenticación admin:** Contraseña hasheada con password_hash() almacenada en la tabla de configuración de SQLite. Sesión PHP estándar con session_start().
+- **Autenticación admin:** Contraseña hasheada con password_hash() guardada en la tabla `settings`. Sesión PHP estándar con session_start(). Soporta 2FA TOTP opcional.
+- **Hardening producción (P7.6):** slow query log automático (configurable con `SLOW_QUERY_THRESHOLD_MS`), retry con backoff exponencial para errores transientes (deadlocks, conexión perdida, lock timeouts), backup manual/cron desde el admin con retención configurable.
+
+### Reglas de oro de DB
+1. Nunca emitir SQL específico de un driver en el código de negocio. Usar `$db->upsert()`, `$db->setting()`, `$db->now()`, `$db->json()`, `$db->bool()` o el Dialect.
+2. Sin `INSERT OR IGNORE/REPLACE`, `datetime('now')`, `AUTOINCREMENT` hardcoded — los helpers cross-driver cubren todos los casos comunes.
+3. Una vez "released", las migraciones son inmutables. Para corregir, crear una migración nueva.
+4. Foreign keys siempre habilitadas (ambos drivers).
+5. Transacciones explícitas (`$db->transaction(callable)`) en mutaciones multi-tabla.
+6. Indices revisados antes de cada release; cada query de hot path lleva su índice o un comentario justificando el scan.
+7. Todo input externo va por prepared statements. Sin excepciones.
 
 ### Deployment
 - Hosting compartido con cPanel
 - Frontend: archivos estáticos en carpeta /public_html/audit/ (o subdominio audit.dominio.com)
 - Backend: archivos PHP en carpeta /public_html/audit/api/
-- SQLite: archivo .db en carpeta FUERA de public_html (no accesible por web) o dentro con .htaccess que bloquee acceso directo
+- DB:
+  - MySQL: base + usuario creados desde cPanel; credenciales en `.env` (o vía wizard).
+  - SQLite: archivo .db en carpeta FUERA de public_html (no accesible por web), o dentro con .htaccess que bloquee acceso directo.
+- Primera carga después del upload → la app redirige automáticamente a `/setup` para el wizard.
 - HTTPS: certificado del hosting (Let's Encrypt via cPanel)
 
 ---

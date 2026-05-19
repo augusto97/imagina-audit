@@ -60,7 +60,8 @@ class UserAuth {
             $_SESSION['user_csrf_token'] = bin2hex(random_bytes(32));
 
             try {
-                $db->execute("UPDATE users SET last_login_at = datetime('now') WHERE id = ?", [$row['id']]);
+                $now = $db->now();
+                $db->execute("UPDATE users SET last_login_at = $now WHERE id = ?", [$row['id']]);
             } catch (Throwable $e) { /* no crítico */ }
 
             return [
@@ -178,8 +179,8 @@ class UserAuth {
         try {
             $db = Database::getInstance();
             return (int) $db->scalar(
-                "SELECT COUNT(*) FROM audits WHERE user_id = ? AND created_at >= datetime('now', 'start of month')",
-                [$userId]
+                "SELECT COUNT(*) FROM audits WHERE user_id = ? AND created_at >= ?",
+                [$userId, $db->startOfMonth()]
             );
         } catch (Throwable $e) {
             return 0;

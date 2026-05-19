@@ -13,7 +13,7 @@
  *       - reviewed: 0 | 1
  *
  *   PUT    /api/admin/translations.php
- *     Body: { lang, namespace, key, value, source?, aiProvider?, reviewed? }
+ *     Body: { lang, namespace, `key`, value, source?, aiProvider?, reviewed? }
  *     Upsert del override. Por default source='manual' reviewed=1.
  *
  *   DELETE /api/admin/translations.php?lang=es&namespace=mobile&key=viewport.name
@@ -108,7 +108,7 @@ if ($method === 'GET') {
 
     // Overrides de la DB
     $rows = $db->query(
-        "SELECT key, value, source, ai_provider, reviewed, updated_at FROM translations WHERE lang = ? AND namespace = ?",
+        "SELECT `key`, value, source, ai_provider, reviewed, updated_at FROM translations WHERE lang = ? AND namespace = ?",
         [$lang, $namespace]
     );
     $overrides = [];
@@ -170,17 +170,18 @@ if ($method === 'PUT') {
     }
 
     $existing = $db->queryOne(
-        "SELECT id FROM translations WHERE lang = ? AND namespace = ? AND key = ?",
+        "SELECT id FROM translations WHERE lang = ? AND namespace = ? AND `key` = ?",
         [$lang, $namespace, $key]
     );
     if ($existing) {
+        $now = $db->now();
         $db->execute(
-            "UPDATE translations SET value = ?, source = ?, ai_provider = ?, reviewed = ?, updated_at = datetime('now') WHERE id = ?",
+            "UPDATE translations SET value = ?, source = ?, ai_provider = ?, reviewed = ?, updated_at = $now WHERE id = ?",
             [$value, $source, $aiProvider, $reviewed, $existing['id']]
         );
     } else {
         $db->execute(
-            "INSERT INTO translations (lang, namespace, key, value, source, ai_provider, reviewed) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO translations (lang, namespace, `key`, value, source, ai_provider, reviewed) VALUES (?, ?, ?, ?, ?, ?, ?)",
             [$lang, $namespace, $key, $value, $source, $aiProvider, $reviewed]
         );
     }
@@ -200,7 +201,7 @@ if ($method === 'DELETE') {
 
     if (!empty($key)) {
         $db->execute(
-            "DELETE FROM translations WHERE lang = ? AND namespace = ? AND key = ?",
+            "DELETE FROM translations WHERE lang = ? AND namespace = ? AND `key` = ?",
             [$lang, $namespace, $key]
         );
     } elseif (!empty($namespace)) {

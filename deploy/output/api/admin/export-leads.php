@@ -19,10 +19,12 @@ switch ($filter) {
         $where .= " AND global_score < 30";
         break;
     case 'this_week':
-        $where .= " AND created_at >= date('now', '-7 days')";
+        $where .= " AND created_at >= ?";
+        $params[] = Database::getInstance()->nowMinus(7 * 86400);
         break;
     case 'this_month':
-        $where .= " AND created_at >= date('now', '-30 days')";
+        $where .= " AND created_at >= ?";
+        $params[] = Database::getInstance()->nowMinus(30 * 86400);
         break;
 }
 

@@ -11,6 +11,38 @@ if ($method === 'GET') {
     $offset = ($page - 1) * $limit;
     $search = trim($_GET['search'] ?? '');
 
+    // Si la tabla está vacía Y existe data/vulnerabilities.json, sembramos
+    // automáticamente. Reemplaza el legacy database/seed.php que fue eliminado
+    // en P7-cleanup. Solo corre cuando count=0, así es idempotente.
+    try {
+        $count = (int) $db->scalar("SELECT COUNT(*) FROM vulnerabilities");
+        if ($count === 0) {
+            $seedFile = dirname(__DIR__, 2) . '/data/vulnerabilities.json';
+            if (is_file($seedFile)) {
+                $seedRows = json_decode(file_get_contents($seedFile), true);
+                if (is_array($seedRows)) {
+                    foreach ($seedRows as $row) {
+                        $db->execute(
+                            "INSERT INTO vulnerabilities (plugin_slug, plugin_name, affected_versions, severity, cve_id, description, fixed_in_version) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            [
+                                $row['pluginSlug'] ?? '',
+                                $row['pluginName'] ?? '',
+                                $row['affectedVersions'] ?? '',
+                                $row['severity'] ?? 'medium',
+                                $row['cveId'] ?? '',
+                                $row['description'] ?? '',
+                                $row['fixedInVersion'] ?? '',
+                            ]
+                        );
+                    }
+                    Logger::info('Vulnerabilities auto-seeded from data/vulnerabilities.json: ' . count($seedRows) . ' rows');
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        Logger::warning('Vulnerabilities auto-seed failed: ' . $e->getMessage());
+    }
+
     $where = '1=1';
     $params = [];
 
@@ -24,9 +56,11 @@ if ($method === 'GET') {
         $total = (int) $db->scalar("SELECT COUNT(*) FROM vulnerabilities WHERE $where", $params);
         $totalPages = (int) ceil($total / $limit);
 
+        // Inline LIMIT/OFFSET con casts a int — MySQL en algunas versiones
+        // rechaza placeholders ? en LIMIT cuando emulate_prepares está off.
         $rows = $db->query(
-            "SELECT * FROM vulnerabilities WHERE $where ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            array_merge($params, [$limit, $offset])
+            "SELECT * FROM vulnerabilities WHERE $where ORDER BY created_at DESC LIMIT " . (int) $limit . " OFFSET " . (int) $offset,
+            $params
         );
 
         $vulns = array_map(function ($row) {
@@ -50,7 +84,8 @@ if ($method === 'GET') {
             'totalPages' => $totalPages,
         ]);
     } catch (Throwable $e) {
-        Response::error(Translator::t('admin_api.vulns.fetch_error'), 500);
+        Logger::error('vulnerabilities GET falló: ' . $e->getMessage());
+        Response::error(Translator::t('admin_api.vulns.fetch_error') . ': ' . $e->getMessage(), 500);
     }
 }
 

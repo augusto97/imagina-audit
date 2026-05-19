@@ -51,7 +51,7 @@ class PluginVault {
     public static function getMetadata(string $slug): ?array {
         try {
             $db = Database::getInstance();
-            $row = $db->queryOne("SELECT value FROM settings WHERE key = ?", ["plugin_vault_$slug"]);
+            $row = $db->queryOne("SELECT value FROM settings WHERE `key` = ?", ["plugin_vault_$slug"]);
             if (!$row) return null;
             $decoded = json_decode((string) $row['value'], true);
             return is_array($decoded) ? $decoded : null;
@@ -352,10 +352,7 @@ class PluginVault {
     private static function saveMetadata(string $slug, array $meta): void {
         try {
             $db = Database::getInstance();
-            $db->execute(
-                "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
-                ["plugin_vault_$slug", json_encode($meta, JSON_UNESCAPED_UNICODE)]
-            );
+            $db->setting("plugin_vault_$slug", json_encode($meta, JSON_UNESCAPED_UNICODE));
         } catch (Throwable $e) {
             Logger::warning("PluginVault.$slug saveMetadata falló: " . $e->getMessage());
         }

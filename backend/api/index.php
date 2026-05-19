@@ -16,6 +16,7 @@ require_once dirname(__DIR__) . '/config/env.php';
 spl_autoload_register(function (string $class) {
     $paths = [
         dirname(__DIR__) . '/lib/' . $class . '.php',
+        dirname(__DIR__) . '/lib/db/' . $class . '.php',
         dirname(__DIR__) . '/analyzers/' . $class . '.php',
     ];
 
@@ -86,8 +87,16 @@ switch ($endpoint) {
         require __DIR__ . '/diag.php';
         break;
 
-    case 'setup':
-        require __DIR__ . '/setup.php';
+    case 'setup/status':
+        require __DIR__ . '/setup/status.php';
+        break;
+
+    case 'setup/test-db':
+        require __DIR__ . '/setup/test-db.php';
+        break;
+
+    case 'setup/install':
+        require __DIR__ . '/setup/install.php';
         break;
 
     case 'admin/login':
@@ -156,6 +165,22 @@ switch ($endpoint) {
 
     case 'admin/languages':
         require __DIR__ . '/admin/languages.php';
+        break;
+
+    case 'admin/scoring':
+        require __DIR__ . '/admin/scoring.php';
+        break;
+
+    case 'admin/queue-actions':
+        require __DIR__ . '/admin/queue-actions.php';
+        break;
+
+    case 'admin/migrate-database':
+        require __DIR__ . '/admin/migrate-database.php';
+        break;
+
+    case 'admin/backup':
+        require __DIR__ . '/admin/backup.php';
         break;
 
     case 'admin/translations-export':

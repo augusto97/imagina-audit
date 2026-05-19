@@ -61,7 +61,7 @@ if (empty($namespace)) {
 // Instanciar provider (viene del body o del setting default_ai_provider)
 $db = Database::getInstance();
 $settingsRows = $db->query(
-    "SELECT key, value FROM settings WHERE key IN ('openai_api_key', 'anthropic_api_key', 'google_translate_api_key', 'default_ai_provider', 'openai_model', 'anthropic_model')"
+    "SELECT `key`, value FROM settings WHERE `key` IN ('openai_api_key', 'anthropic_api_key', 'google_translate_api_key', 'default_ai_provider', 'openai_model', 'anthropic_model')"
 );
 $settings = [];
 foreach ($settingsRows as $row) {
@@ -113,21 +113,21 @@ foreach ($items as $i => $item) {
         $translated = $provider->translate($text, $sourceLang, $targetLang, $context);
 
         if ($persist) {
-            $existing = $db->queryOne(
-                "SELECT id FROM translations WHERE lang = ? AND namespace = ? AND key = ?",
-                [$targetLang, $namespace, $key]
+            $db->upsert(
+                'translations',
+                [
+                    'lang' => $targetLang,
+                    'namespace' => $namespace,
+                    'key' => $key,
+                    'value' => $translated,
+                    'source' => 'ai',
+                    'ai_provider' => $providerId,
+                    'reviewed' => 0,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ],
+                ['lang', 'namespace', 'key'],
+                ['value', 'source', 'ai_provider', 'reviewed', 'updated_at']
             );
-            if ($existing) {
-                $db->execute(
-                    "UPDATE translations SET value = ?, source = 'ai', ai_provider = ?, reviewed = 0, updated_at = datetime('now') WHERE id = ?",
-                    [$translated, $providerId, $existing['id']]
-                );
-            } else {
-                $db->execute(
-                    "INSERT INTO translations (lang, namespace, key, value, source, ai_provider, reviewed) VALUES (?, ?, ?, ?, 'ai', ?, 0)",
-                    [$targetLang, $namespace, $key, $translated, $providerId]
-                );
-            }
         }
 
         $results[] = [

@@ -166,7 +166,7 @@ class Translator
         try {
             $db = Database::getInstance();
             $rows = $db->query(
-                "SELECT key, value FROM translations WHERE lang = ? AND namespace = ?",
+                "SELECT `key`, value FROM translations WHERE lang = ? AND namespace = ?",
                 [$lang, $namespace]
             );
             $out = [];

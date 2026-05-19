@@ -22,6 +22,10 @@ try {
     }
 
     $result = JsonStore::decode($audit['result_json']);
+    // Re-evaluar scores con la config ACTUAL — sin esto, audits viejos
+    // muestran su score original aunque el admin haya ajustado pesos /
+    // thresholds / disabled metrics. Coherencia para el cliente.
+    if (is_array($result)) $result = Scoring::recalculate($result);
     Response::success($result);
 } catch (Throwable $e) {
     Logger::error('Error obteniendo auditoría: ' . $e->getMessage());

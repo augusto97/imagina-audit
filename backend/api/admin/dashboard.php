@@ -17,12 +17,17 @@ try {
     $db = Database::getInstance();
 
     // ─── Audits: totales y segmentación ──────────────────────────────
+    $today = $db->today();
+    $weekAgo = $db->nowMinus(7 * 86400);
+    $monthAgo = $db->nowMinus(30 * 86400);
+    $hourAgo = $db->nowMinus(3600);
+
     $totalAudits    = (int) $db->scalar("SELECT COUNT(*) FROM audits");
-    $auditsToday    = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE date(created_at) = date('now')");
-    $auditsThisWeek = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE created_at >= date('now', '-7 days')");
-    $auditsThisMonth = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE created_at >= date('now', '-30 days')");
+    $auditsToday    = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE created_at >= ?", ["$today 00:00:00"]);
+    $auditsThisWeek = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE created_at >= ?", [$weekAgo]);
+    $auditsThisMonth = (int) $db->scalar("SELECT COUNT(*) FROM audits WHERE created_at >= ?", [$monthAgo]);
     $averageScore   = round((float) ($db->scalar("SELECT AVG(global_score) FROM audits") ?? 0), 1);
-    $averageScore7d = round((float) ($db->scalar("SELECT AVG(global_score) FROM audits WHERE created_at >= date('now', '-7 days')") ?? 0), 1);
+    $averageScore7d = round((float) ($db->scalar("SELECT AVG(global_score) FROM audits WHERE created_at >= ?", [$weekAgo]) ?? 0), 1);
 
     $totalLeads = (int) $db->scalar(
         "SELECT COUNT(*) FROM audits WHERE (lead_email IS NOT NULL AND lead_email != '') OR (lead_whatsapp IS NOT NULL AND lead_whatsapp != '')"
@@ -50,12 +55,15 @@ try {
 
     // ─── Trend: conteos diarios de los últimos 30 días ──────────────
     // Rellena con ceros los días sin datos para graficar una línea continua.
+    // DATE(created_at) funciona en ambos drivers (MySQL: DATE() built-in;
+    // SQLite: date() built-in case-insensitive).
     $rawTrend = $db->query(
-        "SELECT date(created_at) AS d, COUNT(*) AS c, ROUND(AVG(global_score), 1) AS avg_score
+        "SELECT DATE(created_at) AS d, COUNT(*) AS c, ROUND(AVG(global_score), 1) AS avg_score
          FROM audits
-         WHERE created_at >= date('now', '-30 days')
-         GROUP BY date(created_at)
-         ORDER BY d ASC"
+         WHERE created_at >= ?
+         GROUP BY DATE(created_at)
+         ORDER BY d ASC",
+        [$monthAgo]
     );
     $trendByDay = [];
     foreach ($rawTrend as $r) {
@@ -105,21 +113,28 @@ try {
     if (!empty($recurring)) {
         $domains = array_column($recurring, 'domain');
         $placeholders = implode(',', array_fill(0, count($domains), '?'));
-        $trendRows = $db->query(
-            "SELECT domain, global_score, rn FROM (
-                SELECT domain, global_score,
-                       ROW_NUMBER() OVER (PARTITION BY domain ORDER BY created_at DESC) AS rn
-                FROM audits WHERE domain IN ($placeholders)
-            ) WHERE rn <= 2",
+        // ROW_NUMBER() OVER es MySQL 8.0+ — no soportado en 5.7. Traemos
+        // los audits ordenados por dominio + fecha y agrupamos en PHP
+        // quedándonos con los 2 más recientes por dominio. Cantidad
+        // razonable (10 dominios × N audits cada uno; en peor caso 200
+        // filas, despreciable).
+        $allScores = $db->query(
+            "SELECT domain, global_score, created_at
+             FROM audits WHERE domain IN ($placeholders)
+             ORDER BY domain, created_at DESC",
             $domains
         );
         $scoresByDomain = [];
-        foreach ($trendRows as $r) {
-            $scoresByDomain[$r['domain']][(int) $r['rn']] = (int) $r['global_score'];
+        foreach ($allScores as $r) {
+            $d = $r['domain'];
+            if (!isset($scoresByDomain[$d])) $scoresByDomain[$d] = [];
+            if (count($scoresByDomain[$d]) < 2) {
+                $scoresByDomain[$d][] = (int) $r['global_score'];
+            }
         }
         foreach ($scoresByDomain as $domain => $scores) {
-            if (!isset($scores[1], $scores[2])) { $trendByDomain[$domain] = 'stable'; continue; }
-            $diff = $scores[1] - $scores[2];
+            if (count($scores) < 2) { $trendByDomain[$domain] = 'stable'; continue; }
+            $diff = $scores[0] - $scores[1]; // newest - previous
             $trendByDomain[$domain] = $diff > 5 ? 'improving' : ($diff < -5 ? 'declining' : 'stable');
         }
     }
@@ -138,8 +153,8 @@ try {
         $queue['running']           = QueueManager::runningCount();
         $queue['queued']            = QueueManager::queuedCount();
         $queue['maxConcurrent']     = QueueManager::getMaxConcurrent();
-        $queue['failedLastHour']    = (int) $db->scalar("SELECT COUNT(*) FROM audit_jobs WHERE status = 'failed' AND completed_at > datetime('now', '-1 hour')");
-        $queue['completedLastHour'] = (int) $db->scalar("SELECT COUNT(*) FROM audit_jobs WHERE status = 'completed' AND completed_at > datetime('now', '-1 hour')");
+        $queue['failedLastHour']    = (int) $db->scalar("SELECT COUNT(*) FROM audit_jobs WHERE status = 'failed' AND completed_at > ?", [$hourAgo]);
+        $queue['completedLastHour'] = (int) $db->scalar("SELECT COUNT(*) FROM audit_jobs WHERE status = 'completed' AND completed_at > ?", [$hourAgo]);
     } catch (Throwable $e) { /* tabla quizá no existe aún */ }
 
     // ─── Integraciones (snapshots conectados, vulnerabilidades) ──────
@@ -161,9 +176,9 @@ try {
         'recoveryCodesLeft' => 0,
     ];
     try {
-        $row = $db->queryOne("SELECT value FROM settings WHERE key = 'admin_2fa_enabled'");
+        $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'admin_2fa_enabled'");
         $security['twoFaEnabled'] = $row && (string) $row['value'] === '1';
-        $codesRow = $db->queryOne("SELECT value FROM settings WHERE key = 'admin_2fa_recovery_codes'");
+        $codesRow = $db->queryOne("SELECT value FROM settings WHERE `key` = 'admin_2fa_recovery_codes'");
         if ($codesRow) {
             $decoded = json_decode((string) $codesRow['value'], true);
             $security['recoveryCodesLeft'] = is_array($decoded) ? count($decoded) : 0;
@@ -184,9 +199,9 @@ try {
 
     $retention = ['enabled' => false, 'months' => 6];
     try {
-        $row = $db->queryOne("SELECT value FROM settings WHERE key = 'audits_retention_enabled'");
+        $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'audits_retention_enabled'");
         $retention['enabled'] = $row && in_array((string) $row['value'], ['1', 'true'], true);
-        $monthsRow = $db->queryOne("SELECT value FROM settings WHERE key = 'audits_retention_months'");
+        $monthsRow = $db->queryOne("SELECT value FROM settings WHERE `key` = 'audits_retention_months'");
         if ($monthsRow) $retention['months'] = (int) $monthsRow['value'];
     } catch (Throwable $e) { /* ignore */ }
 
@@ -230,6 +245,13 @@ try {
         'cronHealth'        => $cronHealth,
     ]);
 } catch (Throwable $e) {
-    Logger::error('Error en dashboard: ' . $e->getMessage());
-    Response::error(Translator::t('admin_api.dashboard.stats_error'), 500);
+    Logger::error('Error en dashboard: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    // El admin está autenticado (Auth::requireAuth() ya pasó). Exponemos el
+    // mensaje real para que pueda diagnosticar sin SSH. APP_DEBUG=true
+    // además incluye file/line/trace.
+    $msg = Translator::t('admin_api.dashboard.stats_error') . ': ' . $e->getMessage();
+    if (function_exists('env') && env('APP_DEBUG', 'false') === 'true') {
+        $msg .= ' @ ' . basename($e->getFile()) . ':' . $e->getLine();
+    }
+    Response::error($msg, 500);
 }

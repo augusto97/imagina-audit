@@ -37,7 +37,7 @@ $backoffSchedule = [0, 0, 2, 5, 15, 60, 300];
 
 $db = Database::getInstance();
 try {
-    $db->execute("DELETE FROM user_login_attempts WHERE attempted_at < datetime('now', '-' || ? || ' minutes')", [$windowMinutes]);
+    $db->execute("DELETE FROM user_login_attempts WHERE attempted_at < ?", [$db->nowMinus($windowMinutes * 60)]);
     $attempts = (int) $db->scalar("SELECT COUNT(*) FROM user_login_attempts WHERE ip_address = ?", [$ip]);
     $lastIso = $db->scalar("SELECT MAX(attempted_at) FROM user_login_attempts WHERE ip_address = ?", [$ip]);
 

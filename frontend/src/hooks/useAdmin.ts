@@ -356,6 +356,38 @@ export function useAdmin() {
     await api.delete('/admin/languages.php', { params: { code } })
   }, [])
 
+  // ─── Scoring tunables (v2.2) ──────────────────────────────────────
+  const fetchScoring = useCallback(async () => {
+    const res = await api.get('/admin/scoring.php')
+    return res.data.data as {
+      catalog: { modules: Record<string, { name: string; metrics: Array<{ id: string; name: string }> }> }
+      config: Record<string, unknown>
+      defaults: Record<string, unknown>
+      previewAudit: { id: string; url: string; domain: string; currentScore: number; currentLevel: string } | null
+    }
+  }, [])
+
+  const previewScoring = useCallback(async (auditId: string, config: Record<string, unknown>) => {
+    const res = await api.post('/admin/scoring.php', { action: 'preview', auditId, config })
+    return res.data.data as {
+      previousGlobal: number
+      previousLevel: string
+      newGlobal: number
+      newLevel: string
+      moduleScores: Array<{ id: string; name: string; score: number; level: string }>
+    }
+  }, [])
+
+  const saveScoring = useCallback(async (config: Record<string, unknown>) => {
+    await api.post('/admin/scoring.php', { action: 'save', config })
+  }, [])
+
+  // ─── Queue manual actions (v2.2.1) ────────────────────────────────
+  const queueAction = useCallback(async (action: string, params: Record<string, unknown> = {}) => {
+    const res = await api.post('/admin/queue-actions.php', { action, ...params })
+    return res.data.data as Record<string, unknown>
+  }, [])
+
   /**
    * Descarga el pack JSON de un idioma disparando un download en el browser.
    * Hacemos el fetch vía axios para mantener la cookie de sesión — un
@@ -424,5 +456,7 @@ export function useAdmin() {
     fetchAdminProjects, deleteAdminProject,
     fetchAdminLanguages, createAdminLanguage, updateAdminLanguage, deleteAdminLanguage,
     exportLanguagePack, importLanguagePack,
+    fetchScoring, previewScoring, saveScoring,
+    queueAction,
   }
 }
