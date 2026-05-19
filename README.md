@@ -6,7 +6,12 @@ This branch holds the **ready-to-install build artifact**. Nothing else.
 
 The latest packaged build sits at the root of this branch:
 
-- **`imagina-audit-v2.0.zip`** (~1.2 MB)
+- **`imagina-audit-v2.0.1.zip`** (~1.2 MB) — current
+
+### Changelog
+
+- **v2.0.1** — fix MySQL `key` reserved-word + drop ROW_NUMBER() OVER (now 5.7-compatible).
+- **v2.0** — initial public build.
 
 Extract it into your hosting and open `https://your-domain/setup` to run the
 install wizard.
