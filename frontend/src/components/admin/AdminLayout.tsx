@@ -36,7 +36,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             className={`flex items-center rounded text-xs text-[#999] hover:text-[#404040] hover:bg-[#ebebeb] transition-colors w-full cursor-pointer ${collapsed ? 'justify-center p-2' : 'gap-2 px-3 py-1.5'}`}
           >
             {collapsed ? <PanelLeft className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
-            {!collapsed && <span>Colapsar</span>}
+            {!collapsed && <span>{t('nav.sidebar_collapse')}</span>}
           </button>
         </div>
       </aside>

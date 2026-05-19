@@ -30,7 +30,9 @@
     "level_good": "Good",
     "level_excellent": "Excellent",
     "level_info": "Informational",
-    "level_unknown": "Not available"
+    "level_unknown": "Not available",
+    "retry": "Retry",
+    "reload": "Reload"
   },
   "languages": {
     "en": "English",
@@ -68,7 +70,8 @@
     "backups": "Backups",
     "logout": "Logout",
     "view_app": "View app",
-    "admin_panel": "Admin Panel"
+    "admin_panel": "Admin Panel",
+    "sidebar_collapse": "Collapse"
   },
   "admin_backups": {
     "title": "Backups",
@@ -563,7 +566,8 @@
     "integrations_cves_no_sync": "Not synced — configure the update-vulnerabilities cron",
     "integrations_pinned_label": "Protected reports",
     "integrations_pinned_desc": "Never auto-deleted by retention",
-    "integrations_pinned_empty": "Pin important reports to protect them"
+    "integrations_pinned_empty": "Pin important reports to protect them",
+    "error_title": "Dashboard error"
   },
   "leads": {
     "title": "Leads & Audits",
@@ -1097,8 +1101,8 @@
     "messages_preview_description": "Description",
     "messages_preview_whatsapp": "WhatsApp",
     "messages_preview_plans": "Plans",
-    "scoring_title": "Scoring & Thresholds",
-    "scoring_subtitle": "Adjust the weight of each module and the color thresholds of the global score",
+    "scoring_title": "Scoring",
+    "scoring_subtitle": "Fine-tune what counts toward the audit score and how strict the bands are.",
     "scoring_weights_title": "Module weights",
     "scoring_weights_hint": "Must add up to 1.0",
     "scoring_thresholds_title": "Level thresholds",
@@ -1120,8 +1124,6 @@
     "scoring_level_good": "Good",
     "scoring_level_warning": "Warning",
     "scoring_level_critical": "Critical",
-    "scoring_title": "Scoring",
-    "scoring_subtitle": "Fine-tune what counts toward the audit score and how strict the bands are.",
     "scoring_cap_card": "Critical-cap per module",
     "scoring_cap_help": "If a module has at least one critical metric, its score can't go above this cap.",
     "scoring_cap_enabled": "Enabled",
@@ -1601,7 +1603,12 @@
     "waterfall_detail_uncompressed": "Uncompressed",
     "waterfall_detail_start": "Start",
     "waterfall_detail_end": "End",
-    "waterfall_detail_duration": "Duration"
+    "waterfall_detail_duration": "Duration",
+    "scoring_preview_domain_hint": "most recent audit",
+    "vulns_sev_low": "Low",
+    "vulns_sev_medium": "Medium",
+    "vulns_sev_high": "High",
+    "vulns_sev_critical": "Critical"
   },
   "public": {
     "header_compare": "Compare",

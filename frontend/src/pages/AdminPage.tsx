@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { Component, type ReactNode } from 'react'
+import i18n from '@/i18n'
 import { useAuth } from '@/hooks/useAuth'
 import AdminLogin from '@/components/admin/AdminLogin'
 import AdminLayout from '@/components/admin/AdminLayout'
@@ -36,9 +37,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: string |
   render() {
     if (this.state.error) return (
       <div className="p-8 text-center">
-        <p className="text-red-600 font-bold">Error en el panel</p>
+        <p className="text-red-600 font-bold">{i18n.t('dashboard.error_title')}</p>
         <pre className="mt-2 text-xs text-left bg-red-50 p-4 rounded overflow-auto max-h-64">{this.state.error}</pre>
-        <button onClick={() => window.location.reload()} className="mt-4 text-blue-600 underline">Recargar</button>
+        <button onClick={() => window.location.reload()} className="mt-4 text-blue-600 underline">{i18n.t('common.reload')}</button>
       </div>
     )
     return this.props.children

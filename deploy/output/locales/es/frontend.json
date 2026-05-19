@@ -30,7 +30,9 @@
     "level_good": "Bien",
     "level_excellent": "Excelente",
     "level_info": "Informativo",
-    "level_unknown": "No disponible"
+    "level_unknown": "No disponible",
+    "retry": "Reintentar",
+    "reload": "Recargar"
   },
   "languages": {
     "en": "Inglés",
@@ -68,7 +70,8 @@
     "backups": "Backups",
     "logout": "Cerrar sesión",
     "view_app": "Ver herramienta",
-    "admin_panel": "Panel de Administración"
+    "admin_panel": "Panel de Administración",
+    "sidebar_collapse": "Colapsar"
   },
   "admin_backups": {
     "title": "Backups",
@@ -563,7 +566,8 @@
     "integrations_cves_no_sync": "Sin sincronizar — configura el cron update-vulnerabilities",
     "integrations_pinned_label": "Informes protegidos",
     "integrations_pinned_desc": "Nunca se borrarán por la retención automática",
-    "integrations_pinned_empty": "Marca informes importantes con el pin para protegerlos"
+    "integrations_pinned_empty": "Marca informes importantes con el pin para protegerlos",
+    "error_title": "Error en el dashboard"
   },
   "leads": {
     "title": "Leads y Auditorías",
@@ -1097,8 +1101,8 @@
     "messages_preview_description": "Descripción",
     "messages_preview_whatsapp": "WhatsApp",
     "messages_preview_plans": "Planes",
-    "scoring_title": "Scoring y Umbrales",
-    "scoring_subtitle": "Ajusta el peso de cada módulo y los umbrales de color del score global",
+    "scoring_title": "Scoring",
+    "scoring_subtitle": "Ajusta qué métricas cuentan y qué tan estricta es la clasificación del score.",
     "scoring_weights_title": "Pesos por módulo",
     "scoring_weights_hint": "Deben sumar 1.0",
     "scoring_thresholds_title": "Umbrales de nivel",
@@ -1120,8 +1124,6 @@
     "scoring_level_good": "Bueno",
     "scoring_level_warning": "Advertencia",
     "scoring_level_critical": "Crítico",
-    "scoring_title": "Scoring",
-    "scoring_subtitle": "Ajusta qué métricas cuentan y qué tan estricta es la clasificación del score.",
     "scoring_cap_card": "Cap por módulo cuando hay críticos",
     "scoring_cap_help": "Si un módulo tiene al menos una métrica crítica, su score no puede pasar este tope.",
     "scoring_cap_enabled": "Activo",
@@ -1601,7 +1603,12 @@
     "waterfall_detail_uncompressed": "Sin comprimir",
     "waterfall_detail_start": "Inicio",
     "waterfall_detail_end": "Fin",
-    "waterfall_detail_duration": "Duración"
+    "waterfall_detail_duration": "Duración",
+    "scoring_preview_domain_hint": "auditoría más reciente",
+    "vulns_sev_low": "Bajo",
+    "vulns_sev_medium": "Medio",
+    "vulns_sev_high": "Alto",
+    "vulns_sev_critical": "Crítico"
   },
   "public": {
     "header_compare": "Comparar",
