@@ -156,7 +156,7 @@ $payload = json_encode([
     'installedAt' => date('c'),
     'driver' => $driver,
     'migrationsApplied' => $applied,
-    'version' => '2.0.3',
+    'version' => '2.0.4',
 ], JSON_PRETTY_PRINT);
 file_put_contents($installFlag, $payload);
 @chmod($installFlag, 0600);

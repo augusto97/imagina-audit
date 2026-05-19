@@ -205,13 +205,16 @@ class Database {
         $start = microtime(true);
         $attempt = 0;
         $maxAttempts = 3;
-        $lastError = null;
+        // Sentinel para distinguir "success con resultado null" (legitimate:
+        // queryOne sin filas) de "loop terminó sin éxito" — isset() no sirve
+        // porque isset(null) === false.
+        $sentinel = new stdClass();
+        $result = $sentinel;
         while ($attempt < $maxAttempts) {
             try {
                 $result = $fn();
                 break;
             } catch (PDOException $e) {
-                $lastError = $e;
                 if (!$this->isTransientError($e) || $attempt + 1 >= $maxAttempts) {
                     throw $e;
                 }
@@ -221,7 +224,10 @@ class Database {
                 $attempt++;
             }
         }
-        if (!isset($result)) throw $lastError ?? new RuntimeException('Query failed without exception');
+        if ($result === $sentinel) {
+            // No debería ocurrir — el bucle siempre retorna o lanza. Defensa.
+            throw new RuntimeException('Query failed without exception');
+        }
 
         $elapsedMs = (microtime(true) - $start) * 1000;
         $threshold = function_exists('env') ? (int) env('SLOW_QUERY_THRESHOLD_MS', '200') : 200;
