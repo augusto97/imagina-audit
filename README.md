@@ -6,11 +6,12 @@ This branch holds the **ready-to-install build artifact**. Nothing else.
 
 The latest packaged build sits at the root of this branch:
 
-- **`imagina-audit-v2.1.0.zip`** (~1.2 MB) — current
+- **`imagina-audit-v2.2.0.zip`** (~1.2 MB) — current
 
 ### Changelog
 
-- **v2.1.0** — honest scoring (no more inflated 85/good for sites with real problems). Four new levers: stricter thresholds (good ≥ 80), per-metric weights (SSL pesa más que X-Powered-By), critical-cap per module (1 crítica = el módulo no puede pintar verde), exponential penalty by total criticals. All tunable from settings (UI in v2.2). Old audits recalc on read.
+- **v2.2.0** — admin UI to tune the scoring (`/admin/scoring`). Per-module include/exclude toggle, per-module critical-cap slider, exponential penalty curve config, per-metric toggle + weight, and a live preview that recalculates a recent audit with the proposed config before saving.
+- **v2.1.0** — honest scoring (no more inflated 85/good for sites with real problems). Four new levers: stricter thresholds (good ≥ 80), per-metric weights (SSL pesa más que X-Powered-By), critical-cap per module (1 crítica = el módulo no puede pintar verde), exponential penalty by total criticals. Old audits recalc on read.
 - **v2.0.8** — admin panel no longer blocks during a running scan. Two causes fixed: (1) `audit.php` now releases the PHP session lock immediately after reading auth state (was held for the full 30-45s scan, blocking every other request from the same browser); (2) scans are now strictly queue-only — `audit.php` enqueues + responds in milliseconds, the actual work runs in a separate worker via `drain-queue.php`, kicked off asynchronously via `shell_exec` or short-timeout HTTP self-call.
 - **v2.0.7** — fix "Error guardando el resultado" mid-scan on MySQL. The four columns that store gzipped JSON (`audits.result_json`, `audits.waterfall_json`, `wp_snapshots.snapshot_json`, `wp_snapshots.analysis_json`) were declared as `JSON`; MySQL rejected the binary gzip bytes. New migration `0003_json_columns_to_blob` widens them to `LONGBLOB`. Audit failure toast now surfaces the underlying DB error instead of the generic placeholder.
 
