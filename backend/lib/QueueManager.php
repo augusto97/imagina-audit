@@ -439,6 +439,17 @@ class QueueManager {
         $leadData = json_decode($job['lead_data_json'] ?? '[]', true) ?: [];
         $ip = $job['ip_address'] ?? 'unknown';
 
+        // Restaurar el idioma del request original. Sin esto, el worker
+        // (CLI o HTTP kick) cae al DEFAULT_LANG ('en') y todos los strings
+        // del result_json (nombre de métrica, descripción, recomendación,
+        // imaginaSolution) acaban en inglés aunque el visitante pidió el
+        // scan en español. Ver audit.php donde se persiste `lang` dentro
+        // de lead_data_json justo para este momento.
+        $jobLang = $leadData['lang'] ?? null;
+        if (is_string($jobLang) && $jobLang !== '') {
+            Translator::setLang($jobLang);
+        }
+
         // Si otro audit con la misma URL falló mientras este esperaba en cola,
         // no lo re-ejecutamos — devolvemos el mismo error.
         $recentError = self::findRecentFailure($url);
