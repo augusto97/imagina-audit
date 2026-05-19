@@ -95,7 +95,7 @@ try {
 
     // Borrar archivo anterior (si existía) para no acumular basura.
     // Extraemos solo el nombre de archivo para evitar path traversal.
-    $oldUrl = (string) $db->scalar("SELECT value FROM settings WHERE key = ?", [$settingKey]);
+    $oldUrl = (string) $db->scalar("SELECT value FROM settings WHERE `key` = ?", [$settingKey]);
     if ($oldUrl !== '' && preg_match('#/uploads/([^/]+)$#', $oldUrl, $oldMatch)) {
         $oldPath = $uploadsDir . '/' . $oldMatch[1];
         if (is_file($oldPath)) @unlink($oldPath);

@@ -71,7 +71,7 @@ class CronHealth {
     public static function getLastRun(string $name): ?array {
         try {
             $db = Database::getInstance();
-            $row = $db->queryOne("SELECT value FROM settings WHERE key = ?", ["cron_last_run_$name"]);
+            $row = $db->queryOne("SELECT value FROM settings WHERE `key` = ?", ["cron_last_run_$name"]);
             if (!$row) return null;
             $decoded = json_decode((string) $row['value'], true);
             return is_array($decoded) ? $decoded : null;

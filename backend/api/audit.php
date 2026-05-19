@@ -63,7 +63,7 @@ $authUser = !$isAdmin ? UserAuth::currentUser() : null;
 // consumen cuota ni slots de IP (son gratis: no corren scan).
 $maxPerHour = (int) env('RATE_LIMIT_MAX_PER_HOUR', '10');
 try {
-    $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'rate_limit_max_per_hour'");
+    $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE `key` = 'rate_limit_max_per_hour'");
     if ($row && is_numeric($row['value'])) $maxPerHour = (int) $row['value'];
 } catch (Throwable $e) {}
 
@@ -94,7 +94,7 @@ try {
 $forceRefresh = !empty($body['forceRefresh']);
 $cacheTtl = (int) env('CACHE_TTL_SECONDS', '86400');
 try {
-    $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'cache_ttl_seconds'");
+    $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE `key` = 'cache_ttl_seconds'");
     if ($row && is_numeric($row['value'])) $cacheTtl = (int) $row['value'];
 } catch (Throwable $e) {}
 
@@ -369,7 +369,7 @@ try {
     $leadWhatsapp = trim($leadData['leadWhatsapp']);
     if ($leadEmail || $leadWhatsapp) {
         $db = Database::getInstance();
-        $notifRow = $db->queryOne("SELECT value FROM settings WHERE key = 'lead_notification_email'");
+        $notifRow = $db->queryOne("SELECT value FROM settings WHERE `key` = 'lead_notification_email'");
         $notifEmail = $notifRow['value'] ?? '';
         if (!empty($notifEmail) && filter_var($notifEmail, FILTER_VALIDATE_EMAIL)) {
             $score = $result['globalScore'];

@@ -54,7 +54,7 @@ if ($code === '') {
 $db = Database::getInstance();
 $secret = '';
 try {
-    $row = $db->queryOne("SELECT value FROM settings WHERE key = 'admin_2fa_secret'");
+    $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'admin_2fa_secret'");
     $secret = $row ? (string) $row['value'] : '';
 } catch (Throwable $e) { /* ignore */ }
 
@@ -64,7 +64,7 @@ $recoveryValid = false;
 if (!$totpValid) {
     // Intentar recovery code
     try {
-        $row = $db->queryOne("SELECT value FROM settings WHERE key = 'admin_2fa_recovery_codes'");
+        $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'admin_2fa_recovery_codes'");
         if ($row) {
             $hashes = json_decode((string) $row['value'], true);
             if (is_array($hashes)) {

@@ -51,12 +51,12 @@ final class DatabaseTest extends TestCase
         $db->initSchema();
 
         $db->setting('test_key', 'value1');
-        $this->assertSame('value1', $db->scalar("SELECT value FROM settings WHERE key = ?", ['test_key']));
+        $this->assertSame('value1', $db->scalar("SELECT value FROM settings WHERE `key` = ?", ['test_key']));
 
         // Re-set actualiza, no duplica
         $db->setting('test_key', 'value2');
-        $this->assertSame('value2', $db->scalar("SELECT value FROM settings WHERE key = ?", ['test_key']));
-        $count = (int) $db->scalar("SELECT COUNT(*) FROM settings WHERE key = ?", ['test_key']);
+        $this->assertSame('value2', $db->scalar("SELECT value FROM settings WHERE `key` = ?", ['test_key']));
+        $count = (int) $db->scalar("SELECT COUNT(*) FROM settings WHERE `key` = ?", ['test_key']);
         $this->assertSame(1, $count);
     }
 
@@ -68,11 +68,11 @@ final class DatabaseTest extends TestCase
 
         $db->setting('k', 'original');
         $db->settingIfMissing('k', 'replacement');
-        $this->assertSame('original', $db->scalar("SELECT value FROM settings WHERE key = ?", ['k']));
+        $this->assertSame('original', $db->scalar("SELECT value FROM settings WHERE `key` = ?", ['k']));
 
         // Pero sí inserta keys nuevas
         $db->settingIfMissing('new_k', 'fresh');
-        $this->assertSame('fresh', $db->scalar("SELECT value FROM settings WHERE key = ?", ['new_k']));
+        $this->assertSame('fresh', $db->scalar("SELECT value FROM settings WHERE `key` = ?", ['new_k']));
     }
 
     #[Test]
@@ -86,8 +86,8 @@ final class DatabaseTest extends TestCase
             $db->setting('b', '2');
         });
 
-        $this->assertSame('1', $db->scalar("SELECT value FROM settings WHERE key = ?", ['a']));
-        $this->assertSame('2', $db->scalar("SELECT value FROM settings WHERE key = ?", ['b']));
+        $this->assertSame('1', $db->scalar("SELECT value FROM settings WHERE `key` = ?", ['a']));
+        $this->assertSame('2', $db->scalar("SELECT value FROM settings WHERE `key` = ?", ['b']));
     }
 
     #[Test]
@@ -106,7 +106,7 @@ final class DatabaseTest extends TestCase
             $this->assertSame('boom', $e->getMessage());
         }
 
-        $count = (int) $db->scalar("SELECT COUNT(*) FROM settings WHERE key = ?", ['rollback_key']);
+        $count = (int) $db->scalar("SELECT COUNT(*) FROM settings WHERE `key` = ?", ['rollback_key']);
         $this->assertSame(0, $count);
     }
 
@@ -144,8 +144,8 @@ final class DatabaseTest extends TestCase
         $db->initSchema();
 
         $now = $db->now();
-        $db->execute("INSERT INTO settings (key, value, updated_at) VALUES (?, ?, $now)", ['ts_test', 'x']);
-        $stored = $db->scalar("SELECT updated_at FROM settings WHERE key = ?", ['ts_test']);
+        $db->execute("INSERT INTO settings (`key`, value, updated_at) VALUES (?, ?, $now)", ['ts_test', 'x']);
+        $stored = $db->scalar("SELECT updated_at FROM settings WHERE `key` = ?", ['ts_test']);
         $this->assertNotEmpty($stored);
     }
 

@@ -117,7 +117,7 @@ class Response {
 
         // La configuración en DB tiene prioridad sobre .env
         try {
-            $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'allowed_origins'");
+            $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE `key` = 'allowed_origins'");
             if ($row && !empty($row['value'])) {
                 $allowedOrigin = $row['value'];
             }

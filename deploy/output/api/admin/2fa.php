@@ -26,7 +26,7 @@ $db = Database::getInstance();
 function twoFaGetSetting(string $key): ?string {
     global $db;
     try {
-        $row = $db->queryOne("SELECT value FROM settings WHERE key = ?", [$key]);
+        $row = $db->queryOne("SELECT value FROM settings WHERE `key` = ?", [$key]);
         return $row ? (string) $row['value'] : null;
     } catch (Throwable $e) { return null; }
 }
@@ -38,7 +38,7 @@ function twoFaSetSetting(string $key, string $value): void {
 
 function twoFaDeleteSetting(string $key): void {
     global $db;
-    $db->execute("DELETE FROM settings WHERE key = ?", [$key]);
+    $db->execute("DELETE FROM settings WHERE `key` = ?", [$key]);
 }
 
 function twoFaVerifyPassword(string $password): bool {

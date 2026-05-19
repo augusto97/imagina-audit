@@ -61,7 +61,7 @@ if (empty($namespace)) {
 // Instanciar provider (viene del body o del setting default_ai_provider)
 $db = Database::getInstance();
 $settingsRows = $db->query(
-    "SELECT key, value FROM settings WHERE key IN ('openai_api_key', 'anthropic_api_key', 'google_translate_api_key', 'default_ai_provider', 'openai_model', 'anthropic_model')"
+    "SELECT `key`, value FROM settings WHERE `key` IN ('openai_api_key', 'anthropic_api_key', 'google_translate_api_key', 'default_ai_provider', 'openai_model', 'anthropic_model')"
 );
 $settings = [];
 foreach ($settingsRows as $row) {

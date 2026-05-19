@@ -66,7 +66,7 @@ if (!Auth::login($password)) {
 // exigimos un segundo request a login-2fa.php.
 $twoFaEnabled = false;
 try {
-    $row = $db->queryOne("SELECT value FROM settings WHERE key = 'admin_2fa_enabled'");
+    $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'admin_2fa_enabled'");
     $twoFaEnabled = $row && (string) $row['value'] === '1';
 } catch (Throwable $e) { /* sin tabla settings = sin 2FA */ }
 

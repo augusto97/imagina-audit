@@ -140,7 +140,7 @@ class SystemInfo {
         try {
             if (!class_exists('Database')) return null;
             $db = Database::getInstance();
-            $val = $db->scalar('SELECT value FROM settings WHERE key = ?', [$key]);
+            $val = $db->scalar('SELECT value FROM settings WHERE `key` = ?', [$key]);
             if ($val === null || $val === '' || $val === false) return null;
             $num = (int) $val;
             return $num > 0 ? $num : null;

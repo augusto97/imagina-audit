@@ -113,22 +113,28 @@ try {
     if (!empty($recurring)) {
         $domains = array_column($recurring, 'domain');
         $placeholders = implode(',', array_fill(0, count($domains), '?'));
-        // MySQL exige alias en derived tables; SQLite lo acepta opcional.
-        $trendRows = $db->query(
-            "SELECT domain, global_score, rn FROM (
-                SELECT domain, global_score,
-                       ROW_NUMBER() OVER (PARTITION BY domain ORDER BY created_at DESC) AS rn
-                FROM audits WHERE domain IN ($placeholders)
-            ) AS ranked WHERE rn <= 2",
+        // ROW_NUMBER() OVER es MySQL 8.0+ — no soportado en 5.7. Traemos
+        // los audits ordenados por dominio + fecha y agrupamos en PHP
+        // quedándonos con los 2 más recientes por dominio. Cantidad
+        // razonable (10 dominios × N audits cada uno; en peor caso 200
+        // filas, despreciable).
+        $allScores = $db->query(
+            "SELECT domain, global_score, created_at
+             FROM audits WHERE domain IN ($placeholders)
+             ORDER BY domain, created_at DESC",
             $domains
         );
         $scoresByDomain = [];
-        foreach ($trendRows as $r) {
-            $scoresByDomain[$r['domain']][(int) $r['rn']] = (int) $r['global_score'];
+        foreach ($allScores as $r) {
+            $d = $r['domain'];
+            if (!isset($scoresByDomain[$d])) $scoresByDomain[$d] = [];
+            if (count($scoresByDomain[$d]) < 2) {
+                $scoresByDomain[$d][] = (int) $r['global_score'];
+            }
         }
         foreach ($scoresByDomain as $domain => $scores) {
-            if (!isset($scores[1], $scores[2])) { $trendByDomain[$domain] = 'stable'; continue; }
-            $diff = $scores[1] - $scores[2];
+            if (count($scores) < 2) { $trendByDomain[$domain] = 'stable'; continue; }
+            $diff = $scores[0] - $scores[1]; // newest - previous
             $trendByDomain[$domain] = $diff > 5 ? 'improving' : ($diff < -5 ? 'declining' : 'stable');
         }
     }
@@ -170,9 +176,9 @@ try {
         'recoveryCodesLeft' => 0,
     ];
     try {
-        $row = $db->queryOne("SELECT value FROM settings WHERE key = 'admin_2fa_enabled'");
+        $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'admin_2fa_enabled'");
         $security['twoFaEnabled'] = $row && (string) $row['value'] === '1';
-        $codesRow = $db->queryOne("SELECT value FROM settings WHERE key = 'admin_2fa_recovery_codes'");
+        $codesRow = $db->queryOne("SELECT value FROM settings WHERE `key` = 'admin_2fa_recovery_codes'");
         if ($codesRow) {
             $decoded = json_decode((string) $codesRow['value'], true);
             $security['recoveryCodesLeft'] = is_array($decoded) ? count($decoded) : 0;
@@ -193,9 +199,9 @@ try {
 
     $retention = ['enabled' => false, 'months' => 6];
     try {
-        $row = $db->queryOne("SELECT value FROM settings WHERE key = 'audits_retention_enabled'");
+        $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'audits_retention_enabled'");
         $retention['enabled'] = $row && in_array((string) $row['value'], ['1', 'true'], true);
-        $monthsRow = $db->queryOne("SELECT value FROM settings WHERE key = 'audits_retention_months'");
+        $monthsRow = $db->queryOne("SELECT value FROM settings WHERE `key` = 'audits_retention_months'");
         if ($monthsRow) $retention['months'] = (int) $monthsRow['value'];
     } catch (Throwable $e) { /* ignore */ }
 

@@ -37,7 +37,7 @@ class Auth {
         $hash = '';
         try {
             $db = Database::getInstance();
-            $row = $db->queryOne("SELECT value FROM settings WHERE key = 'admin_password_hash'");
+            $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'admin_password_hash'");
             if ($row) {
                 $hash = $row['value'];
             }

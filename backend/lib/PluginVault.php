@@ -51,7 +51,7 @@ class PluginVault {
     public static function getMetadata(string $slug): ?array {
         try {
             $db = Database::getInstance();
-            $row = $db->queryOne("SELECT value FROM settings WHERE key = ?", ["plugin_vault_$slug"]);
+            $row = $db->queryOne("SELECT value FROM settings WHERE `key` = ?", ["plugin_vault_$slug"]);
             if (!$row) return null;
             $decoded = json_decode((string) $row['value'], true);
             return is_array($decoded) ? $decoded : null;

@@ -37,7 +37,7 @@ class QueueManager {
         $max = (int) ($defaults['audit_max_concurrent'] ?? self::DEFAULT_MAX_CONCURRENT);
         try {
             $db = Database::getInstance();
-            $row = $db->queryOne("SELECT value FROM settings WHERE key = 'audit_max_concurrent'");
+            $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'audit_max_concurrent'");
             if ($row && is_numeric($row['value'])) {
                 $max = max(1, (int) $row['value']);
             }
@@ -438,7 +438,7 @@ class QueueManager {
             $leadWhatsapp = trim($leadData['leadWhatsapp'] ?? '');
             if ($leadEmail || $leadWhatsapp) {
                 $db = Database::getInstance();
-                $notifRow = $db->queryOne("SELECT value FROM settings WHERE key = 'lead_notification_email'");
+                $notifRow = $db->queryOne("SELECT value FROM settings WHERE `key` = 'lead_notification_email'");
                 $notifEmail = $notifRow['value'] ?? '';
                 if (!empty($notifEmail) && filter_var($notifEmail, FILTER_VALIDATE_EMAIL)) {
                     $score = $result['globalScore'];

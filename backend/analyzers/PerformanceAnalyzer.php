@@ -295,7 +295,7 @@ class PerformanceAnalyzer {
 
         try {
             $db = Database::getInstance();
-            $row = $db->queryOne("SELECT value FROM settings WHERE key = 'google_pagespeed_api_key'");
+            $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'google_pagespeed_api_key'");
             if ($row && !empty($row['value'])) {
                 return $row['value'];
             }

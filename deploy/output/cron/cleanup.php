@@ -72,8 +72,8 @@ try {
     // + ventana en meses `audits_retention_months`. Los informes con
     // is_pinned=1 quedan excluidos del borrado.
     try {
-        $enabledRow = $db->queryOne("SELECT value FROM settings WHERE key = 'audits_retention_enabled'");
-        $monthsRow = $db->queryOne("SELECT value FROM settings WHERE key = 'audits_retention_months'");
+        $enabledRow = $db->queryOne("SELECT value FROM settings WHERE `key` = 'audits_retention_enabled'");
+        $monthsRow = $db->queryOne("SELECT value FROM settings WHERE `key` = 'audits_retention_months'");
 
         // Settings en DB ganan sobre defaults
         $enabled = $enabledRow ? filter_var($enabledRow['value'], FILTER_VALIDATE_BOOLEAN) : (bool) ($defaults['audits_retention_enabled'] ?? false);

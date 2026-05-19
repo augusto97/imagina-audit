@@ -141,7 +141,7 @@ foreach ($envKeys as $key => $critical) {
 // Check también en DB (el setup wizard guarda ahí en vez de .env)
 if (!$hasAdminHash) {
     try {
-        $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE key = 'admin_password_hash'");
+        $row = Database::getInstance()->queryOne("SELECT value FROM settings WHERE `key` = 'admin_password_hash'");
         if ($row && !empty($row['value'])) $hasAdminHash = true;
     } catch (Throwable $e) {}
 }
