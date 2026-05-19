@@ -382,6 +382,12 @@ export function useAdmin() {
     await api.post('/admin/scoring.php', { action: 'save', config })
   }, [])
 
+  // ─── Queue manual actions (v2.2.1) ────────────────────────────────
+  const queueAction = useCallback(async (action: string, params: Record<string, unknown> = {}) => {
+    const res = await api.post('/admin/queue-actions.php', { action, ...params })
+    return res.data.data as Record<string, unknown>
+  }, [])
+
   /**
    * Descarga el pack JSON de un idioma disparando un download en el browser.
    * Hacemos el fetch vía axios para mantener la cookie de sesión — un
@@ -451,5 +457,6 @@ export function useAdmin() {
     fetchAdminLanguages, createAdminLanguage, updateAdminLanguage, deleteAdminLanguage,
     exportLanguagePack, importLanguagePack,
     fetchScoring, previewScoring, saveScoring,
+    queueAction,
   }
 }

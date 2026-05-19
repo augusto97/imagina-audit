@@ -196,12 +196,10 @@ class QueueManager {
 
         // Intento 2: curl HTTP self-call con timeout 1s.
         if (function_exists('curl_init')) {
-            $token = function_exists('env') ? env('CRON_SECRET_TOKEN', '') : '';
-            if ($token === '') return; // sin token no podemos llamar al endpoint protegido
+            $token = self::ensureCronToken(); // auto-genera si no existe
+            if ($token === '') return;
             $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
             $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-            // Asumimos que la app está montada en /api/. drain-queue.php está
-            // en /cron/ — accesible vía rewrite o ruta directa.
             $url = "$scheme://$host/cron/drain-queue.php?token=" . urlencode($token);
             $ch = curl_init($url);
             curl_setopt_array($ch, [
@@ -214,6 +212,33 @@ class QueueManager {
             ]);
             @curl_exec($ch);
             @curl_close($ch);
+        }
+    }
+
+    /**
+     * Resuelve el token de cron — del .env si está, si no de la tabla
+     * settings, si no genera uno aleatorio y lo persiste en settings.
+     * Esto desbloquea instalaciones donde el admin no configuró
+     * CRON_SECRET_TOKEN: la cola se procesa igual.
+     *
+     * El drain-queue.php usa el mismo helper para validar el token.
+     */
+    public static function ensureCronToken(): string {
+        $envToken = function_exists('env') ? env('CRON_SECRET_TOKEN', '') : '';
+        if ($envToken !== '' && $envToken !== 'cambiar-este-token') {
+            return $envToken;
+        }
+        try {
+            $db = Database::getInstance();
+            $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'cron_secret_token'");
+            if ($row && !empty($row['value'])) return (string) $row['value'];
+
+            // Generar uno nuevo + persistir en settings
+            $token = bin2hex(random_bytes(16));
+            $db->setting('cron_secret_token', $token);
+            return $token;
+        } catch (Throwable $e) {
+            return '';
         }
     }
 

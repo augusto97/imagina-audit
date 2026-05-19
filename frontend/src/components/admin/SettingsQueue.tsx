@@ -377,7 +377,94 @@ export default function SettingsQueue() {
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" strokeWidth={1.5} />}
         {t('settings.queue_save')}
       </Button>
+
+      <QueueRescueCard />
     </div>
+  )
+}
+
+/**
+ * Acciones manuales de rescate para la cola. Visible siempre, pero solo
+ * útil cuando:
+ *   - El kick HTTP/shell falla (host sin shell_exec ni con curl que pueda
+ *     llamarse a sí mismo).
+ *   - Hay jobs colgados en 'running' porque PHP murió a mitad del scan.
+ *   - Una URL quedó "vetada" en la cache de fallos (audit_jobs failed).
+ *
+ * Estos botones son los que destraban la cola sin SSH al hosting.
+ */
+function QueueRescueCard() {
+  const { t } = useTranslation()
+  const { queueAction } = useAdmin()
+  const [busy, setBusy] = useState<string | null>(null)
+  const [urlToClear, setUrlToClear] = useState('')
+
+  const run = async (action: string, params: Record<string, unknown> = {}, successMsg = '') => {
+    setBusy(action)
+    try {
+      const res = await queueAction(action, params)
+      toast.success(successMsg || t('settings.queue_action_done'), {
+        description: Object.entries(res).map(([k, v]) => `${k}: ${v}`).join(' · '),
+      })
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error ?? t('settings.queue_action_error'))
+    }
+    setBusy(null)
+  }
+
+  return (
+    <Card className="border-amber-200 bg-amber-50/30">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          {t('settings.queue_rescue_title')}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-xs text-[var(--text-secondary)]">{t('settings.queue_rescue_help')}</p>
+
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => run('drain-now', {}, t('settings.queue_drain_done'))} disabled={!!busy}>
+            {busy === 'drain-now' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Server className="h-3.5 w-3.5" />}
+            {t('settings.queue_drain_now')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => run('reset-running', {}, t('settings.queue_reset_done'))} disabled={!!busy}>
+            {busy === 'reset-running' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+            {t('settings.queue_reset_running')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => run('clear-failures', {}, t('settings.queue_clear_done'))} disabled={!!busy}>
+            {busy === 'clear-failures' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
+            {t('settings.queue_clear_all_failures')}
+          </Button>
+        </div>
+
+        <div className="border-t border-amber-200 pt-3 space-y-2">
+          <p className="text-xs font-semibold">{t('settings.queue_unblock_url_title')}</p>
+          <p className="text-[11px] text-[var(--text-tertiary)]">{t('settings.queue_unblock_url_help')}</p>
+          <div className="flex gap-2">
+            <Input
+              type="url"
+              value={urlToClear}
+              onChange={e => setUrlToClear(e.target.value)}
+              placeholder="https://misitio.com"
+              className="flex-1 text-xs"
+            />
+            <Button
+              size="sm"
+              onClick={() => {
+                if (!urlToClear.trim()) return
+                run('clear-failures', { url: urlToClear.trim() }, t('settings.queue_unblock_done'))
+                setUrlToClear('')
+              }}
+              disabled={!!busy || !urlToClear.trim()}
+            >
+              {t('settings.queue_unblock_url_button')}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
