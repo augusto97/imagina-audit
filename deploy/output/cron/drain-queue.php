@@ -41,6 +41,17 @@ spl_autoload_register(function (string $class) {
 set_time_limit(240);
 ini_set('memory_limit', '256M');
 
+// CRÍTICO para HTTP kicks: cuando /api/audit nos llama con curl + timeout
+// muy bajo, el cliente cierra la conexión casi inmediato. Sin esto PHP
+// mataría el script al detectar el cliente desconectado, abortando el scan.
+ignore_user_abort(true);
+
+// Cerrar la sesión PHP del request entrante (si la había) para no
+// retener el lock mientras drenamos jobs largos.
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
+
 try {
     Database::getInstance()->initSchema();
 

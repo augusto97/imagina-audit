@@ -145,6 +145,85 @@ class QueueManager {
     }
 
     /**
+     * Encola el job SIEMPRE como 'queued' (nunca 'running'), sin intentar
+     * arrancarlo inline. Pensado para arquitectura queue-only donde el
+     * scan corre exclusivamente en un drain worker (cron o kick async),
+     * NO en el mismo proceso PHP que recibió el POST /audit.
+     *
+     * Beneficio: el worker que atiende /audit responde en milisegundos y
+     * queda libre. El admin / dashboard / otros endpoints no compiten con
+     * un scan de 30-45s por la misma sesión PHP o por workers escasos.
+     */
+    public static function enqueue(string $auditId, string $url, array $leadData, string $ip): array {
+        $db = Database::getInstance();
+        $leadJson = json_encode($leadData, JSON_UNESCAPED_UNICODE);
+
+        self::reapStaleRunning();
+
+        $db->execute(
+            "INSERT INTO audit_jobs (audit_id, url, lead_data_json, status, ip_address) VALUES (?, ?, ?, 'queued', ?)",
+            [$auditId, $url, $leadJson, $ip]
+        );
+        $position = self::getPosition($auditId);
+        return ['status' => 'queued', 'position' => $position];
+    }
+
+    /**
+     * Dispara el drain de la cola en background — fire-and-forget. Lo
+     * llama /api/audit después de encolar para que el scan arranque casi
+     * al instante, sin esperar al cron de fallback (~1 min de latencia).
+     *
+     * Estrategia:
+     *   1. Si shell_exec está habilitado → spawn `php cron/drain-queue.php`
+     *      en background con redirect a /dev/null. Es lo más rápido y
+     *      barato (no usa worker web).
+     *   2. Fallback: curl HTTP a /cron/drain-queue.php?token=X con timeout
+     *      muy bajo. La conexión se cierra rápido pero el server-side
+     *      mantiene el script vivo gracias a `ignore_user_abort(true)`.
+     *   3. Si todo falla, el cron seguirá drenando — solo perdemos
+     *      inmediatez.
+     */
+    public static function kickDrain(): void {
+        // Intento 1: shell_exec en background. El más limpio.
+        if (function_exists('shell_exec') && !self::isFunctionDisabled('shell_exec')) {
+            $script = dirname(__DIR__) . '/cron/drain-queue.php';
+            if (is_file($script)) {
+                $cmd = sprintf('php %s > /dev/null 2>&1 &', escapeshellarg($script));
+                @shell_exec($cmd);
+                return;
+            }
+        }
+
+        // Intento 2: curl HTTP self-call con timeout 1s.
+        if (function_exists('curl_init')) {
+            $token = function_exists('env') ? env('CRON_SECRET_TOKEN', '') : '';
+            if ($token === '') return; // sin token no podemos llamar al endpoint protegido
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            // Asumimos que la app está montada en /api/. drain-queue.php está
+            // en /cron/ — accesible vía rewrite o ruta directa.
+            $url = "$scheme://$host/cron/drain-queue.php?token=" . urlencode($token);
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT_MS => 500,
+                CURLOPT_TIMEOUT_MS => 1000,
+                CURLOPT_NOSIGNAL => true,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => 0,
+            ]);
+            @curl_exec($ch);
+            @curl_close($ch);
+        }
+    }
+
+    /** Detecta si una función PHP está en `disable_functions`. */
+    private static function isFunctionDisabled(string $name): bool {
+        $disabled = explode(',', (string) ini_get('disable_functions'));
+        return in_array($name, array_map('trim', $disabled), true);
+    }
+
+    /**
      * Posición FIFO del job en la cola (1-indexed). 0 si ya está running.
      */
     public static function getPosition(string $auditId): int {
