@@ -174,8 +174,9 @@ if ($method === 'PUT') {
         [$lang, $namespace, $key]
     );
     if ($existing) {
+        $now = $db->now();
         $db->execute(
-            "UPDATE translations SET value = ?, source = ?, ai_provider = ?, reviewed = ?, updated_at = datetime('now') WHERE id = ?",
+            "UPDATE translations SET value = ?, source = ?, ai_provider = ?, reviewed = ?, updated_at = $now WHERE id = ?",
             [$value, $source, $aiProvider, $reviewed, $existing['id']]
         );
     } else {

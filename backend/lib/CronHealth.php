@@ -60,10 +60,7 @@ class CronHealth {
         try {
             $db = Database::getInstance();
             $payload = ['at' => date('c'), 'duration' => $durationSec, 'note' => $note];
-            $db->execute(
-                "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
-                ["cron_last_run_$name", json_encode($payload, JSON_UNESCAPED_UNICODE)]
-            );
+            $db->setting("cron_last_run_$name", json_encode($payload, JSON_UNESCAPED_UNICODE));
         } catch (Throwable $e) {
             if (class_exists('Logger')) {
                 Logger::warning("CronHealth.markRun($name) falló: " . $e->getMessage());

@@ -101,10 +101,7 @@ try {
         if (is_file($oldPath)) @unlink($oldPath);
     }
 
-    $db->execute(
-        "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
-        [$settingKey, $publicUrl]
-    );
+    $db->setting($settingKey, $publicUrl);
 } catch (Throwable $e) {
     Logger::error('Error guardando URL de upload: ' . $e->getMessage());
     Response::error(Translator::t('admin_api.upload.register_error'), 500);

@@ -128,8 +128,9 @@ class QueueManager {
         $max = self::getMaxConcurrent();
 
         if ($running < $max) {
+            $now = $db->now();
             $db->execute(
-                "INSERT INTO audit_jobs (audit_id, url, lead_data_json, status, ip_address, started_at) VALUES (?, ?, ?, 'running', ?, datetime('now'))",
+                "INSERT INTO audit_jobs (audit_id, url, lead_data_json, status, ip_address, started_at) VALUES (?, ?, ?, 'running', ?, $now)",
                 [$auditId, $url, $leadJson, $ip]
             );
             return ['status' => 'running', 'position' => 0];
@@ -169,8 +170,10 @@ class QueueManager {
 
     public static function markCompleted(string $auditId): void {
         try {
-            Database::getInstance()->execute(
-                "UPDATE audit_jobs SET status = 'completed', completed_at = datetime('now') WHERE audit_id = ?",
+            $db = Database::getInstance();
+            $now = $db->now();
+            $db->execute(
+                "UPDATE audit_jobs SET status = 'completed', completed_at = $now WHERE audit_id = ?",
                 [$auditId]
             );
         } catch (Throwable $e) {
@@ -180,8 +183,10 @@ class QueueManager {
 
     public static function markFailed(string $auditId, string $error): void {
         try {
-            Database::getInstance()->execute(
-                "UPDATE audit_jobs SET status = 'failed', completed_at = datetime('now'), error_message = ? WHERE audit_id = ?",
+            $db = Database::getInstance();
+            $now = $db->now();
+            $db->execute(
+                "UPDATE audit_jobs SET status = 'failed', completed_at = $now, error_message = ? WHERE audit_id = ?",
                 [mb_substr($error, 0, 500), $auditId]
             );
         } catch (Throwable $e) {
@@ -221,10 +226,14 @@ class QueueManager {
             // falla de nuevo. No queremos retry eterno de URLs problemáticas.
             $defaults = require dirname(__DIR__) . '/config/defaults.php';
             $maxAttempts = (int) ($defaults['audit_max_attempts'] ?? 3);
+            $now = $db->now();
             if (((int) $job['attempts']) >= $maxAttempts) {
+                // CONCAT funciona en MySQL y SQLite (vía sqlite_compat); para
+                // evitar la dependencia, computamos el mensaje en PHP.
+                $msg = 'Abandonado tras ' . (int) $job['attempts'] . ' intentos.';
                 $db->execute(
-                    "UPDATE audit_jobs SET status = 'failed', error_message = 'Abandonado tras ' || attempts || ' intentos.', completed_at = datetime('now') WHERE id = ?",
-                    [$job['id']]
+                    "UPDATE audit_jobs SET status = 'failed', error_message = ?, completed_at = $now WHERE id = ?",
+                    [$msg, $job['id']]
                 );
                 $pdo->commit();
                 AuditProgress::failed($job['audit_id'], 'El análisis falló repetidamente y fue abandonado. Contacta a soporte si persiste.');
@@ -234,7 +243,7 @@ class QueueManager {
             }
 
             $db->execute(
-                "UPDATE audit_jobs SET status = 'running', started_at = datetime('now'), attempts = attempts + 1 WHERE id = ?",
+                "UPDATE audit_jobs SET status = 'running', started_at = $now, attempts = attempts + 1 WHERE id = ?",
                 [$job['id']]
             );
             $pdo->commit();
@@ -255,16 +264,22 @@ class QueueManager {
         try {
             $db = Database::getInstance();
             $stale = self::getStaleSeconds();
+            $now = $db->now();
+            // Threshold computado en PHP — evita dialect-specific date math
+            // (SQLite: datetime('now', '-N seconds'); MySQL: DATE_SUB(NOW(), INTERVAL N SECOND)).
+            $threshold = date('Y-m-d H:i:s', time() - $stale);
             $count = $db->execute(
-                "UPDATE audit_jobs SET status = 'failed', error_message = 'Job huérfano: proceso PHP murió antes de completar el audit.', completed_at = datetime('now') WHERE status = 'running' AND started_at IS NOT NULL AND started_at < datetime('now', ?)",
-                ["-$stale seconds"]
+                "UPDATE audit_jobs SET status = 'failed', error_message = 'Job huérfano: proceso PHP murió antes de completar el audit.', completed_at = $now WHERE status = 'running' AND started_at IS NOT NULL AND started_at < ?",
+                [$threshold]
             );
             if ($count > 0) {
                 Logger::warning("Reaped $count stale audit jobs");
                 // Marcar también el AuditProgress de estos jobs como 'failed'
                 // para que el frontend deje de hacer polling indefinidamente
+                $recentThreshold = date('Y-m-d H:i:s', time() - 60);
                 $staleJobs = $db->query(
-                    "SELECT audit_id FROM audit_jobs WHERE status = 'failed' AND error_message LIKE 'Job huérfano%' AND completed_at > datetime('now', '-1 minute')"
+                    "SELECT audit_id FROM audit_jobs WHERE status = 'failed' AND error_message LIKE 'Job huérfano%' AND completed_at > ?",
+                    [$recentThreshold]
                 );
                 foreach ($staleJobs as $j) {
                     AuditProgress::failed($j['audit_id'], 'El análisis tardó demasiado y fue cancelado. Intenta nuevamente.');

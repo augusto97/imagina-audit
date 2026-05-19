@@ -19,6 +19,7 @@ if (!function_exists('env')) {
 spl_autoload_register(function (string $class) {
     $paths = [
         __DIR__ . '/../lib/' . $class . '.php',
+        __DIR__ . '/../lib/db/' . $class . '.php',
         __DIR__ . '/../analyzers/' . $class . '.php',
     ];
     foreach ($paths as $path) {

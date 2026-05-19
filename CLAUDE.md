@@ -43,17 +43,34 @@ Convencer a prospectos de contratar los planes de soporte mensual de Imagina WP 
 
 ### Backend (PHP — corre en hosting compartido)
 - **Lenguaje:** PHP 8.0+
-- **Extensiones requeridas:** cURL, DOM (DOMDocument), JSON, OpenSSL, mbstring — todas vienen por defecto en hosting compartido
-- **Sin framework.** PHP vanilla con una estructura organizada de clases/archivos. No necesita Composer ni dependencias externas.
-- **Base de datos:** SQLite (un solo archivo .db dentro del hosting, sin necesidad de MySQL). Se usa para almacenar auditorías, leads y configuración. PHP tiene SQLite integrado (extensión pdo_sqlite, habilitada por defecto).
+- **Extensiones requeridas:** cURL, DOM (DOMDocument), JSON, OpenSSL, mbstring, pdo_mysql o pdo_sqlite (según driver elegido) — todas vienen por defecto en hosting compartido
+- **Sin framework, sin ORM.** PHP vanilla con PDO directo + un wrapper cross-driver. No necesita Composer ni dependencias externas en producción.
+- **Base de datos (P7):** soporta **dos drivers** que se eligen vía `DB_DRIVER` en `.env`:
+  - **MySQL/MariaDB** (recomendado para producción). Versiones mínimas: MySQL 5.7+ / MariaDB 10.3+. Universal en hosting cPanel; permite JSON nativo, concurrencia real y backups con `mysqldump`.
+  - **SQLite** (fallback). Single-file, ideal para dev, demos o hostings sin MySQL. Mantiene la promesa "drop & go" inicial.
+  El admin elige el driver en el wizard de instalación (`/setup`); el `.env` se escribe automáticamente. La capa de abstracción vive en `backend/lib/Database.php` + `backend/lib/db/{SqliteDialect,MysqlDialect}.php`.
+- **Schema:** versionado con migraciones en `backend/database/migrations/NNNN_descripcion.sql`. El runner `backend/lib/Migrator.php` (CLI: `backend/database/migrate.php`) las aplica en orden y trackea estado en la tabla `schema_migrations`. SQL cross-driver vía placeholders (`{{AUTO_PK}}`, `{{NOW}}`, `{{JSON}}`, `{{BOOL}}`, …) y bloques condicionales (`--{mysql} … --{/mysql}`).
 - **Cache:** Archivos JSON en disco (carpeta /cache/) con TTL de 24 horas. Sin Redis ni Memcached.
-- **Autenticación admin:** Contraseña hasheada con password_hash() almacenada en la tabla de configuración de SQLite. Sesión PHP estándar con session_start().
+- **Autenticación admin:** Contraseña hasheada con password_hash() guardada en la tabla `settings`. Sesión PHP estándar con session_start(). Soporta 2FA TOTP opcional.
+- **Hardening producción (P7.6):** slow query log automático (configurable con `SLOW_QUERY_THRESHOLD_MS`), retry con backoff exponencial para errores transientes (deadlocks, conexión perdida, lock timeouts), backup manual/cron desde el admin con retención configurable.
+
+### Reglas de oro de DB
+1. Nunca emitir SQL específico de un driver en el código de negocio. Usar `$db->upsert()`, `$db->setting()`, `$db->now()`, `$db->json()`, `$db->bool()` o el Dialect.
+2. Sin `INSERT OR IGNORE/REPLACE`, `datetime('now')`, `AUTOINCREMENT` hardcoded — los helpers cross-driver cubren todos los casos comunes.
+3. Una vez "released", las migraciones son inmutables. Para corregir, crear una migración nueva.
+4. Foreign keys siempre habilitadas (ambos drivers).
+5. Transacciones explícitas (`$db->transaction(callable)`) en mutaciones multi-tabla.
+6. Indices revisados antes de cada release; cada query de hot path lleva su índice o un comentario justificando el scan.
+7. Todo input externo va por prepared statements. Sin excepciones.
 
 ### Deployment
 - Hosting compartido con cPanel
 - Frontend: archivos estáticos en carpeta /public_html/audit/ (o subdominio audit.dominio.com)
 - Backend: archivos PHP en carpeta /public_html/audit/api/
-- SQLite: archivo .db en carpeta FUERA de public_html (no accesible por web) o dentro con .htaccess que bloquee acceso directo
+- DB:
+  - MySQL: base + usuario creados desde cPanel; credenciales en `.env` (o vía wizard).
+  - SQLite: archivo .db en carpeta FUERA de public_html (no accesible por web), o dentro con .htaccess que bloquee acceso directo.
+- Primera carga después del upload → la app redirige automáticamente a `/setup` para el wizard.
 - HTTPS: certificado del hosting (Let's Encrypt via cPanel)
 
 ---

@@ -157,20 +157,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             // Cambio de contraseña admin
             if ($key === 'adminPassword' && !empty($value)) {
                 $hash = password_hash($value, PASSWORD_BCRYPT);
-                $db->execute(
-                    "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('admin_password_hash', ?, datetime('now'))",
-                    [$hash]
-                );
+                $db->setting('admin_password_hash', $hash);
                 continue;
             }
 
             // Convertir cacheTtlHours a cache_ttl_seconds
             if ($key === 'cacheTtlHours') {
                 $seconds = max(0, (int) $value) * 3600;
-                $db->execute(
-                    "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('cache_ttl_seconds', ?, datetime('now'))",
-                    [(string) $seconds]
-                );
+                $db->setting('cache_ttl_seconds', (string) $seconds);
                 continue;
             }
 
@@ -186,10 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 $value = $value ? '1' : '0';
             }
 
-            $db->execute(
-                "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
-                [$dbKey, (string) $value]
-            );
+            $db->setting($dbKey, (string) $value);
         }
         Response::success();
     } catch (Throwable $e) {

@@ -27,8 +27,11 @@ $backoffSchedule = [0, 0, 2, 5, 15, 60, 300];
 
 try {
     $db = Database::getInstance();
-    $db->execute("CREATE TABLE IF NOT EXISTS login_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, ip_address TEXT NOT NULL, attempted_at TEXT NOT NULL DEFAULT (datetime('now')))");
-    $db->execute("DELETE FROM login_attempts WHERE attempted_at < datetime('now', '-' || ? || ' minutes')", [$windowMinutes]);
+    // La tabla login_attempts la crea el migrator (0002_admin_login_attempts).
+    // Limpieza: borrar intentos fuera de la ventana — threshold computado
+    // en PHP para evitar date math específico del driver.
+    $windowThreshold = date('Y-m-d H:i:s', time() - $windowMinutes * 60);
+    $db->execute("DELETE FROM login_attempts WHERE attempted_at < ?", [$windowThreshold]);
 
     $attempts = (int) $db->scalar("SELECT COUNT(*) FROM login_attempts WHERE ip_address = ?", [$ip]);
     $lastAttemptIso = $db->scalar("SELECT MAX(attempted_at) FROM login_attempts WHERE ip_address = ?", [$ip]);

@@ -16,13 +16,17 @@ require_once __DIR__ . '/db/MysqlDialect.php';
  * — siguen aceptando SQL crudo con placeholders ? y bindings positional.
  *
  * Los helpers nuevos (`now()`, `transaction()`, `bool()`, `json()`,
- * `upsert()`, `dialect()`) van por encima de la abstracción Dialect para
- * que el código de negocio no tenga que conocer el driver activo.
+ * `upsert()`, `setting()`, `settingIfMissing()`, `dialect()`) van por
+ * encima de la abstracción Dialect para que el código de negocio no
+ * tenga que conocer el driver activo.
  *
- * NOTA P7: initSchema() / runMigrations() siguen aquí por compatibilidad
- * pero solo operan en SQLite. Para MySQL hay que correr el migrator
- * versionado de la Fase 2 (P7.2). En SQLite el comportamiento es
- * idéntico al pre-P7.
+ * Schema bootstrap: initSchema() delega al Migrator versionado (que
+ * crea schema_migrations + aplica todas las pendientes). El schema.sql
+ * legacy y runMigrations() ad-hoc fueron retirados en P7-cleanup.
+ *
+ * Retry: los métodos query/queryOne/execute/scalar pasan por traced()
+ * que reintenta automáticamente errores transientes (deadlock, lock
+ * timeout, connection lost) con backoff exponencial 100-200-400ms.
  */
 class Database {
     private static ?Database $instance = null;
@@ -181,28 +185,81 @@ class Database {
     }
 
     /**
-     * Wrapper que mide tiempo de cada query y loguea las lentas. El
-     * umbral se controla con SLOW_QUERY_THRESHOLD_MS en .env (default
-     * 200ms). El log va a backend/logs/slow-queries.log vía Logger.
+     * Wrapper que (1) mide tiempo y loguea las queries lentas, y (2)
+     * reintenta automáticamente errores transientes con backoff
+     * exponencial.
+     *
+     * Slow log:
+     *   - Umbral SLOW_QUERY_THRESHOLD_MS (env, default 200). 0 = desactivado.
+     *   - Log va a Logger::warning con SQL + params (sanitizados).
+     *
+     * Retry:
+     *   - MySQL: 2006 (gone away), 2013 (lost connection), 1205 (lock
+     *     wait timeout), 1213 (deadlock), HY000 (general).
+     *   - SQLite: SQLITE_BUSY (5), SQLITE_LOCKED (6).
+     *   - Backoff: 100ms, 200ms, 400ms. Max 3 intentos.
+     *   - Errores no transientes (syntax, FK, UNIQUE) propagan inmediatamente.
      */
     private function traced(string $sql, array $params, callable $fn): mixed
     {
         $start = microtime(true);
-        try {
-            return $fn();
-        } finally {
-            $elapsedMs = (microtime(true) - $start) * 1000;
-            $threshold = function_exists('env') ? (int) env('SLOW_QUERY_THRESHOLD_MS', '200') : 200;
-            if ($threshold > 0 && $elapsedMs >= $threshold && class_exists('Logger')) {
-                $sanitized = $this->sanitizeParams($params);
-                Logger::warning(sprintf(
-                    'SLOW QUERY %dms — %s | params: %s',
-                    (int) $elapsedMs,
-                    trim(preg_replace('/\s+/', ' ', $sql) ?? $sql),
-                    json_encode($sanitized, JSON_UNESCAPED_UNICODE)
-                ));
+        $attempt = 0;
+        $maxAttempts = 3;
+        $lastError = null;
+        while ($attempt < $maxAttempts) {
+            try {
+                $result = $fn();
+                break;
+            } catch (PDOException $e) {
+                $lastError = $e;
+                if (!$this->isTransientError($e) || $attempt + 1 >= $maxAttempts) {
+                    throw $e;
+                }
+                // Backoff: 100ms, 200ms, 400ms
+                $backoffMs = 100 * (1 << $attempt);
+                usleep($backoffMs * 1000);
+                $attempt++;
             }
         }
+        if (!isset($result)) throw $lastError ?? new RuntimeException('Query failed without exception');
+
+        $elapsedMs = (microtime(true) - $start) * 1000;
+        $threshold = function_exists('env') ? (int) env('SLOW_QUERY_THRESHOLD_MS', '200') : 200;
+        if ($threshold > 0 && $elapsedMs >= $threshold && class_exists('Logger')) {
+            $sanitized = $this->sanitizeParams($params);
+            Logger::warning(sprintf(
+                'SLOW QUERY %dms — %s | params: %s',
+                (int) $elapsedMs,
+                trim(preg_replace('/\s+/', ' ', $sql) ?? $sql),
+                json_encode($sanitized, JSON_UNESCAPED_UNICODE)
+            ));
+        }
+        if ($attempt > 0 && class_exists('Logger')) {
+            Logger::warning(sprintf(
+                'DB query retried %d time(s) before success — %s',
+                $attempt,
+                trim(preg_replace('/\s+/', ' ', $sql) ?? $sql)
+            ));
+        }
+        return $result;
+    }
+
+    /**
+     * Decide si un PDOException representa un error transitorio que vale
+     * la pena reintentar. Está limitado a códigos específicos para no
+     * meterse en loops con errores reales (sintaxis, constraints, etc.).
+     */
+    private function isTransientError(PDOException $e): bool
+    {
+        $code = $e->errorInfo[1] ?? null;
+        if ($this->driver === 'mysql') {
+            return in_array($code, [2006, 2013, 1205, 1213], true);
+        }
+        if ($this->driver === 'sqlite') {
+            // SQLITE_BUSY=5, SQLITE_LOCKED=6
+            return in_array($code, [5, 6], true);
+        }
+        return false;
     }
 
     /**
@@ -311,88 +368,53 @@ class Database {
         return $this->execute($sql, array_values($row));
     }
 
-    // ─── Schema bootstrap legacy (solo SQLite — Fase 2 reemplaza esto) ─
+    /**
+     * Helper para la tabla `settings` (key-value). Reemplaza el patrón
+     * legacy `INSERT OR REPLACE INTO settings (key, value, updated_at)
+     * VALUES (?, ?, datetime('now'))` que vivía en ~12 sitios.
+     * Cross-driver: usa upsert() internamente.
+     */
+    public function setting(string $key, string $value): int {
+        return $this->upsert(
+            'settings',
+            ['key' => $key, 'value' => $value, 'updated_at' => date('Y-m-d H:i:s')],
+            ['key'],
+            ['value', 'updated_at']
+        );
+    }
 
     /**
-     * Inicializa el schema legacy de SQLite. Para MySQL es un no-op:
-     * Phase 2 (P7.2) introduce el migrator versionado y este método será
-     * eliminado.
+     * Helper "set only if not exists" para settings. Reemplaza
+     * `INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`.
+     */
+    public function settingIfMissing(string $key, string $value): int {
+        return $this->upsert(
+            'settings',
+            ['key' => $key, 'value' => $value, 'updated_at' => date('Y-m-d H:i:s')],
+            ['key'],
+            []
+        );
+    }
+
+    /**
+     * Initializa el schema vía el Migrator versionado. Idempotente:
+     * crea schema_migrations si no existe y aplica las migraciones
+     * pendientes. Sustituye al antiguo initSchema() que ejecutaba
+     * schema.sql crudo.
+     *
+     * Lo llaman bootstrap.php y los CLIs para garantizar que la DB
+     * está al día antes de servir requests.
      */
     public function initSchema(): void {
-        if ($this->driver !== 'sqlite') {
-            // En MySQL la inicialización corre vía Migrator (P7.2). El
-            // setup wizard (P7.4) llama al migrator explícitamente; el
-            // boot normal ya no necesita tocar el schema.
+        if (!class_exists('Migrator')) {
+            // Migrator vive en lib/Migrator.php — el autoloader debería
+            // encontrarlo. Si no está disponible (test minimal), abortamos
+            // silenciosamente.
             return;
         }
-
-        // 1. Migraciones sobre tablas existentes (si las hay)
-        $this->runMigrations();
-
-        // 2. Schema completo — tolerante a fallos por statement
-        $schemaPath = dirname(__DIR__) . '/database/schema.sql';
-        if (file_exists($schemaPath)) {
-            $sql = file_get_contents($schemaPath);
-            $statements = $this->splitSqlStatements($sql);
-            foreach ($statements as $stmt) {
-                try {
-                    $this->pdo->exec($stmt);
-                } catch (Throwable $e) {
-                    // Ignorar fallos por statement (IF NOT EXISTS que no aplica,
-                    // índices sobre columnas aún no migradas, etc.)
-                }
-            }
-        }
-
-        // 3. Repetir migraciones por si alguna no aplicó por el orden
-        $this->runMigrations();
-    }
-
-    /**
-     * Parte un dump SQL en statements individuales, respetando strings.
-     * Tolerante a strings con ';' internos.
-     */
-    private function splitSqlStatements(string $sql): array {
-        $sql = preg_replace('/^\s*--.*$/m', '', $sql) ?? $sql;
-        $parts = preg_split('/;\s*\n/', $sql) ?: [];
-        $out = [];
-        foreach ($parts as $p) {
-            $p = trim(rtrim(trim($p), ';'));
-            if ($p !== '') $out[] = $p;
-        }
-        return $out;
-    }
-
-    /**
-     * Migraciones defensive ad-hoc — pre-P7. Solo se aplican en SQLite.
-     * Phase 2 (P7.2) reemplaza este método por el Migrator versionado.
-     */
-    private function runMigrations(): void {
-        if ($this->driver !== 'sqlite') return;
-
-        $migrations = [
-            "ALTER TABLE audits ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE audits ADD COLUMN lang TEXT NOT NULL DEFAULT 'en'",
-            "ALTER TABLE audits ADD COLUMN user_id INTEGER",
-            "ALTER TABLE audits ADD COLUMN project_id INTEGER",
-            "ALTER TABLE plans ADD COLUMN max_projects INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE audits ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0",
-        ];
-        $seedLanguages = [
-            ['en', 'English', 'English', 0],
-            ['es', 'Spanish', 'Español', 1],
-        ];
-        foreach ($migrations as $sql) {
-            try { $this->pdo->exec($sql); } catch (Throwable $e) { /* columna ya existe */ }
-        }
-        try {
-            $stmt = $this->pdo->prepare(
-                "INSERT OR IGNORE INTO languages (code, name, native_name, is_active, is_public, sort_order) VALUES (?, ?, ?, 1, 1, ?)"
-            );
-            foreach ($seedLanguages as [$code, $name, $native, $order]) {
-                $stmt->execute([$code, $name, $native, $order]);
-            }
-        } catch (Throwable $e) { /* tabla aún no creada */ }
+        $migrator = new Migrator($this);
+        $migrator->bootstrap();
+        $migrator->up();
     }
 
     // Prevenir clonación y deserialización

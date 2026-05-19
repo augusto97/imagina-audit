@@ -87,10 +87,6 @@ switch ($endpoint) {
         require __DIR__ . '/diag.php';
         break;
 
-    case 'setup':
-        require __DIR__ . '/setup.php';
-        break;
-
     case 'setup/status':
         require __DIR__ . '/setup/status.php';
         break;

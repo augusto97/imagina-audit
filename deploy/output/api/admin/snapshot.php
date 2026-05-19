@@ -44,19 +44,8 @@ if ($method === 'POST') {
 }
 AuditAccess::require($auditIdForAccess);
 
-// Auto-migration
-try {
-    $db->execute("CREATE TABLE IF NOT EXISTS wp_snapshots (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        audit_id TEXT NOT NULL,
-        source TEXT NOT NULL DEFAULT 'upload',
-        source_url TEXT,
-        snapshot_json TEXT NOT NULL,
-        analysis_json TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        UNIQUE(audit_id)
-    )");
-} catch (Throwable $e) {}
+// La tabla wp_snapshots se crea vía el migrator (0001_initial.sql).
+// El bloque ad-hoc legacy quedó removido en P7-cleanup.
 
 if ($method === 'GET') {
     $auditId = $_GET['audit_id'] ?? '';
@@ -129,18 +118,19 @@ if ($method === 'POST') {
     $snapshotJson = JsonStore::encode($snapshotData);
     $analysisJson = JsonStore::encode($analysis);
 
-    $existing = $db->queryOne("SELECT id FROM wp_snapshots WHERE audit_id = ?", [$auditId]);
-    if ($existing) {
-        $db->execute(
-            "UPDATE wp_snapshots SET source = ?, source_url = ?, snapshot_json = ?, analysis_json = ?, created_at = datetime('now') WHERE audit_id = ?",
-            ['upload', null, $snapshotJson, $analysisJson, $auditId]
-        );
-    } else {
-        $db->execute(
-            "INSERT INTO wp_snapshots (audit_id, source, source_url, snapshot_json, analysis_json) VALUES (?, ?, ?, ?, ?)",
-            [$auditId, 'upload', null, $snapshotJson, $analysisJson]
-        );
-    }
+    $db->upsert(
+        'wp_snapshots',
+        [
+            'audit_id' => $auditId,
+            'source' => 'upload',
+            'source_url' => null,
+            'snapshot_json' => $snapshotJson,
+            'analysis_json' => $analysisJson,
+            'created_at' => date('Y-m-d H:i:s'),
+        ],
+        ['audit_id'],
+        ['source', 'source_url', 'snapshot_json', 'analysis_json', 'created_at']
+    );
 
     // Re-run full audit with snapshot data injected
     $reauditResult = null;

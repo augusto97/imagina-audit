@@ -199,24 +199,28 @@ if ($dryRun) {
 
 // Aplicación real — insertamos/actualizamos vía upsert.
 // Envuelto en transacción para que un error a mitad no deje la DB mediopatida.
-$pdo = $db->getPdo();
-$pdo->beginTransaction();
 try {
-    $upsert = $pdo->prepare(
-        "INSERT INTO translations (lang, namespace, key, value, source, ai_provider, reviewed)
-         VALUES (?, ?, ?, ?, 'import', NULL, 1)
-         ON CONFLICT(lang, namespace, key) DO UPDATE SET
-            value = excluded.value,
-            source = 'import',
-            reviewed = 1,
-            updated_at = datetime('now')"
-    );
-    foreach ($toApply as $row) {
-        $upsert->execute([$code, $row['namespace'], $row['key'], $row['value']]);
-    }
-    $pdo->commit();
+    $db->transaction(function ($db) use ($code, $toApply) {
+        $now = date('Y-m-d H:i:s');
+        foreach ($toApply as $row) {
+            $db->upsert(
+                'translations',
+                [
+                    'lang' => $code,
+                    'namespace' => $row['namespace'],
+                    'key' => $row['key'],
+                    'value' => $row['value'],
+                    'source' => 'import',
+                    'ai_provider' => null,
+                    'reviewed' => 1,
+                    'updated_at' => $now,
+                ],
+                ['lang', 'namespace', 'key'],
+                ['value', 'source', 'reviewed', 'updated_at']
+            );
+        }
+    });
 } catch (Throwable $e) {
-    $pdo->rollBack();
     Logger::error('translations-import falló: ' . $e->getMessage());
     Response::error(Translator::t('admin_api.translations_import.apply_error'), 500);
 }

@@ -23,34 +23,103 @@ public_html/audit/
 ├── index.html            (React build)
 ├── assets/               (JS/CSS compilados)
 ├── api/                  (endpoints PHP)
-├── lib/                  (clases PHP, protegidas por .htaccess)
+├── lib/                  (clases PHP + lib/db/ con Dialects)
 ├── analyzers/            (protegidos por .htaccess)
 ├── config/               (protegidos por .htaccess)
-├── data/                 (protegidos por .htaccess)
-├── database/             (protegidos por .htaccess)
+├── data/                 (incluye `.installed` tras el wizard)
+├── database/migrations/  (NNNN_*.sql versionadas)
+├── locales/              (bundles backend + frontend.json)
+├── storage/backups/      (escribible — backups DB)
 ├── cache/                (escribible por PHP)
 └── logs/                 (escribible por PHP)
 ```
 
-La base de datos SQLite se crea automáticamente en `~/imagina_audit_data/audit.db`
-(fuera de `public_html`) si hay permisos de escritura. Si no, cae en `audit/database/audit.db`
-protegida por `.htaccess`.
+## 3. Primera instalación — wizard
 
-## 3. Variables de entorno
+Abre `https://tu-dominio/audit/setup` en el navegador. La app detecta que aún
+no está instalada y dispara un wizard de 3 pasos:
 
-Crea `public_html/audit/.env` (copia de `.env.example`) y configura:
+1. **Base de datos** — elige driver:
+   - **MySQL/MariaDB** (recomendado para producción, mínimo 5.7+ / 10.3+).
+     Crea la base y el usuario antes desde cPanel → MySQL Databases.
+     Mete host, puerto, nombre, usuario, password → click **Test connection**.
+   - **SQLite** (fallback) — la app crea `~/imagina_audit_data/audit.db` fuera
+     de `public_html` automáticamente. Sirve para dev, demos, hostings sin MySQL.
+2. **Admin** — email + password iniciales (mínimo 10 caracteres).
+3. **Review + install** — confirma. La app escribe `.env`, aplica las
+   migraciones versionadas (crea todas las tablas), guarda la cuenta admin,
+   marca como instalado y redirige a `/admin/login`.
+
+El wizard queda bloqueado tras la primera ejecución exitosa (existe
+`data/.installed`).
+
+## 4. Migración SQLite → MySQL (installs ya existentes)
+
+Si ya tienes una instalación corriendo en SQLite y quieres pasar a MySQL:
+
+1. Crea la base + usuario MySQL en cPanel.
+2. Entra al panel admin → **Base de datos**.
+3. Mete las credenciales MySQL, click **Test connection**.
+4. Click **Run migration** — la app aplica el schema en MySQL y copia todas
+   las filas en orden topológico (FKs respetadas).
+5. Click **Switch driver to MySQL** — escribe `DB_DRIVER=mysql` al `.env` y
+   recarga automáticamente. La próxima request boot-a en MySQL.
+6. El archivo SQLite queda intacto como backup hasta que lo borres.
+
+Alternativa CLI: `php database/migrate-from-sqlite.php --mysql-host=... --mysql-db=... ...`.
+
+## 5. Variables de entorno (.env)
+
+`.env` se escribe automáticamente por el wizard. Si prefieres editarlo a mano,
+copia `.env.example` a `.env` y configura:
+
+### Bloque DB (nuevo en P7)
+
+| Variable | Obligatorio | Descripción |
+|---|---|---|
+| `DB_DRIVER` | sí | `mysql` (producción) o `sqlite` (fallback) |
+| `DB_HOST` | si DB_DRIVER=mysql | Host MySQL (típico `localhost`) |
+| `DB_PORT` | si DB_DRIVER=mysql | Default 3306 |
+| `DB_NAME` | si DB_DRIVER=mysql | Nombre de la base |
+| `DB_USER` | si DB_DRIVER=mysql | Usuario con CREATE/INSERT/UPDATE/DELETE/SELECT |
+| `DB_PASSWORD` | si DB_DRIVER=mysql | Password del usuario |
+| `DB_CHARSET` | no | Default `utf8mb4` |
+| `DB_SQLITE_PATH` | no | Solo si DB_DRIVER=sqlite. Vacío = ruta auto |
+| `SLOW_QUERY_THRESHOLD_MS` | no | Default 200. Queries más lentas se loguean en `logs/`. 0 desactiva |
+| `BACKUP_RETENTION_COUNT` | no | Default 10. Backups conservados en `storage/backups/` |
+
+### Bloque general
 
 | Variable | Obligatorio | Descripción |
 |---|---|---|
 | `APP_ENV` | sí | `production` |
 | `APP_DEBUG` | sí | `false` en producción |
-| `ALLOWED_ORIGIN` | **sí** | Dominio(s) del panel admin separados por coma. Solo aplica a `/api/admin/*`. Los endpoints públicos (audit, config, health, etc.) están abiertos con `*` sin credenciales para que el widget embebible funcione desde cualquier dominio cliente. |
-| `ADMIN_PASSWORD_HASH` | sí (primer arranque) | Genera con `php -r "echo password_hash('tu-pass', PASSWORD_BCRYPT);"` |
+| `ALLOWED_ORIGIN` | **sí** | Dominio(s) del panel admin separados por coma. Solo aplica a `/api/admin/*`. Los endpoints públicos están abiertos con `*` para que el widget embebible funcione desde cualquier dominio. |
+| `ADMIN_PASSWORD_HASH` | (opcional) | Bypass el wizard. Genera con `php -r "echo password_hash('tu-pass', PASSWORD_BCRYPT);"` |
 | `GOOGLE_PAGESPEED_API_KEY` | no | Mejora cuota de PageSpeed |
 | `GOOGLE_SAFE_BROWSING_API_KEY` | no | Activa check de Safe Browsing |
 | `RATE_LIMIT_MAX_PER_HOUR` | no | Default `10` |
 | `CACHE_TTL_SECONDS` | no | Default `86400` (24h) |
 | `LEAD_NOTIFICATION_EMAIL` | no | Email para notificar nuevos leads |
+
+### Cron jobs recomendados (cPanel → Cron Jobs)
+
+```cron
+# Backup diario de la DB (mantiene los últimos BACKUP_RETENTION_COUNT)
+0 3 * * * php /home/USER/public_html/audit/cron/backup.php
+
+# Drain de la cola de audits cada 2 minutos
+*/2 * * * * php /home/USER/public_html/audit/cron/drain-queue.php
+
+# Limpieza de logs/cache viejos diaria
+0 4 * * * php /home/USER/public_html/audit/cron/cleanup.php
+
+# Refresh del Plugin Vault semanal
+0 5 * * 0 php /home/USER/public_html/audit/cron/refresh-plugin-vault.php
+
+# Actualizar base de vulnerabilidades mensual
+0 6 1 * * php /home/USER/public_html/audit/cron/update-vulnerabilities.php
+```
 
 ## 4. Permisos de archivos
 

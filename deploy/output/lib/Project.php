@@ -102,13 +102,14 @@ class Project {
             $isOk = in_array($level, ['good', 'excellent'], true);
             $existing = $current[$metricId] ?? null;
 
+            $now = $db->now();
             if ($existing === null) {
                 // Nueva métrica en el radar. Solo insertamos si requiere acción —
                 // no poblamos todo el catálogo en el checklist.
                 if ($needsAction) {
                     try {
                         $db->execute(
-                            "INSERT INTO project_checklist_items (project_id, metric_id, status, severity, user_modified, updated_at) VALUES (?, ?, 'open', ?, 0, datetime('now'))",
+                            "INSERT INTO project_checklist_items (project_id, metric_id, status, severity, user_modified, updated_at) VALUES (?, ?, 'open', ?, 0, $now)",
                             [$projectId, $metricId, $level]
                         );
                     } catch (Throwable $e) { /* UNIQUE race, ignorar */ }
@@ -122,13 +123,13 @@ class Project {
                 // (preserva 'ignored' manual y 'done' manual).
                 if (!$existing['userModified'] && $existing['status'] !== 'ignored') {
                     $db->execute(
-                        "UPDATE project_checklist_items SET status = 'done', severity = ?, completed_at = datetime('now'), updated_at = datetime('now') WHERE project_id = ? AND metric_id = ?",
+                        "UPDATE project_checklist_items SET status = 'done', severity = ?, completed_at = $now, updated_at = $now WHERE project_id = ? AND metric_id = ?",
                         [$level, $projectId, $metricId]
                     );
                 } else {
                     // Solo actualizar severity (última conocida)
                     $db->execute(
-                        "UPDATE project_checklist_items SET severity = ?, updated_at = datetime('now') WHERE project_id = ? AND metric_id = ?",
+                        "UPDATE project_checklist_items SET severity = ?, updated_at = $now WHERE project_id = ? AND metric_id = ?",
                         [$level, $projectId, $metricId]
                     );
                 }
@@ -137,13 +138,13 @@ class Project {
                 if ($existing['status'] === 'done' && !$existing['userModified']) {
                     // La habíamos marcado done automáticamente antes — re-abrir.
                     $db->execute(
-                        "UPDATE project_checklist_items SET status = 'open', severity = ?, completed_at = NULL, updated_at = datetime('now') WHERE project_id = ? AND metric_id = ?",
+                        "UPDATE project_checklist_items SET status = 'open', severity = ?, completed_at = NULL, updated_at = $now WHERE project_id = ? AND metric_id = ?",
                         [$level, $projectId, $metricId]
                     );
                 } else {
                     // Sea 'open' o 'done'/'ignored' manual del user, solo refrescar severity
                     $db->execute(
-                        "UPDATE project_checklist_items SET severity = ?, updated_at = datetime('now') WHERE project_id = ? AND metric_id = ?",
+                        "UPDATE project_checklist_items SET severity = ?, updated_at = $now WHERE project_id = ? AND metric_id = ?",
                         [$level, $projectId, $metricId]
                     );
                 }

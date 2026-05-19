@@ -33,10 +33,7 @@ function twoFaGetSetting(string $key): ?string {
 
 function twoFaSetSetting(string $key, string $value): void {
     global $db;
-    $db->execute(
-        "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
-        [$key, $value]
-    );
+    $db->setting($key, $value);
 }
 
 function twoFaDeleteSetting(string $key): void {

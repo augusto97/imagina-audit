@@ -73,10 +73,7 @@ if (!$totpValid) {
                 if ($idx !== false) {
                     // Consumir el recovery code
                     array_splice($hashes, (int) $idx, 1);
-                    $db->execute(
-                        "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
-                        ['admin_2fa_recovery_codes', json_encode($hashes)]
-                    );
+                    $db->setting('admin_2fa_recovery_codes', json_encode($hashes));
                     $recoveryValid = true;
                     Logger::info('Admin logged in con recovery code (quedan ' . count($hashes) . ')');
                 }
