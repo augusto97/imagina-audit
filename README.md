@@ -6,10 +6,11 @@ This branch holds the **ready-to-install build artifact**. Nothing else.
 
 The latest packaged build sits at the root of this branch:
 
-- **`imagina-audit-v2.0.5.zip`** (~1.2 MB) — current
+- **`imagina-audit-v2.0.6.zip`** (~1.2 MB) — current
 
 ### Changelog
 
+- **v2.0.6** — fix `/admin/vulnerabilities` empty on fresh installs: auto-seed from `data/vulnerabilities.json` when table is empty; baseline plugin list so "Refresh from API" works without prior audits; inline LIMIT/OFFSET as int casts to dodge MySQL native-prepare edge case.
 - **v2.0.5** — fix /admin/health throwing "Table sqlite_master doesn't exist" on MySQL installs (diag.php now branches by active driver for table listing + column-existence checks).
 - **v2.0.4** — fix Database retry wrapper that misread legitimate `null` results as "loop failed" (was throwing "Query failed without exception" on every dashboard load and on any optional-row lookup).
 - **v2.0.3** — persistent install (re-uploads don't re-trigger the wizard if DB+admin are intact); dashboard 500 now shows the real error in the UI.
