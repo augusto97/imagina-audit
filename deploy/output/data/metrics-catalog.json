@@ -1,0 +1,114 @@
+{
+  "modules": {
+    "security": {
+      "name": "Seguridad",
+      "metrics": [
+        { "id": "ssl_valid", "name": "Certificado SSL válido" },
+        { "id": "https_redirect", "name": "Redirección HTTP → HTTPS" },
+        { "id": "security_headers", "name": "Headers de seguridad" },
+        { "id": "directory_listing", "name": "Directory listing" },
+        { "id": "login_protection", "name": "Protección de login" },
+        { "id": "vulnerabilities", "name": "Vulnerabilidades de plugins" },
+        { "id": "powered_by_header", "name": "X-Powered-By expuesto" },
+        { "id": "server_header", "name": "Server header con versión" },
+        { "id": "wp_users_exposed", "name": "Usuarios WP enumerables" },
+        { "id": "xmlrpc_active", "name": "XML-RPC activo" }
+      ]
+    },
+    "performance": {
+      "name": "Rendimiento",
+      "metrics": [
+        { "id": "lcp", "name": "Largest Contentful Paint" },
+        { "id": "fcp", "name": "First Contentful Paint" },
+        { "id": "cls", "name": "Cumulative Layout Shift" },
+        { "id": "tbt", "name": "Total Blocking Time" },
+        { "id": "ttfb", "name": "Time to First Byte" },
+        { "id": "tti", "name": "Time to Interactive" },
+        { "id": "speed_index", "name": "Speed Index" },
+        { "id": "performance_score", "name": "PageSpeed score" },
+        { "id": "compression", "name": "Compresión GZIP/Brotli" },
+        { "id": "cache_headers", "name": "Headers de cache" }
+      ]
+    },
+    "wordpress": {
+      "name": "WordPress",
+      "metrics": [
+        { "id": "wp_detected", "name": "Es WordPress" },
+        { "id": "wp_version", "name": "Versión de WordPress" },
+        { "id": "wp_version_current", "name": "WP actualizado" },
+        { "id": "theme_name", "name": "Tema detectado" },
+        { "id": "child_theme", "name": "Usa child theme" },
+        { "id": "plugins_count", "name": "Cantidad de plugins" },
+        { "id": "plugins_outdated", "name": "Plugins desactualizados" },
+        { "id": "rest_api_exposed", "name": "REST API expone usuarios" },
+        { "id": "xmlrpc_active", "name": "XML-RPC activo" },
+        { "id": "user_enumeration", "name": "User enumeration via ?author=" },
+        { "id": "debug_mode", "name": "Debug mode visible" },
+        { "id": "sensitive_files", "name": "Archivos sensibles expuestos" }
+      ]
+    },
+    "seo": {
+      "name": "SEO",
+      "metrics": [
+        { "id": "title", "name": "Title tag" },
+        { "id": "meta_description", "name": "Meta description" },
+        { "id": "h1", "name": "H1 único" },
+        { "id": "canonical", "name": "Canonical URL" },
+        { "id": "open_graph", "name": "Open Graph tags" },
+        { "id": "twitter_cards", "name": "Twitter Cards" },
+        { "id": "schema", "name": "Datos estructurados (JSON-LD)" },
+        { "id": "sitemap", "name": "Sitemap.xml" },
+        { "id": "robots_txt", "name": "Robots.txt" },
+        { "id": "favicon", "name": "Favicon" },
+        { "id": "lang_attr", "name": "Atributo lang en HTML" },
+        { "id": "image_alts", "name": "Imágenes con alt text" },
+        { "id": "content_length", "name": "Cantidad de contenido" },
+        { "id": "analytics", "name": "Google Analytics" }
+      ]
+    },
+    "mobile": {
+      "name": "Móvil",
+      "metrics": [
+        { "id": "viewport", "name": "Viewport meta tag" },
+        { "id": "mobile_score", "name": "PageSpeed móvil" },
+        { "id": "responsive", "name": "Diseño responsive" }
+      ]
+    },
+    "infrastructure": {
+      "name": "Infraestructura",
+      "metrics": [
+        { "id": "https", "name": "HTTPS habilitado" },
+        { "id": "server", "name": "Servidor web detectado" },
+        { "id": "hosting", "name": "Proveedor de hosting" },
+        { "id": "protocol", "name": "HTTP/2 o HTTP/3" },
+        { "id": "ttfb", "name": "TTFB del servidor" },
+        { "id": "cdn", "name": "CDN detectado" },
+        { "id": "compression", "name": "Compresión activa" },
+        { "id": "php_exposed", "name": "PHP version expuesta" }
+      ]
+    },
+    "conversion": {
+      "name": "Conversión",
+      "metrics": [
+        { "id": "analytics", "name": "Google Analytics" },
+        { "id": "gtm", "name": "Google Tag Manager" },
+        { "id": "facebook_pixel", "name": "Facebook Pixel" },
+        { "id": "live_chat", "name": "Chat en vivo" },
+        { "id": "whatsapp", "name": "Botón de WhatsApp" },
+        { "id": "contact_form", "name": "Formulario de contacto" },
+        { "id": "push_notifications", "name": "Notificaciones push" },
+        { "id": "cookies_banner", "name": "Banner de cookies" },
+        { "id": "social_links", "name": "Enlaces a redes sociales" }
+      ]
+    },
+    "page_health": {
+      "name": "Salud de página",
+      "metrics": [
+        { "id": "http_status", "name": "HTTP status correcto" },
+        { "id": "broken_links", "name": "Enlaces rotos" },
+        { "id": "mixed_content", "name": "Mixed content" },
+        { "id": "redirects", "name": "Cadenas de redirects" }
+      ]
+    }
+  }
+}
