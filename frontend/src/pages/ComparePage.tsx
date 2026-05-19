@@ -65,11 +65,11 @@ export default function ComparePage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{t('public.compare_site_1')}</label>
-                      <Input {...register('url1', { required: true })} placeholder="https://tusitio.com" disabled={loading} />
+                      <Input {...register('url1', { required: true })} placeholder={t('public.compare_placeholder_site1')} disabled={loading} />
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{t('public.compare_site_2')}</label>
-                      <Input {...register('url2', { required: true })} placeholder="https://competidor.com" disabled={loading} />
+                      <Input {...register('url2', { required: true })} placeholder={t('public.compare_placeholder_site2')} disabled={loading} />
                     </div>
                   </div>
                   <Button type="submit" size="xl" className="w-full" disabled={loading}>
@@ -147,7 +147,7 @@ function CompareResults({ data, onReset }: { data: CompareData; onReset: () => v
                   <span className="font-medium">{MODULE_EMOJIS[mod.moduleId] || ''} {mod.moduleName}</span>
                   <div className="flex items-center gap-3 text-xs">
                     <span className={mod.winner === 'url1' ? 'font-bold text-[var(--accent-primary)]' : 'text-[var(--text-tertiary)]'}>{mod.score1}</span>
-                    <span className="text-[var(--text-tertiary)]">vs</span>
+                    <span className="text-[var(--text-tertiary)]">{t('public.compare_vs')}</span>
                     <span className={mod.winner === 'url2' ? 'font-bold text-violet-500' : 'text-[var(--text-tertiary)]'}>{mod.score2}</span>
                   </div>
                 </div>

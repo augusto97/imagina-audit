@@ -20,28 +20,36 @@ import { getAuditResult, getConfig } from '@/lib/api'
 import type { AuditResult } from '@/types/audit'
 
 /** Genera mensaje de WhatsApp con resumen del informe */
-function buildWhatsAppMessage(result: AuditResult, baseUrl: string): string {
-  const moduleLines = result.modules.map((m) => {
-    const emojis: Record<string, string> = {
-      security: '🛡️', performance: '⚡', seo: '🔍', wordpress: '🧩',
-      mobile: '📱', infrastructure: '🖥️', conversion: '📊',
-    }
-    return `${emojis[m.id] || '📋'} ${m.name}: ${m.score ?? '-'}/100`
-  }).join('\n')
+function buildWhatsAppMessage(
+  result: AuditResult,
+  baseUrl: string,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  lang: string,
+): string {
+  const emojis: Record<string, string> = {
+    security: '🛡️', performance: '⚡', seo: '🔍', wordpress: '🧩',
+    mobile: '📱', infrastructure: '🖥️', conversion: '📊',
+  }
+  const moduleLines = result.modules
+    .map((m) => `${emojis[m.id] || '📋'} ${m.name}: ${m.score ?? '-'}/100`)
+    .join('\n')
+  const date = new Date(result.timestamp).toLocaleDateString(lang, { day: 'numeric', month: 'short', year: 'numeric' })
 
-  return `🔍 *Auditoría Web — ${result.domain}*
-📅 ${new Date(result.timestamp).toLocaleDateString('es-CO')}
-
-📊 *Score Global: ${result.globalScore}/100*
-
-${moduleLines}
-
-⚠️ *${result.totalIssues.critical} problemas críticos* y *${result.totalIssues.warning} advertencias*.
-
-📄 Ver informe completo:
-${baseUrl}/results/${result.id}
-
-_Informe generado por Imagina Audit_`
+  return [
+    t('public.share_wa_title', { domain: result.domain }),
+    `📅 ${date}`,
+    '',
+    t('public.share_wa_score', { score: result.globalScore }),
+    '',
+    moduleLines,
+    '',
+    t('public.share_wa_issues', { critical: result.totalIssues.critical, warning: result.totalIssues.warning }),
+    '',
+    t('public.share_wa_report'),
+    `${baseUrl}/results/${result.id}`,
+    '',
+    t('public.share_wa_footer'),
+  ].join('\n')
 }
 
 export default function ResultsPage() {
@@ -73,7 +81,7 @@ export default function ResultsPage() {
   const shareWhatsApp = () => {
     if (!result) return
     const baseUrl = window.location.origin
-    const msg = buildWhatsAppMessage(result, baseUrl)
+    const msg = buildWhatsAppMessage(result, baseUrl, t, i18n.language)
     const waNumber = config.companyWhatsapp.replace(/[^0-9]/g, '')
     window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank')
   }

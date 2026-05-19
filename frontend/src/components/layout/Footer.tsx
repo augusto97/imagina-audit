@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Separator } from '@/components/ui/separator'
 import { useConfigStore } from '@/store/configStore'
 
 export default function Footer() {
+  const { t } = useTranslation()
   const { companyName, companyUrl, footer } = useConfigStore((s) => s.config)
 
   return (
@@ -39,7 +41,7 @@ export default function Footer() {
               </>
             )}
             <Link to="/admin" className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors">
-              Admin
+              {t('public.footer_admin')}
             </Link>
           </div>
         </div>

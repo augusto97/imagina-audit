@@ -40,7 +40,9 @@
     "pt": "Portugués",
     "fr": "Francés",
     "de": "Alemán",
-    "it": "Italiano"
+    "it": "Italiano",
+    "active_indicator": "Activo: {{code}}",
+    "change_aria": "Cambiar idioma"
   },
   "nav": {
     "general_section": "General",
@@ -1699,6 +1701,13 @@
     "compare_vs": "VS",
     "compare_by_module": "Comparación por Módulo",
     "compare_view_report": "Ver informe completo — {{domain}}",
-    "footer_admin": "Admin"
+    "footer_admin": "Admin",
+    "share_wa_title": "🔍 *Auditoría Web — {{domain}}*",
+    "share_wa_score": "📊 *Score Global: {{score}}/100*",
+    "share_wa_issues": "⚠️ *{{critical}} problemas críticos* y *{{warning}} advertencias*.",
+    "share_wa_report": "📄 Ver informe completo:",
+    "share_wa_footer": "_Informe generado por Imagina Audit_",
+    "compare_placeholder_site1": "https://tusitio.com",
+    "compare_placeholder_site2": "https://competidor.com"
   }
 }
