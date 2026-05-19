@@ -6,10 +6,11 @@ This branch holds the **ready-to-install build artifact**. Nothing else.
 
 The latest packaged build sits at the root of this branch:
 
-- **`imagina-audit-v2.2.2.zip`** (~1.2 MB) — current
+- **`imagina-audit-v2.2.3.zip`** (~1.2 MB) — current
 
 ### Changelog
 
+- **v2.2.3** — fix audits being scanned in English regardless of the language the visitor requested. Since v2.0.8 the architecture became queue-only: `audit.php` reads `body.lang` and sets the translator, but it never carried that lang into the job row. Later `drain-queue.php` (cron or HTTP kick) picked up the job and ran `processJob` with no lang context, so the `Translator` silently fell through to `DEFAULT_LANG = 'en'`. Every metric name, description, recommendation and imagina-solution string got frozen into `result_json` in English — even when the admin viewed the lead in a Spanish UI. Fix: persist `lang` inside `lead_data_json` and re-apply it via `Translator::setLang()` at the top of `processJob`. Existing audits keep their stored language; re-scan from the public form to refresh them.
 - **v2.2.2** — i18n completeness pass. 19 hardcoded strings extracted to `t()` across admin, public, layout and dashboard components (`AdminPage` ErrorBoundary, `DashboardPage` error/retry, `VulnerabilityManager` severity labels, `AdminLayout` collapse button, `Footer` admin link, `Header` compare button fallback, `RecentAuditsTable` score column + open-lead tooltip, `LanguageSwitcher` aria-label + active indicator, `ResultsPage` WhatsApp share message, `ComparePage` "vs" label + URL placeholders, `SettingsScoring` preview hint). 18 new translation keys added to `en.json` / `es.json` and backend mirrors. Date formatting in the admin dashboard + WhatsApp share now uses `i18n.language` instead of the hardcoded `'es-CO'` locale.
 - **v2.2.1** — fix audits stuck in queue + URLs acting "blacklisted". `CRON_SECRET_TOKEN` now auto-generates and persists in settings if missing (kicks via HTTP no longer return 403 silently on fresh installs). New rescue panel in `/admin/queue` with 4 buttons: process queue now, reset stuck running jobs, clear failure cache (all or by URL).
 - **v2.2.0** — admin UI to tune the scoring (`/admin/scoring`). Per-module include/exclude toggle, per-module critical-cap slider, exponential penalty curve config, per-metric toggle + weight, and a live preview that recalculates a recent audit with the proposed config before saving.
