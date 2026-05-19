@@ -13,22 +13,111 @@ return [
     'company_plans_url' => 'https://imaginawp.com/mensualidad',
     'logo_url' => '',
 
-    // Umbrales de scoring
-    'threshold_excellent' => 90,
-    'threshold_good' => 70,
-    'threshold_warning' => 50,
-    'threshold_critical' => 30,
+    // Umbrales de scoring — recalibrados v2.1 para reflejar la realidad de los
+    // sitios analizados. Antes "good ≥ 70" hacía que sitios con problemas
+    // reales cayeran en zona verde. Ahora "good ≥ 80" es un umbral exigente:
+    // un sitio típico con 2-3 problemas concretos cae a "warning/deficient" y
+    // el cliente percibe que sí hay algo que arreglar.
+    'threshold_excellent' => 92,
+    'threshold_good' => 80,
+    'threshold_warning' => 60,
+    'threshold_critical' => 40,
 
-    // Pesos de módulos (deben sumar 1.0)
-    'weight_wordpress' => 0.12,
-    'weight_security' => 0.20,
-    'weight_performance' => 0.18,
-    'weight_seo' => 0.13,
-    'weight_mobile' => 0.07,
+    // Pesos de módulos (deben sumar ~1.0 — el normalizer ajusta).
+    // Recalibrado v2.1: seguridad + performance + WordPress pesan más porque
+    // son lo que Imagina WP realmente resuelve. Conversion baja porque
+    // "tener Analytics instalado" no debería compensar SSL roto.
+    'weight_wordpress' => 0.15,
+    'weight_security' => 0.25,
+    'weight_performance' => 0.20,
+    'weight_seo' => 0.12,
+    'weight_mobile' => 0.06,
     'weight_infrastructure' => 0.08,
-    'weight_conversion' => 0.10,
-    'weight_page_health' => 0.12,
+    'weight_conversion' => 0.04,
+    'weight_page_health' => 0.10,
     'weight_wp_internal' => 0.10, // Solo aplica si el admin subió un wp-snapshot
+
+    // Cap del score de un módulo cuando tiene métricas críticas. Sin esto, un
+    // módulo con 1 crítica y 9 buenas saca ~85, lo que da una falsa sensación
+    // de "casi perfecto". Con cap=50 el módulo no puede pintar verde si tiene
+    // al menos una métrica crítica. Configurable por módulo desde admin.
+    'scoring_critical_cap_enabled' => true,
+    'scoring_critical_cap_per_module' => [
+        'security'       => 50, // 1 crítico = serio
+        'wordpress'      => 55,
+        'performance'    => 65,
+        'page_health'    => 65,
+        'infrastructure' => 70,
+        'seo'            => 75,
+        'mobile'         => 70,
+        'conversion'     => 80, // críticos en conversion son menos impactantes
+        'wp_internal'    => 60,
+    ],
+
+    // Penalización exponencial al score GLOBAL según número de críticos
+    // totales en el audit. Si hay muchos problemas reales el score baja
+    // notoriamente — no se promedia hacia el centro.
+    'scoring_critical_penalty_enabled' => true,
+    'scoring_critical_penalties' => [
+        // index = nro de críticos, value = puntos a restar.
+        // 0 críticos => 0 (sin penalty), 1 => -3, 2 => -8, 3 => -15, 4+ => -25
+        0, 3, 8, 15, 25,
+    ],
+
+    // Métricas / módulos excluidos del cálculo del score (siguen apareciendo
+    // en el informe como "informativas"). Editable desde /admin/scoring.
+    // Formato: array de strings.
+    //   scoring_disabled_metrics  → ["security.powered_by_header", ...]
+    //   scoring_disabled_modules  → ["backups", ...]
+    'scoring_disabled_metrics' => [],
+    'scoring_disabled_modules' => [],
+
+    // Pesos por métrica DENTRO de su módulo (defaults). Editable desde
+    // /admin/scoring para ajustar finamente. Las que no están aquí pesan 1.0.
+    // Empuja a que las métricas críticas para el negocio (SSL, headers,
+    // velocidad) pesen más que las cosméticas (X-Powered-By, etc.).
+    'scoring_metric_weights' => [
+        // Security
+        'security.ssl_valid'         => 3.0,
+        'security.security_headers'  => 2.5,
+        'security.directory_listing' => 2.0,
+        'security.login_protection'  => 1.8,
+        'security.https_redirect'    => 2.0,
+        'security.vulnerabilities'   => 3.0,
+        'security.powered_by_header' => 0.5,
+        // Performance
+        'performance.lcp'            => 3.0,
+        'performance.fcp'            => 2.0,
+        'performance.cls'            => 2.5,
+        'performance.tbt'            => 2.0,
+        'performance.ttfb'           => 2.0,
+        'performance.compression'    => 1.5,
+        // WordPress
+        'wordpress.wp_version'             => 2.5,
+        'wordpress.plugins_outdated'       => 2.5,
+        'wordpress.rest_api_exposed'       => 3.0,
+        'wordpress.xmlrpc_active'          => 1.5,
+        'wordpress.user_enumeration'       => 2.0,
+        'wordpress.debug_mode'             => 3.0,
+        'wordpress.sensitive_files'        => 3.0,
+        // SEO
+        'seo.title'                  => 2.0,
+        'seo.meta_description'       => 1.8,
+        'seo.h1'                     => 1.5,
+        'seo.sitemap'                => 1.5,
+        'seo.canonical'              => 1.2,
+        'seo.favicon'                => 0.5,
+        // Mobile
+        'mobile.viewport'            => 2.5,
+        // Infrastructure
+        'infrastructure.https'       => 2.5,
+        'infrastructure.ttfb'        => 2.0,
+        'infrastructure.cdn'         => 1.0,
+        // Conversion (todo cosmético, casi todo pesa 0.5-1)
+        'conversion.analytics'       => 1.5,
+        'conversion.contact_form'    => 1.0,
+        'conversion.facebook_pixel'  => 0.3,
+    ],
 
     // Mensajes de venta por módulo
     'sales_wordpress' => 'Con nuestros planes de soporte, mantenemos tu WordPress actualizado y seguro. Actualizamos core, plugins y temas cada semana con testing previo para evitar problemas de compatibilidad.',
