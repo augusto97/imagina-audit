@@ -357,9 +357,19 @@ try {
         }
     }
 } catch (Throwable $e) {
-    Logger::error('Error guardando auditoría: ' . $e->getMessage());
-    QueueManager::markFailed($auditId, Translator::t('api.audit.save_error'));
-    AuditProgress::failed($auditId, Translator::t('api.audit.save_error'));
+    Logger::error('Error guardando auditoría: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    // Mensaje base + detalle real para que el admin lo vea sin SSH.
+    $msg = Translator::t('api.audit.save_error');
+    if (function_exists('env') && env('APP_DEBUG', 'false') === 'true') {
+        $msg .= ' [' . $e->getMessage() . ']';
+    } else {
+        // En producción exponemos solo la primera línea del mensaje SQL
+        // (sin stack trace). Útil para diagnosticar tipos rechazados,
+        // FK rotos, etc. — sin filtrar paths del servidor.
+        $msg .= ' — ' . preg_replace('/^SQLSTATE\[\w+\](?:\s*\[\d+\])?\s*/', '', explode("\n", $e->getMessage())[0]);
+    }
+    QueueManager::markFailed($auditId, $msg);
+    AuditProgress::failed($auditId, $msg);
     exit;
 }
 
