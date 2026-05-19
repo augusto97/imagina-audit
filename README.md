@@ -6,9 +6,11 @@ This branch holds the **ready-to-install build artifact**. Nothing else.
 
 The latest packaged build sits at the root of this branch:
 
-- **`imagina-audit-v2.0.6.zip`** (~1.2 MB) — current
+- **`imagina-audit-v2.0.7.zip`** (~1.2 MB) — current
 
 ### Changelog
+
+- **v2.0.7** — fix "Error guardando el resultado" mid-scan on MySQL. The four columns that store gzipped JSON (`audits.result_json`, `audits.waterfall_json`, `wp_snapshots.snapshot_json`, `wp_snapshots.analysis_json`) were declared as `JSON`; MySQL rejected the binary gzip bytes. New migration `0003_json_columns_to_blob` widens them to `LONGBLOB`. Audit failure toast now surfaces the underlying DB error instead of the generic placeholder.
 
 - **v2.0.6** — fix `/admin/vulnerabilities` empty on fresh installs: auto-seed from `data/vulnerabilities.json` when table is empty; baseline plugin list so "Refresh from API" works without prior audits; inline LIMIT/OFFSET as int casts to dodge MySQL native-prepare edge case.
 - **v2.0.5** — fix /admin/health throwing "Table sqlite_master doesn't exist" on MySQL installs (diag.php now branches by active driver for table listing + column-existence checks).
