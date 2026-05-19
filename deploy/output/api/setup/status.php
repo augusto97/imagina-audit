@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 $installFlag = dirname(__DIR__, 2) . '/data/.installed';
-$installed = is_file($installFlag);
+$flagExists = is_file($installFlag);
 $hasEnv = is_file(dirname(__DIR__, 2) . '/.env');
 
 $dbDriver = function_exists('env') ? strtolower(env('DB_DRIVER', 'sqlite')) : 'sqlite';
@@ -60,8 +60,28 @@ try {
     $dbError = $e->getMessage();
 }
 
+// "Installed" = el flag está, O la app ya quedó funcionalmente lista (DB ok +
+// migraciones aplicadas + admin con password). Esto sobrevive scenarios donde
+// el .installed se pierde — re-upload del zip, hosts que limpian /data/ en
+// migraciones, restore desde backup, etc.
+$installed = $flagExists || ($dbConnected && $migrationsApplied > 0 && $hasAdmin);
+
+// Auto-restore del flag si la app está funcional pero el archivo no está.
+// Evita que el siguiente boot vuelva a redirigir al wizard.
+if ($installed && !$flagExists) {
+    @mkdir(dirname($installFlag), 0755, true);
+    @file_put_contents($installFlag, json_encode([
+        'installedAt' => date('c'),
+        'driver' => $dbDriver,
+        'restoredFromState' => true,
+        'note' => 'Reconstructed: flag missing but DB+admin present.',
+    ], JSON_PRETTY_PRINT));
+    @chmod($installFlag, 0600);
+}
+
 Response::success([
     'installed' => $installed,
+    'flagExists' => $flagExists,
     'hasEnv' => $hasEnv,
     'dbDriver' => $dbDriver,
     'dbConnected' => $dbConnected,

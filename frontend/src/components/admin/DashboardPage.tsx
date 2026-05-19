@@ -30,18 +30,41 @@ export default function DashboardPage() {
   const { t } = useTranslation()
   const { fetchDashboard } = useAdmin()
   const [data, setData] = useState<DashboardData | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
-    const d = await fetchDashboard()
-    if (d) setData(d as DashboardData)
+    setError(null)
+    try {
+      const d = await fetchDashboard()
+      if (d) setData(d as DashboardData)
+    } catch (e: unknown) {
+      // El backend pone el detalle real en la response (e.response.data.error)
+      // — lo mostramos para que el admin no tenga que abrir DevTools.
+      const axiosErr = e as { response?: { data?: { error?: string } } }
+      setError(axiosErr.response?.data?.error ?? String(e))
+    }
     setLastUpdated(new Date())
     setRefreshing(false)
   }, [fetchDashboard])
 
   useEffect(() => { load() }, [load])
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <h2 className="text-base font-bold text-red-800 mb-2">Dashboard error</h2>
+          <pre className="text-xs whitespace-pre-wrap font-mono text-red-700 bg-red-100 rounded p-3 overflow-x-auto">{error}</pre>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => load(true)}>
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   if (!data) return <DashboardSkeleton />
 
