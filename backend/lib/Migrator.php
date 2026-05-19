@@ -279,7 +279,9 @@ class Migrator
         $replacements = $this->driver === 'mysql'
             ? [
                 '{{NOW}}'           => 'CURRENT_TIMESTAMP',
-                '{{AUTO_PK}}'       => 'BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY',
+                // BIGINT (signed) para que coincida con las columnas FK que
+                // referencian este PK; UNSIGNED rompía MySQL FK constraint 1005.
+                '{{AUTO_PK}}'       => 'BIGINT AUTO_INCREMENT PRIMARY KEY',
                 '{{BOOL}}'          => 'TINYINT(1)',
                 '{{JSON}}'          => 'JSON',
                 '{{INT}}'           => 'INT',

@@ -46,7 +46,7 @@ class MysqlDialect implements Dialect
 
     public function jsonType(): string { return 'JSON'; }
 
-    public function autoIncrementPk(): string { return 'BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY'; }
+    public function autoIncrementPk(): string { return 'BIGINT AUTO_INCREMENT PRIMARY KEY'; }
 
     public function enforceForeignKeys(): string { return 'SET FOREIGN_KEY_CHECKS = 1'; }
 

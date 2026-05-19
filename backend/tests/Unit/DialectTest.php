@@ -55,7 +55,9 @@ final class DialectTest extends TestCase
     #[Test]
     public function auto_pk_returns_driver_specific_syntax(): void
     {
-        $this->assertSame('BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY', (new MysqlDialect())->autoIncrementPk());
+        // BIGINT (signed) — sin UNSIGNED para que coincida con los FK
+        // que referencian este PK; UNSIGNED causaba MySQL 1005.
+        $this->assertSame('BIGINT AUTO_INCREMENT PRIMARY KEY', (new MysqlDialect())->autoIncrementPk());
         $this->assertSame('INTEGER PRIMARY KEY AUTOINCREMENT', (new SqliteDialect())->autoIncrementPk());
     }
 
