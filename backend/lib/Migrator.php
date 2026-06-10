@@ -210,11 +210,13 @@ class Migrator
     {
         $sql = $this->preprocess(file_get_contents($mig['file']));
         $statements = $this->splitStatements($sql);
-        $this->runStatements($statements);
-        $this->db->execute(
-            "INSERT INTO schema_migrations (version, name) VALUES (?, ?)",
-            [$mig['version'], $mig['name']]
-        );
+        // En SQLite el INSERT a schema_migrations queda dentro de la
+        // misma transacción que runStatements para evitar la ventana
+        // "aplicada pero no registrada" si crashea PHP entre los dos.
+        // (En MySQL la DDL es autocommit, no hay nada que podamos hacer.)
+        $registerSql = "INSERT INTO schema_migrations (version, name) VALUES (?, ?)";
+        $registerParams = [$mig['version'], $mig['name']];
+        $this->runStatements($statements, fn() => $this->db->execute($registerSql, $registerParams));
     }
 
     private function revertMigration(array $mig): void
@@ -233,7 +235,7 @@ class Migrator
      * MySQL hace autocommit en DDL así que cada CREATE/ALTER va por su
      * cuenta. SQLite sí soporta DDL transaccional y lo aprovechamos.
      */
-    private function runStatements(array $statements): void
+    private function runStatements(array $statements, ?callable $extra = null): void
     {
         $pdo = $this->db->getPdo();
         if ($this->driver === 'sqlite') {
@@ -243,6 +245,11 @@ class Migrator
                     if (trim($stmt) === '') continue;
                     $pdo->exec($stmt);
                 }
+                // Hook opcional para que applyMigration registre la
+                // migración aplicada dentro de la misma transacción —
+                // sin esto había una ventana "aplicada pero no registrada"
+                // si crashea PHP justo después del commit del schema.
+                if ($extra) $extra();
                 $pdo->commit();
             } catch (Throwable $e) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -250,11 +257,56 @@ class Migrator
             }
         } else {
             // MySQL: autocommit en DDL. Sin protección transaccional
-            // pero seguimos parando al primer error.
+            // pero seguimos parando al primer error. Adicional:
+            // emulamos `CREATE INDEX IF NOT EXISTS` (sintaxis MariaDB-only,
+            // Oracle MySQL 5.7/8.0 lo rechaza con syntax error) consultando
+            // information_schema antes de ejecutar.
             foreach ($statements as $stmt) {
-                if (trim($stmt) === '') continue;
+                $stmt = trim($stmt);
+                if ($stmt === '') continue;
+                if ($this->shouldSkipMysqlIndex($stmt)) continue;
+                // Reescribir el CREATE INDEX IF NOT EXISTS a CREATE INDEX
+                // simple — el "IF NOT EXISTS" ya lo simulamos arriba.
+                $stmt = preg_replace(
+                    '/^CREATE\s+(UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\s+/i',
+                    'CREATE $1INDEX ',
+                    $stmt
+                ) ?? $stmt;
                 $pdo->exec($stmt);
             }
+            // MySQL DDL es autocommit — no podemos meter el INSERT a
+            // schema_migrations en la misma transacción que el schema.
+            // Lo ejecutamos como statement final aparte.
+            if ($extra) $extra();
+        }
+    }
+
+    /**
+     * Detecta `CREATE INDEX IF NOT EXISTS X ON Y(...)` y consulta
+     * information_schema para saber si ya existe. Retorna true si hay que
+     * skipearlo. MariaDB soporta la sintaxis nativa, pero Oracle MySQL no:
+     * sin esta emulación, todo re-run de una migración tras fallo parcial
+     * de DDL (MySQL no es transaccional) muere con "Duplicate key name".
+     */
+    private function shouldSkipMysqlIndex(string $stmt): bool
+    {
+        if (!preg_match('/^CREATE\s+(?:UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\s+(\S+)\s+ON\s+(\S+)\s*\(/i', $stmt, $m)) {
+            return false;
+        }
+        $indexName = trim($m[1], '`"\'');
+        $tableName = trim($m[2], '`"\'');
+        try {
+            $exists = $this->db->scalar(
+                "SELECT COUNT(*) FROM information_schema.statistics
+                 WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?",
+                [$tableName, $indexName]
+            );
+            return ((int) $exists) > 0;
+        } catch (Throwable $e) {
+            // Si la consulta falla (perm raro), dejamos que el CREATE
+            // intente — peor caso re-lanza duplicado y la migración para,
+            // pero al menos no enmascaramos un error real.
+            return false;
         }
     }
 

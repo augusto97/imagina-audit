@@ -15,7 +15,29 @@
 require_once dirname(__DIR__) . '/bootstrap.php';
 
 $installFlag = dirname(__DIR__, 2) . '/data/.installed';
-if (is_file($installFlag)) {
+
+// Mismo guard que install.php (ver explicación allí). Sin esto, si el flag
+// desaparece, este endpoint se vuelve un escáner de puertos interno
+// no-autenticado: cualquiera puede probar conexiones MySQL a host:port
+// arbitrarios y el error de conexión filtra info de reachability.
+function _testDbAlreadyInstalled(string $installFlag): bool {
+    if (is_file($installFlag)) return true;
+    try {
+        $db = Database::getInstance();
+        try {
+            $migrator = new Migrator($db);
+            $migrator->bootstrap();
+            $applied = $migrator->status()['totalApplied'] ?? 0;
+            if ($applied <= 0) return false;
+        } catch (Throwable $e) { return false; }
+        $envHash = function_exists('env') ? env('ADMIN_PASSWORD_HASH', '') : '';
+        if ($envHash !== '') return true;
+        $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'admin_password_hash'");
+        return $row !== null && !empty($row['value']);
+    } catch (Throwable $e) { return false; }
+}
+
+if (_testDbAlreadyInstalled($installFlag)) {
     Response::error('Setup already completed', 403);
 }
 

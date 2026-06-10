@@ -218,6 +218,16 @@ class Database {
                 if (!$this->isTransientError($e) || $attempt + 1 >= $maxAttempts) {
                     throw $e;
                 }
+                // Dentro de una transacción no podemos reintentar statements
+                // sueltos: un deadlock (MySQL 1213) ya hizo rollback implícito
+                // de TODA la transacción. Re-ejecutar este statement en
+                // autocommit produce escritura parcial fuera de la
+                // transacción y el commit() posterior lanza "no active
+                // transaction". El caller (el bloque transaction()) debe
+                // reintentar la transacción completa, no nosotros.
+                if ($this->pdo->inTransaction()) {
+                    throw $e;
+                }
                 // Backoff: 100ms, 200ms, 400ms
                 $backoffMs = 100 * (1 << $attempt);
                 usleep($backoffMs * 1000);

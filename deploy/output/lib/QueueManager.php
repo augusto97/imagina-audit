@@ -75,12 +75,39 @@ class QueueManager {
                 [$url, $db->nowMinus($windowMin * 60)]
             );
             if ($row && !empty($row['error_message'])) {
-                return $row['error_message'];
+                $msg = $row['error_message'];
+                // No envenenamos el cache con errores de infraestructura.
+                // Causa raíz del bug v2.2.1: un "Job huérfano…" o "Error
+                // guardando el resultado" hacía que la URL apareciera
+                // "blacklisteada" 10 min, aunque el sitio estaba ok. La
+                // mitigación de aquel commit (panel de rescate manual) era
+                // el síntoma — esto es la causa.
+                if (self::isInfrastructureError($msg)) return null;
+                return $msg;
             }
         } catch (Throwable $e) {
             Logger::warning('findRecentFailure falló: ' . $e->getMessage());
         }
         return null;
+    }
+
+    /**
+     * Decide si un error_message representa un fallo de infraestructura
+     * (cosa nuestra) en vez de un fallo del sitio auditado. Para los
+     * primeros, no envenenamos el failure-cache: que la próxima request
+     * lo intente de nuevo.
+     */
+    public static function isInfrastructureError(string $msg): bool {
+        $needles = [
+            'Job huérfano',
+            'Error guardando',
+            'Abandonado tras',
+            'proceso PHP murió',
+        ];
+        foreach ($needles as $n) {
+            if (stripos($msg, $n) !== false) return true;
+        }
+        return false;
     }
 
     /**
@@ -194,13 +221,31 @@ class QueueManager {
             }
         }
 
-        // Intento 2: curl HTTP self-call con timeout 1s.
+        // Intento 2: curl HTTP self-call con timeout 1s. La URL base se
+        // resuelve desde settings (APP_URL) — no desde HTTP_HOST porque ese
+        // header es spoofeable por el cliente, y aquí estamos pasando el
+        // token de cron en la querystring. Un Host forjado contra un vhost
+        // que aceptara el catch-all enrutaría el token a un servidor del
+        // atacante. Si no hay APP_URL configurado, fallback a localhost
+        // (que requiere que el server escuche allí, pero al menos no
+        // filtra el token a fuera).
         if (function_exists('curl_init')) {
             $token = self::ensureCronToken(); // auto-genera si no existe
             if ($token === '') return;
-            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-            $url = "$scheme://$host/cron/drain-queue.php?token=" . urlencode($token);
+
+            $base = '';
+            try {
+                $base = (string) Database::getInstance()->setting('app_url', '');
+            } catch (Throwable $e) { /* DB no disponible */ }
+            $base = rtrim($base, '/');
+            if ($base === '') {
+                // Fallback: usar SERVER_NAME (config del vhost, no HTTP_HOST).
+                $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $name = $_SERVER['SERVER_NAME'] ?? 'localhost';
+                $base = "$scheme://$name";
+            }
+
+            $url = "$base/cron/drain-queue.php?token=" . urlencode($token);
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
@@ -304,57 +349,64 @@ class QueueManager {
      */
     public static function dequeueNext(): ?array {
         $db = Database::getInstance();
-        $pdo = $db->getPdo();
 
         try {
-            $pdo->beginTransaction();
-
-            // Re-verificar slot dentro de la transacción
+            // Check de capacidad fuera de transacción — es solo una pista
+            // (race-y por naturaleza); la atomicidad real del claim vive en
+            // el UPDATE condicional de abajo.
             $running = (int) $db->scalar("SELECT COUNT(*) FROM audit_jobs WHERE status = 'running'");
             $max = self::getMaxConcurrent();
-            if ($running >= $max) {
-                $pdo->rollback();
-                return null;
-            }
+            if ($running >= $max) return null;
 
-            $job = $db->queryOne(
-                "SELECT * FROM audit_jobs WHERE status = 'queued' ORDER BY created_at ASC LIMIT 1"
-            );
-            if (!$job) {
-                $pdo->rollback();
-                return null;
-            }
-
-            // Defensa: si el job ya superó max attempts, marcarlo failed y pasar.
-            // Ocurre si un job quedó running, se reapeó, se re-encoló manual y
-            // falla de nuevo. No queremos retry eterno de URLs problemáticas.
+            // Loop: leemos el primer 'queued', intentamos claim atómico con
+            // UPDATE condicional (`AND status='queued'`). Si rowCount() es 0,
+            // otro worker se lo llevó — probamos con el siguiente. Sin esto,
+            // dos drainers (cron + kickDrain) toman el mismo job, lo procesan
+            // doble, y el segundo INSERT en `audits` falla con PK duplicada
+            // → envenena el failure-cache. Causa raíz del bug v2.2.1 que
+            // mitigamos con el panel de rescate.
             $defaults = require dirname(__DIR__) . '/config/defaults.php';
             $maxAttempts = (int) ($defaults['audit_max_attempts'] ?? 3);
-            $now = $db->now();
-            if (((int) $job['attempts']) >= $maxAttempts) {
-                // CONCAT funciona en MySQL y SQLite (vía sqlite_compat); para
-                // evitar la dependencia, computamos el mensaje en PHP.
-                $msg = 'Abandonado tras ' . (int) $job['attempts'] . ' intentos.';
-                $db->execute(
-                    "UPDATE audit_jobs SET status = 'failed', error_message = ?, completed_at = $now WHERE id = ?",
-                    [$msg, $job['id']]
+            $maxProbes = 20;  // defensa anti loop infinito
+            for ($i = 0; $i < $maxProbes; $i++) {
+                $job = $db->queryOne(
+                    "SELECT * FROM audit_jobs WHERE status = 'queued' ORDER BY created_at ASC LIMIT 1"
                 );
-                $pdo->commit();
-                AuditProgress::failed($job['audit_id'], 'El análisis falló repetidamente y fue abandonado. Contacta a soporte si persiste.');
-                // Recursive call para intentar el siguiente; evita bucle porque
-                // este job ya se marcó failed y no volverá a salir del query.
-                return self::dequeueNext();
-            }
+                if (!$job) return null;
 
-            $db->execute(
-                "UPDATE audit_jobs SET status = 'running', started_at = $now, attempts = attempts + 1 WHERE id = ?",
-                [$job['id']]
-            );
-            $pdo->commit();
-            $job['attempts'] = ((int) $job['attempts']) + 1;
-            return $job;
+                $now = $db->now();
+                if (((int) $job['attempts']) >= $maxAttempts) {
+                    // El job ya gastó sus intentos — claim condicional para
+                    // marcarlo failed y seguir.
+                    $msg = 'Abandonado tras ' . (int) $job['attempts'] . ' intentos.';
+                    $marked = $db->execute(
+                        "UPDATE audit_jobs SET status = 'failed', error_message = ?, completed_at = $now WHERE id = ? AND status = 'queued'",
+                        [$msg, $job['id']]
+                    );
+                    if ($marked > 0) {
+                        AuditProgress::failed($job['audit_id'], 'El análisis falló repetidamente y fue abandonado. Contacta a soporte si persiste.');
+                    }
+                    continue;
+                }
+
+                // Claim atómico: solo gana el primer worker que ejecute el
+                // UPDATE. rowCount=1 → es nuestro; rowCount=0 → otro worker
+                // se adelantó, probar siguiente.
+                $claimed = $db->execute(
+                    "UPDATE audit_jobs SET status = 'running', started_at = $now, attempts = attempts + 1 WHERE id = ? AND status = 'queued'",
+                    [$job['id']]
+                );
+                if ($claimed === 0) continue;
+
+                $job['status'] = 'running';
+                $job['attempts'] = ((int) $job['attempts']) + 1;
+                $job['started_at'] = date('Y-m-d H:i:s');
+                return $job;
+            }
+            // Si tras 20 probes no logramos claim, probablemente hay
+            // contention extrema o jobs corruptos — el cron volverá a probar.
+            return null;
         } catch (Throwable $e) {
-            try { $pdo->rollback(); } catch (Throwable $e2) {}
             Logger::error('dequeueNext falló: ' . $e->getMessage());
             return null;
         }

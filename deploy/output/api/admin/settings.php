@@ -98,7 +98,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'auditMaxAttempts'         => (int) ($dbSettings['audit_max_attempts'] ?? $defaults['audit_max_attempts'] ?? 3),
 
             'systemTotalRamMb' => (int) ($dbSettings['system_total_ram_mb'] ?? 0),
-            'googlePagespeedApiKey' => $dbSettings['google_pagespeed_api_key'] ?? '',
+            // Consistencia con el resto de keys: enmascarar también la de PSI.
+            // El PUT corresponiente debe ignorar el valor si llega con
+            // bullets (no sobreescribir con placeholder).
+            'googlePagespeedApiKey' => !empty($dbSettings['google_pagespeed_api_key']) ? '••••••••' : '',
             'defaultAiProvider'      => $dbSettings['default_ai_provider']       ?? 'claude',
             'openaiApiKey'           => !empty($dbSettings['openai_api_key']) ? '••••••••' : '',
             'openaiModel'            => $dbSettings['openai_model']              ?? 'gpt-4o-mini',
@@ -149,13 +152,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 continue;
             }
             // Tampoco pisar las API keys con el placeholder de bullets
-            if (in_array($key, ['openaiApiKey', 'anthropicApiKey', 'googleTranslateApiKey'], true)
+            // No sobreescribir keys ya guardadas si llegan enmascaradas
+            // o vacías. googlePagespeedApiKey se añadió aquí cuando empezamos
+            // a enmascararla también en el GET.
+            if (in_array($key, ['openaiApiKey', 'anthropicApiKey', 'googleTranslateApiKey', 'googlePagespeedApiKey'], true)
                 && ($value === '••••••••' || $value === '')) {
                 continue;
             }
 
             // Cambio de contraseña admin
             if ($key === 'adminPassword' && !empty($value)) {
+                // Mismo mínimo que el wizard de install: 10 chars. Antes el
+                // PUT aceptaba cualquier longitud > 0, contradiciendo el
+                // install.
+                if (strlen($value) < 10) {
+                    Response::error(Translator::t('admin_api.settings.password_too_short'), 400);
+                }
                 $hash = password_hash($value, PASSWORD_BCRYPT);
                 $db->setting('admin_password_hash', $hash);
                 continue;

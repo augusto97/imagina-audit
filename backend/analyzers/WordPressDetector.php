@@ -9,16 +9,18 @@ class WordPressDetector {
     private array $headers;
     private HtmlParser $parser;
     private bool $isWordPress = false;
+    private array $soft404;  // ['active' => bool, ...] del orchestrator
 
     /** Datos detectados expuestos para otros analyzers */
     private ?string $detectedWpVersion = null;
     private array $detectedPlugins = [];
     private array $detectedThemeInfo = ['slug' => null, 'name' => null, 'version' => null, 'childTheme' => false];
 
-    public function __construct(string $url, string $html, array $headers) {
+    public function __construct(string $url, string $html, array $headers, array $soft404 = ['active' => false]) {
         $this->url = rtrim($url, '/');
         $this->html = $html;
         $this->headers = $headers;
+        $this->soft404 = $soft404;
         $this->parser = new HtmlParser();
         $this->parser->loadHtml($html);
     }
@@ -399,14 +401,23 @@ class WordPressDetector {
     }
 
     /**
-     * Verifica si hay errores PHP visibles
+     * Verifica si hay errores PHP visibles. Antes usábamos str_contains
+     * con palabras sueltas ("Warning:", "Notice:") sobre todo el HTML, lo
+     * que producía masivos falsos positivos: cualquier página con texto
+     * legítimo ("Warning:", "Notice:") o un plugin que mencionara
+     * "WP_DEBUG" en JS inline marcaba el sitio como crítico.
+     * Ahora exigimos el patrón completo de error PHP:
+     *   <b>Fatal error</b>:  ...mensaje... in /path on line N
+     * que es lo que PHP emite cuando display_errors=On.
      */
     private function checkDebugMode(): bool {
-        $patterns = ['Fatal error:', 'Warning:', 'Notice:', 'WP_DEBUG', 'Parse error:', 'Deprecated:'];
-        foreach ($patterns as $pattern) {
-            if (str_contains($this->html, $pattern)) {
-                return true;
-            }
+        // Patrón de error PHP estándar — incluye "in /path/ on line N".
+        if (preg_match('/(?:<b>)?(Fatal error|Warning|Notice|Parse error|Deprecated)(?:<\/b>)?:\s+[^<]{4,}\s+in\s+\/[^\s<]+\s+on\s+line\s+\d+/i', $this->html)) {
+            return true;
+        }
+        // O el bloque típico de stack trace que PHP emite.
+        if (str_contains($this->html, 'Stack trace:') && str_contains($this->html, '#0 ')) {
+            return true;
         }
         return false;
     }
@@ -461,6 +472,13 @@ class WordPressDetector {
      * Verifica archivos sensibles accesibles
      */
     private function checkSensitiveFiles(): array {
+        // Si soft-404 está activo, no podemos distinguir archivo real de
+        // inexistente — antes este check marcaba los 8 archivos como
+        // "expuestos" y le pegaba un -240 al score, generando un informe
+        // catastrófico ante un prospecto cuando el sitio simplemente no
+        // tiene un 404 configurado. Devolver lista vacía es honesto.
+        if (!empty($this->soft404['active'])) return [];
+
         $filesToCheck = [
             '/wp-config.php.bak',
             '/wp-config.old',
@@ -477,10 +495,37 @@ class WordPressDetector {
         $responses = Fetcher::multiGet($urls, 3);
         $found = [];
         foreach ($filesToCheck as $file) {
-            if (($responses[$file]['statusCode'] ?? 0) === 200) $found[] = $file;
+            // Validar firma de contenido además del status code:
+            // - .env: contiene KEY=VALUE
+            // - .bak/.old (wp-config): contiene "define(" o "DB_"
+            // - backup.zip: empieza con magic bytes ZIP (PK)
+            // - debug.log/error_log: contiene marca de error
+            $resp = $responses[$file] ?? null;
+            if (!$resp || ($resp['statusCode'] ?? 0) !== 200) continue;
+            if (!self::sensitiveFileSignatureMatches($file, $resp['body'] ?? '')) continue;
+            $found[] = $file;
         }
 
         return $found;
+    }
+
+    /**
+     * Valida que el body de la respuesta contenga firma del archivo
+     * sensible esperado, en vez de solo confiar en status 200. Mata los
+     * falsos positivos restantes cuando el server-side reescribe paths
+     * desconocidos a una página genérica.
+     */
+    private static function sensitiveFileSignatureMatches(string $path, string $body): bool {
+        if ($body === '') return false;
+        $head = substr($body, 0, 4096);
+        return match (true) {
+            str_ends_with($path, '/.env') => (bool) preg_match('/^[A-Z_][A-Z0-9_]*\s*=/m', $head),
+            str_contains($path, 'wp-config') => str_contains($head, 'DB_') || str_contains($head, 'define('),
+            str_contains($path, '.zip') => str_starts_with($body, 'PK'),
+            str_contains($path, '.sql') => (bool) preg_match('/(CREATE TABLE|INSERT INTO|--\s)/i', $head),
+            str_contains($path, 'debug.log') || str_contains($path, 'error_log') => (bool) preg_match('/(PHP (Fatal|Warning|Notice|Parse) error|Stack trace)/i', $head),
+            default => true,
+        };
     }
 
     /**

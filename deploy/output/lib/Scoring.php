@@ -125,7 +125,11 @@ class Scoring {
             $weightedSum += $module['score'] * $weight;
             $totalWeight += $weight;
         }
-        if ($totalWeight === 0) return 0;
+        // Comparación con <= 0 (no === 0): los weights vienen del config admin
+        // como float; 0.0 === 0 es false en PHP estricto, y un comparator falso
+        // dispara DivisionByZeroError. También cubre el caso de weights
+        // negativos accidentales en config malformado.
+        if ($totalWeight <= 0) return 0;
         $base = (int) round($weightedSum / $totalWeight);
 
         // Penalty exponencial por críticos totales
@@ -172,7 +176,7 @@ class Scoring {
             }
         }
 
-        if ($totalWeight === 0) return 0;
+        if ($totalWeight <= 0) return 0;
         $score = (int) round($weightedSum / $totalWeight);
 
         // Critical-cap: si hay al menos un crítico, capear el módulo.

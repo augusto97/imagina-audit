@@ -75,15 +75,18 @@ export default function SettingsMessages() {
           <TabsContent value="modules">
             <Card>
               <CardContent className="space-y-5 pt-6">
-                {moduleIds.map((id) => (
-                  <div key={id} className="space-y-1.5">
-                    <Label className="flex items-center gap-2">
-                      <ModuleIcon id={id} className="h-4 w-4 text-[var(--text-secondary)]" />
-                      {MODULE_NAMES[id]}
-                    </Label>
-                    <Textarea {...register(`sales_${id}`)} rows={3} placeholder={t('settings.messages_module_placeholder', { name: MODULE_NAMES[id] })} />
-                  </div>
-                ))}
+                {moduleIds.map((id) => {
+                  const name = t(`public.module_name_${id}`, { defaultValue: MODULE_NAMES[id] })
+                  return (
+                    <div key={id} className="space-y-1.5">
+                      <Label className="flex items-center gap-2">
+                        <ModuleIcon id={id} className="h-4 w-4 text-[var(--text-secondary)]" />
+                        {name}
+                      </Label>
+                      <Textarea {...register(`sales_${id}`)} rows={3} placeholder={t('settings.messages_module_placeholder', { name })} />
+                    </div>
+                  )
+                })}
               </CardContent>
             </Card>
           </TabsContent>

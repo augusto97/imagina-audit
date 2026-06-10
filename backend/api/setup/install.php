@@ -32,7 +32,50 @@
 require_once dirname(__DIR__) . '/bootstrap.php';
 
 $installFlag = dirname(__DIR__, 2) . '/data/.installed';
-if (is_file($installFlag)) {
+
+// Guard de instalación: chequear el flag NO es suficiente. El archivo se
+// pierde en re-uploads del zip, hosts que limpian /data/, restore desde
+// backup. Si lo dejáramos solo en el flag, un atacante no autenticado
+// podría llamar /api/setup/install tras esos escenarios y sobrescribir
+// admin_password_hash. Replicamos el check funcional de status.php:
+// si la DB está viva + migraciones aplicadas + admin existe, la app ya
+// está instalada — el wizard se rechaza independientemente del flag.
+// (Bonus: auto-recreamos el flag para no caer en el mismo loop la próxima.)
+function setupIsAlreadyInstalled(string $installFlag): bool {
+    if (is_file($installFlag)) return true;
+    try {
+        $db = Database::getInstance();
+        // Migraciones aplicadas
+        try {
+            $migrator = new Migrator($db);
+            $migrator->bootstrap();
+            $applied = $migrator->status()['totalApplied'] ?? 0;
+            if ($applied <= 0) return false;
+        } catch (Throwable $e) {
+            return false; // sin schema_migrations no podemos decir que está instalada
+        }
+        // Admin con password
+        $envHash = function_exists('env') ? env('ADMIN_PASSWORD_HASH', '') : '';
+        if ($envHash !== '') return true;
+        $row = $db->queryOne("SELECT value FROM settings WHERE `key` = 'admin_password_hash'");
+        return $row !== null && !empty($row['value']);
+    } catch (Throwable $e) {
+        return false; // sin DB, no podemos asegurar nada → permite continuar
+    }
+}
+
+if (setupIsAlreadyInstalled($installFlag)) {
+    // Auto-restaurar el flag si la app está funcional pero el archivo se
+    // perdió. Idéntico patrón al de status.php.
+    if (!is_file($installFlag)) {
+        @mkdir(dirname($installFlag), 0755, true);
+        @file_put_contents($installFlag, json_encode([
+            'installedAt' => date('c'),
+            'restoredFromState' => true,
+            'note' => 'Reconstructed by install guard: app already functional.',
+        ], JSON_PRETTY_PRINT));
+        @chmod($installFlag, 0600);
+    }
     Response::error('Setup already completed', 403);
 }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -156,7 +199,7 @@ $payload = json_encode([
     'installedAt' => date('c'),
     'driver' => $driver,
     'migrationsApplied' => $applied,
-    'version' => '2.2.3',
+    'version' => '2.3.0',
 ], JSON_PRETTY_PRINT);
 file_put_contents($installFlag, $payload);
 @chmod($installFlag, 0600);

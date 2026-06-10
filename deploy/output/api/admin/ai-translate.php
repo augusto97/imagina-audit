@@ -30,6 +30,9 @@
 
 require_once __DIR__ . '/../bootstrap.php';
 Auth::requireAuth();
+// Llamadas a IA (Claude/OpenAI) pueden tardar 1-2 min — liberamos el
+// lock de sesión PHP para que el admin no quede bloqueado mientras corre.
+if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     Response::error(Translator::t('api.common.method_not_allowed'), 405);

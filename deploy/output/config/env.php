@@ -62,3 +62,13 @@ function env(string $key, mixed $default = ''): string {
 // Cargar .env automáticamente
 $envPath = dirname(__DIR__) . '/.env';
 loadEnv($envPath);
+
+// Forzar UTC en TODO el backend. La DB ya está en UTC (MySQL via SET time_zone
+// en postConnect; SQLite via datetime('now')), pero los helpers de fecha en
+// Database.php (nowMinus, startOfMonth, today, reapStaleRunning) usan date()
+// que respeta la TZ de php.ini. Sin esta línea, en un hosting con php.ini en
+// Europe/Madrid (UTC+2) reapStaleRunning calcula un threshold "2h en el
+// futuro" y mata al instante todo job 'running'; las ventanas de rate-limit
+// y cuota mensual también quedan corridas. UTC en todos lados, sin
+// excepciones — la UI ya formatea con i18n.language en el cliente.
+date_default_timezone_set('UTC');

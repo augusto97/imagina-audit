@@ -122,7 +122,13 @@ class SeoTechnicalChecker {
         $lines = explode("\n", $body);
         $lineCount = count(array_filter($lines, fn($l) => trim($l) !== '' && !str_starts_with(trim($l), '#')));
 
-        $blocksAll = (bool) preg_match('/Disallow:\s*\/\s*$/m', $body);
+        // Parse por bloques: solo nos importa "Disallow: /" si está dentro
+        // del bloque que afecta al crawler general (User-agent: *) o al de
+        // Googlebot. Sin esto, un `Disallow: /` dentro de un bloque
+        // User-agent: GPTBot (patrón ubicuo para bloquear bots de IA) hace
+        // que la métrica marque el sitio como "no indexable" — falso
+        // positivo masivo.
+        $blocksAll = self::robotsBlocksGeneralCrawler($body);
         $hasSitemap = stripos($body, 'sitemap:') !== false;
         $hasCrawlDelay = stripos($body, 'crawl-delay') !== false;
 
@@ -175,6 +181,52 @@ class SeoTechnicalChecker {
             Translator::t('seo.robots.solution.none'),
             ['lineCount' => $lineCount, 'disallowCount' => $disallowCount, 'hasSitemap' => $hasSitemap]
         );
+    }
+
+    /**
+     * Parsea robots.txt en bloques (un bloque empieza con User-agent: y
+     * dura hasta el siguiente User-agent: o EOF) y solo devuelve true si
+     * algún bloque que afecte al crawler general (* o Googlebot) tiene
+     * `Disallow: /` raíz. Sin esto, un `Disallow: /` dentro de un bloque
+     * `User-agent: GPTBot` produce un falso positivo.
+     */
+    private static function robotsBlocksGeneralCrawler(string $body): bool {
+        $lines = preg_split('/\r?\n/', $body) ?: [];
+        $currentAgents = [];
+        $blocks = [];   // [agents => disallowList]
+        $cursor = ['agents' => [], 'disallow' => []];
+        $flush = function() use (&$cursor, &$blocks) {
+            if (!empty($cursor['agents'])) $blocks[] = $cursor;
+            $cursor = ['agents' => [], 'disallow' => []];
+        };
+        foreach ($lines as $rawLine) {
+            $line = trim($rawLine);
+            if ($line === '' || str_starts_with($line, '#')) continue;
+            if (preg_match('/^user-agent:\s*(.+)$/i', $line, $m)) {
+                // Si el block anterior ya tenía disallow, los user-agent
+                // adicionales son "agentes alternos del mismo block".
+                // Heurística: si cursor ya tiene disallow, flushear primero.
+                if (!empty($cursor['disallow'])) { $flush(); }
+                $cursor['agents'][] = strtolower(trim($m[1]));
+                continue;
+            }
+            if (preg_match('/^disallow:\s*(.*)$/i', $line, $m)) {
+                $cursor['disallow'][] = trim($m[1]);
+            }
+        }
+        $flush();
+        foreach ($blocks as $b) {
+            // Aplica al crawler general si incluye '*' o 'googlebot'
+            $affectsGeneral = false;
+            foreach ($b['agents'] as $a) {
+                if ($a === '*' || $a === 'googlebot') { $affectsGeneral = true; break; }
+            }
+            if (!$affectsGeneral) continue;
+            foreach ($b['disallow'] as $d) {
+                if ($d === '/') return true;
+            }
+        }
+        return false;
     }
 
     public function checkCanonical(): array {

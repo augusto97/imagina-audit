@@ -1,4 +1,5 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useAuditStore } from '@/store/auditStore'
 import { useUserAuthStore } from '@/store/userAuthStore'
@@ -29,54 +30,78 @@ const POLL_TIMEOUT_MS = 15 * 60_000
  * 3. Si no: polling a /api/scan-progress cada 1.5s hasta status=completed.
  * 4. Cuando termina: fetch del resultado final y navega a /results/:id.
  *
- * El polling tiene timeout de 3 minutos por si algo se cuelga en el backend.
+ * Cancelación: cada scan tiene un token (ref). Si el componente se
+ * desmonta o se lanza un nuevo scan, el token actual se invalida y los
+ * polls viejos se ignoran. Esto evita que un loop residual (hasta 15 min
+ * de vida) pise el store con un resultado obsoleto mientras corre el nuevo.
  */
 export function useAudit() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { status, result, error, setScanning, setProgress, setResult, setError, reset } = useAuditStore()
 
-  const startPolling = useCallback(async (auditId: string): Promise<void> => {
+  // Token monotónico para identificar el scan activo. Cada nuevo scan
+  // incrementa el ref; el polling guarda su valor inicial y aborta si
+  // observa que el ref se ha movido.
+  const activeTokenRef = useRef(0)
+
+  // Invalidar cualquier polling vivo al desmontar el componente.
+  useEffect(() => {
+    return () => { activeTokenRef.current++ }
+  }, [])
+
+  const startPolling = useCallback(async (auditId: string, token: number): Promise<void> => {
     const deadline = Date.now() + POLL_TIMEOUT_MS
+    const isStale = () => activeTokenRef.current !== token
 
     while (Date.now() < deadline) {
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
+      if (isStale()) return  // user navegó / re-escaneó
 
       try {
         const progress = await getScanProgress(auditId)
+        if (isStale()) return
         setProgress(progress)
 
         if (progress.status === 'completed') {
           const auditResult = await getAuditResult(auditId)
+          if (isStale()) return
           setResult(auditResult)
           navigate(auditViewPath(auditId))
           return
         }
 
         if (progress.status === 'failed') {
-          setError(progress.error || 'El análisis falló.')
+          setError(progress.error || t('public.scan_error_failed'))
           return
         }
         // 'running' → seguir iterando
       } catch (err) {
+        if (isStale()) return
         // 404 al inicio es normal (el progreso aún no se escribió);
         // lo ignoramos y reintentamos. Otros errores se muestran.
         const axiosErr = err as { response?: { status?: number; data?: { error?: string } } }
         if (axiosErr.response?.status === 404) {
           continue
         }
-        setError(axiosErr.response?.data?.error || 'Error consultando el estado del análisis.')
+        setError(axiosErr.response?.data?.error || t('public.scan_error_progress'))
         return
       }
     }
 
-    setError('El análisis tardó demasiado. Intenta nuevamente.')
-  }, [setProgress, setResult, setError, navigate])
+    if (!isStale()) setError(t('public.scan_error_timeout'))
+  }, [setProgress, setResult, setError, navigate, t])
 
   const runAudit = useCallback(async (request: AuditRequest) => {
+    // Invalidar cualquier polling vivo (de un scan anterior en esta misma
+    // sesión) antes de arrancar el nuevo. Sin esto, el loop viejo podía
+    // sobrevivir hasta 15 minutos pisando el store.
+    const token = ++activeTokenRef.current
     setScanning(request)
 
     try {
       const response = await startAudit(request)
+      if (activeTokenRef.current !== token) return
 
       if (response.cached && response.result) {
         // Camino rápido: resultado cacheado
@@ -86,17 +111,22 @@ export function useAudit() {
       }
 
       // Camino background: polling
-      await startPolling(response.auditId)
+      await startPolling(response.auditId, token)
     } catch (err: unknown) {
+      if (activeTokenRef.current !== token) return
       const axiosErr = err as { response?: { data?: { error?: string } } }
       if (axiosErr.response?.data?.error) {
         setError(axiosErr.response.data.error)
         return
       }
-      const message = err instanceof Error ? err.message : 'Ocurrió un error al analizar el sitio.'
+      const message = err instanceof Error ? err.message : t('public.scan_error_generic')
       setError(message)
     }
-  }, [setScanning, setResult, setError, navigate, startPolling])
+  }, [setScanning, setResult, setError, navigate, startPolling, t])
+
+  const cancel = useCallback(() => {
+    activeTokenRef.current++
+  }, [])
 
   return {
     status,
@@ -104,5 +134,6 @@ export function useAudit() {
     error,
     startAudit: runAudit,
     reset,
+    cancel,
   }
 }

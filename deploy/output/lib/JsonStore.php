@@ -21,6 +21,12 @@ class JsonStore {
     public static function encode(array $data): string {
         $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
+            // Antes: silenciosamente devolvíamos '' y el audit se "guardaba"
+            // vacío sin nada en logs. Ahora avisamos (audit no se pierde si
+            // logueamos a tiempo — el caller puede decidir abortar).
+            if (class_exists('Logger')) {
+                Logger::error('JsonStore::encode: json_encode falló — ' . json_last_error_msg());
+            }
             return '';
         }
         $compressed = gzencode($json, self::GZIP_LEVEL);

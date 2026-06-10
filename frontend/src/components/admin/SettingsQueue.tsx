@@ -48,20 +48,24 @@ export default function SettingsQueue() {
   const [maxAttempts, setMaxAttempts] = useState(3)
   const [manualRamMb, setManualRamMb] = useState<string>('')
 
-  // Carga inicial: settings + status
+  // Carga inicial: settings + status. Antes: si cualquiera de las dos
+  // promises rechazaba, setLoading(false) no corría y el skeleton quedaba
+  // permanente sin toast. Ahora always-finally.
   useEffect(() => {
-    Promise.all([fetchSettings(), fetchQueueStatus()]).then(([settings, queueStatus]) => {
-      if (settings) {
-        setMaxConcurrent(Number(settings.auditMaxConcurrent ?? settings.audit_max_concurrent ?? 3))
-        setStaleSeconds(Number(settings.auditStaleSeconds ?? settings.audit_stale_seconds ?? 180))
-        setFailureCacheMin(Number(settings.auditFailureCacheMinutes ?? settings.audit_failure_cache_minutes ?? 10))
-        setMaxAttempts(Number(settings.auditMaxAttempts ?? settings.audit_max_attempts ?? 3))
-        const ramOverride = settings.systemTotalRamMb ?? settings.system_total_ram_mb
-        setManualRamMb(ramOverride ? String(ramOverride) : '')
-      }
-      if (queueStatus) setStatus(queueStatus as QueueStatus)
-      setLoading(false)
-    })
+    Promise.all([fetchSettings(), fetchQueueStatus()])
+      .then(([settings, queueStatus]) => {
+        if (settings) {
+          setMaxConcurrent(Number(settings.auditMaxConcurrent ?? settings.audit_max_concurrent ?? 3))
+          setStaleSeconds(Number(settings.auditStaleSeconds ?? settings.audit_stale_seconds ?? 180))
+          setFailureCacheMin(Number(settings.auditFailureCacheMinutes ?? settings.audit_failure_cache_minutes ?? 10))
+          setMaxAttempts(Number(settings.auditMaxAttempts ?? settings.audit_max_attempts ?? 3))
+          const ramOverride = settings.systemTotalRamMb ?? settings.system_total_ram_mb
+          setManualRamMb(ramOverride ? String(ramOverride) : '')
+        }
+        if (queueStatus) setStatus(queueStatus as QueueStatus)
+      })
+      .catch(() => { /* error ya logueado en api interceptor; el spinner cierra */ })
+      .finally(() => setLoading(false))
   }, [fetchSettings, fetchQueueStatus])
 
   // Polling del status cada 3s (solo el status, no los settings)

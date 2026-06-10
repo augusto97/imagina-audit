@@ -245,7 +245,9 @@ class Project {
             foreach ($result['modules'] ?? [] as $mod) {
                 if (($mod['id'] ?? '') !== 'wordpress') continue;
                 foreach ($mod['metrics'] ?? [] as $m) {
-                    if (($m['id'] ?? '') === 'plugins') {
+                    // El analyzer emite 'wp_plugins' (ver WordPressDetector.php).
+                    // Antes leíamos 'plugins' y el diff salía siempre vacío.
+                    if (($m['id'] ?? '') === 'wp_plugins') {
                         $list = $m['details']['list'] ?? $m['details']['plugins'] ?? [];
                         if (!is_array($list)) continue;
                         $slugs = [];

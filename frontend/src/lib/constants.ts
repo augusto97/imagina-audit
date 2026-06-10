@@ -35,17 +35,22 @@ export const MODULE_ICONS: Record<string, string> = {
   wp_internal: 'database',
 }
 
-/** Nombres de módulos en español */
+/**
+ * Nombres de módulos por defecto (fallback). Para el grid de la home y
+ * los settings de mensajes preferimos resolver `public.module_name_<id>`
+ * desde i18n; este record queda como red de seguridad si la key no
+ * existe (idiomas dinámicos sin esa clave todavía).
+ */
 export const MODULE_NAMES: Record<string, string> = {
   wordpress: 'WordPress',
-  security: 'Seguridad',
-  performance: 'Rendimiento',
+  security: 'Security',
+  performance: 'Performance',
   seo: 'SEO',
-  mobile: 'Móvil',
-  infrastructure: 'Infraestructura',
-  conversion: 'Conversión',
-  page_health: 'Salud de Página',
-  wp_internal: 'Análisis Interno',
+  mobile: 'Mobile',
+  infrastructure: 'Infrastructure',
+  conversion: 'Conversion',
+  page_health: 'Page health',
+  wp_internal: 'Internal analysis',
 }
 
 /** Emojis de módulos para el feature grid */
@@ -61,16 +66,3 @@ export const MODULE_EMOJIS: Record<string, string> = {
   wp_internal: '🗄️',
 }
 
-/** Pasos simulados del escaneo */
-export const SCAN_STEPS = [
-  { id: 'fetch', label: 'Descargando página...', duration: 2000 },
-  { id: 'wordpress', label: 'Detectando WordPress...', duration: 3000 },
-  { id: 'security', label: 'Analizando seguridad...', duration: 3000 },
-  { id: 'performance', label: 'Consultando Google PageSpeed...', duration: 8000 },
-  { id: 'seo', label: 'Verificando SEO...', duration: 3000 },
-  { id: 'mobile', label: 'Evaluando compatibilidad móvil...', duration: 2000 },
-  { id: 'infrastructure', label: 'Analizando infraestructura...', duration: 2000 },
-  { id: 'page_health', label: 'Verificando salud de página...', duration: 2000 },
-  { id: 'conversion', label: 'Detectando herramientas de marketing...', duration: 2000 },
-  { id: 'compile', label: 'Compilando resultados...', duration: 2000 },
-]

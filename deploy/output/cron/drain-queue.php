@@ -37,13 +37,12 @@ spl_autoload_register(function (string $class) {
 if (php_sapi_name() !== 'cli') {
     $token = (string) ($_GET['token'] ?? '');
     // Resolvemos el token esperado: .env > settings (auto-generado).
-    // Esto permite que kickDrain HTTP funcione aunque el admin no haya
-    // configurado CRON_SECRET_TOKEN manualmente — QueueManager genera y
-    // persiste uno la primera vez.
+    // Si ensureCronToken falla (DB caída), denegamos. Antes caíamos al
+    // literal 'cambiar-este-token' como fallback, que dejaba el endpoint
+    // accesible si el admin no había configurado el token.
     $expected = '';
-    try { $expected = QueueManager::ensureCronToken(); } catch (Throwable $e) { /* fallback abajo */ }
-    if ($expected === '') $expected = getenv('CRON_SECRET_TOKEN') ?: 'cambiar-este-token';
-    if (!hash_equals($expected, $token)) {
+    try { $expected = QueueManager::ensureCronToken(); } catch (Throwable $e) {}
+    if ($expected === '' || !hash_equals($expected, $token)) {
         http_response_code(403);
         die('Acceso denegado');
     }

@@ -11,6 +11,18 @@ class Fetcher {
     private const DEFAULT_TIMEOUT = 10;
 
     /**
+     * Memo-cache por scan: clave = method:url. Los analyzers piden las
+     * mismas URLs (~10 redundantes por scan WP: /wp-json/wp/v2/users ×3,
+     * /robots.txt ×2, /?author=1 ×2, etc.). Con esto se ahorran ~5-10s.
+     * Se invalida al inicio de cada scan vía clearScanCache().
+     */
+    private static array $scanCache = [];
+
+    public static function clearScanCache(): void {
+        self::$scanCache = [];
+    }
+
+    /**
      * Resultado de un fetch
      */
     public static function createResult(
@@ -45,7 +57,18 @@ class Fetcher {
         bool $followRedirects = true,
         int $retries = 1
     ): array {
-        return self::request('GET', $url, null, $timeout, $followRedirects, $retries);
+        // Cache hit: misma URL+method ya consultada en este scan.
+        $cacheKey = "GET:$url:$followRedirects";
+        if (isset(self::$scanCache[$cacheKey])) {
+            return self::$scanCache[$cacheKey];
+        }
+        $result = self::request('GET', $url, null, $timeout, $followRedirects, $retries);
+        // Solo cachear respuestas válidas (status > 0) para no enmascarar
+        // errores de red transientes en re-fetches.
+        if (($result['statusCode'] ?? 0) > 0) {
+            self::$scanCache[$cacheKey] = $result;
+        }
+        return $result;
     }
 
     /**
@@ -258,9 +281,15 @@ class Fetcher {
         $ch = curl_init();
         $responseHeaders = [];
 
+        // CURLOPT_MAXFILESIZE solo se honra cuando el servidor declara
+        // Content-Length. Con chunked encoding el body se descarga entero
+        // hasta el memory_limit. Defensa adicional con WRITEFUNCTION que
+        // aborta el transfer cuando supera MAX_RESPONSE_SIZE.
+        $bodyBuffer = '';
+        $aborted = false;
+
         $opts = [
             CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_CONNECTTIMEOUT => min(5, $timeout),
             CURLOPT_USERAGENT => self::USER_AGENT,
@@ -285,6 +314,18 @@ class Fetcher {
                 }
                 return $len;
             },
+            // Defensa real contra responses chunked sin Content-Length:
+            // si excede MAX_RESPONSE_SIZE, devolver != len aborta el transfer
+            // sin pre-llenar la memoria del worker.
+            CURLOPT_WRITEFUNCTION => function ($ch, $chunk) use (&$bodyBuffer, &$aborted) {
+                $len = strlen($chunk);
+                if (strlen($bodyBuffer) + $len > self::MAX_RESPONSE_SIZE) {
+                    $aborted = true;
+                    return 0; // != len → cURL aborta el handle
+                }
+                $bodyBuffer .= $chunk;
+                return $len;
+            },
         ];
 
         if ($dnsResolve !== null) {
@@ -307,7 +348,7 @@ class Fetcher {
         }
 
         $startTime = microtime(true);
-        $responseBody = curl_exec($ch);
+        @curl_exec($ch);  // body se acumula en $bodyBuffer vía WRITEFUNCTION
         $endTime = microtime(true);
 
         $responseTime = round(($endTime - $startTime) * 1000, 2); // milisegundos
@@ -326,9 +367,17 @@ class Fetcher {
         }
 
         if (curl_errno($ch)) {
-            Logger::warning('cURL error: ' . curl_error($ch), ['url' => $url]);
-            $statusCode = 0;
-            $responseBody = '';
+            // Si abortamos por tamaño, no es un error real del transfer —
+            // devolvemos lo que se descargó hasta el límite + 200 OK
+            // simulado para que el analyzer pueda decidir si trabaja con
+            // body truncado o saltar.
+            if ($aborted) {
+                Logger::info('Fetcher abortó response excediendo MAX_RESPONSE_SIZE', ['url' => $url, 'partial' => strlen($bodyBuffer)]);
+            } else {
+                Logger::warning('cURL error: ' . curl_error($ch), ['url' => $url]);
+                $statusCode = 0;
+                $bodyBuffer = '';
+            }
         }
 
         curl_close($ch);
@@ -336,7 +385,7 @@ class Fetcher {
         return self::createResult(
             $statusCode,
             $responseHeaders,
-            $responseBody ?: '',
+            $bodyBuffer,
             $finalUrl ?: $url,
             $responseTime,
             $httpVersion

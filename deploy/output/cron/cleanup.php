@@ -16,20 +16,27 @@
  *   - Rota logs > 30 días (Logger::rotate).
  */
 
+// Bootstrap mínimo antes del check del token: necesitamos QueueManager
+// para resolver el token efectivo (auto-generado en settings si no hay
+// CRON_SECRET_TOKEN en .env). Mismo patrón que drain-queue.php.
+require_once dirname(__DIR__) . '/config/env.php';
+spl_autoload_register(function (string $class) {
+    $paths = [dirname(__DIR__) . '/lib/' . $class . '.php', dirname(__DIR__) . '/lib/db/' . $class . '.php', dirname(__DIR__) . '/analyzers/' . $class . '.php'];
+    foreach ($paths as $p) { if (file_exists($p)) { require_once $p; return; } }
+});
+
 if (php_sapi_name() !== 'cli') {
-    $token = $_GET['token'] ?? '';
-    $expectedToken = getenv('CRON_SECRET_TOKEN') ?: 'cambiar-este-token';
-    if ($token !== $expectedToken) {
+    $token = (string) ($_GET['token'] ?? '');
+    $expected = '';
+    try { $expected = QueueManager::ensureCronToken(); } catch (Throwable $e) {}
+    // Si no podemos resolver token (DB caída, instalación rota), denegamos:
+    // antes el fallback al literal 'cambiar-este-token' dejaba el endpoint
+    // accesible públicamente a cualquiera. Mejor negar que loggear.
+    if ($expected === '' || !hash_equals($expected, $token)) {
         http_response_code(403);
         die('Acceso denegado');
     }
 }
-
-require_once dirname(__DIR__) . '/config/env.php';
-spl_autoload_register(function (string $class) {
-    $paths = [dirname(__DIR__) . '/lib/' . $class . '.php', dirname(__DIR__) . '/analyzers/' . $class . '.php'];
-    foreach ($paths as $p) { if (file_exists($p)) { require_once $p; return; } }
-});
 
 set_time_limit(120);
 

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { Download, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { getLevelLabel, formatCurrency } from '@/lib/utils'
 import type { AuditResult } from '@/types/audit'
@@ -401,6 +402,9 @@ export default function PdfReport({ result }: PdfReportProps) {
       doc.save(`${t('report.pdf_filename_prefix')}-${result.domain}-${new Date().toISOString().slice(0, 10)}.pdf`)
     } catch (err) {
       console.error('Error generando PDF:', err)
+      // Antes el error era silencioso: el spinner desaparecía sin PDF ni
+      // explicación. El usuario quedaba sin saber si funcionó o no.
+      toast.error(t('report.pdf_error'))
     } finally {
       setGenerating(false)
     }

@@ -48,20 +48,16 @@ class Cache {
     }
 
     /**
-     * Guarda un valor en el cache
+     * Guarda un valor en el cache de forma atómica (write tmp + rename).
+     * Antes usaba LOCK_EX en el write, pero los readers no lockean — y
+     * un reader podía agarrar el archivo a mitad de escritura y obtener
+     * JSON truncado (null al decodear). Para AuditProgress eso era un
+     * glitch visible de polling. Con rename() la escritura es atómica:
+     * el reader ve siempre la versión completa, vieja o nueva.
      */
     public function set(string $key, mixed $value, ?int $ttl = null): void {
         $filePath = $this->getFilePath($key);
-        $effectiveTtl = $ttl ?? $this->ttl;
-
-        $data = [
-            'key' => $key,
-            'value' => $value,
-            'created_at' => time(),
-            'expires_at' => time() + $effectiveTtl,
-        ];
-
-        @file_put_contents($filePath, json_encode($data, JSON_UNESCAPED_UNICODE), LOCK_EX);
+        $this->atomicWrite($filePath, $key, $value, $ttl);
     }
 
     /**
@@ -136,16 +132,27 @@ class Cache {
      */
     public function setByName(string $name, mixed $value, ?int $ttl = null): void {
         $filePath = $this->getNamedFilePath($name);
-        $effectiveTtl = $ttl ?? $this->ttl;
+        $this->atomicWrite($filePath, $name, $value, $ttl);
+    }
 
-        $data = [
-            'key' => $name,
+    /**
+     * Write atómico: serializa, escribe a archivo temporal y renombra.
+     * `rename()` en el mismo filesystem es atómico — el reader observa
+     * o el archivo viejo o el nuevo, nunca uno a medio escribir.
+     */
+    private function atomicWrite(string $filePath, string $key, mixed $value, ?int $ttl): void {
+        $effectiveTtl = $ttl ?? $this->ttl;
+        $payload = json_encode([
+            'key' => $key,
             'value' => $value,
             'created_at' => time(),
             'expires_at' => time() + $effectiveTtl,
-        ];
-
-        @file_put_contents($filePath, json_encode($data, JSON_UNESCAPED_UNICODE), LOCK_EX);
+        ], JSON_UNESCAPED_UNICODE);
+        if ($payload === false) return;
+        $tmp = $filePath . '.' . bin2hex(random_bytes(4)) . '.tmp';
+        if (@file_put_contents($tmp, $payload) === false) return;
+        // Si rename falla (raro), limpiar el tmp para no acumular basura.
+        if (!@rename($tmp, $filePath)) @unlink($tmp);
     }
 
     /**

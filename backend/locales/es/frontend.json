@@ -1066,7 +1066,8 @@
     "snap_content_col_rest_short": "REST",
     "snap_content_col_hier_short": "Hier.",
     "snap_content_yes_short": "sí",
-    "snap_content_no_short": "no"
+    "snap_content_no_short": "no",
+    "pdf_error": "No se pudo generar el PDF. Intenta nuevamente."
   },
   "settings": {
     "save": "Guardar",
@@ -1708,6 +1709,19 @@
     "share_wa_report": "📄 Ver informe completo:",
     "share_wa_footer": "_Informe generado por Imagina Audit_",
     "compare_placeholder_site1": "https://tusitio.com",
-    "compare_placeholder_site2": "https://competidor.com"
+    "compare_placeholder_site2": "https://competidor.com",
+    "scan_error_failed": "El análisis falló.",
+    "scan_error_progress": "Error consultando el estado del análisis.",
+    "scan_error_timeout": "El análisis tardó demasiado. Intenta nuevamente.",
+    "scan_error_generic": "Ocurrió un error al analizar el sitio.",
+    "module_name_wordpress": "WordPress",
+    "module_name_security": "Seguridad",
+    "module_name_performance": "Rendimiento",
+    "module_name_seo": "SEO",
+    "module_name_mobile": "Móvil",
+    "module_name_infrastructure": "Infraestructura",
+    "module_name_conversion": "Conversión",
+    "module_name_page_health": "Salud de Página",
+    "module_name_wp_internal": "Análisis Interno"
   }
 }

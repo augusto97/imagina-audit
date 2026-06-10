@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage'
 import ResultsPage from './pages/ResultsPage'
 import ComparePage from './pages/ComparePage'
 import NotFoundPage from './pages/NotFoundPage'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { useConfigStore } from './store/configStore'
 import api from './lib/api'
 
@@ -27,6 +28,7 @@ function App() {
 
   return (
     <SetupGate>
+      <ErrorBoundary>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/results/:auditId" element={<ResultsPage />} />
@@ -132,6 +134,7 @@ function App() {
         } />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      </ErrorBoundary>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -157,23 +160,32 @@ function App() {
  * instalado" para no bloquear el dev local.
  */
 function SetupGate({ children }: { children: React.ReactNode }) {
-  const [checking, setChecking] = useState(true)
-  const [installed, setInstalled] = useState(true) // optimista: si la API falla, no bloqueamos
+  // Cache local: si ya verificamos que la app está instalada, no preguntamos
+  // /setup/status.php en cada page load (en hosting compartido cada request
+  // cuenta). Se invalida vía localStorage.removeItem('imagina_installed')
+  // si el operador necesita forzar el check (p.ej. reinstaló).
+  const cachedInstalled = typeof window !== 'undefined' && window.localStorage.getItem('imagina_installed') === '1'
+  const [checking, setChecking] = useState(!cachedInstalled)
+  const [installed, setInstalled] = useState<boolean>(cachedInstalled || true)
   const navigate = useNavigate()
   const location = useLocation()
 
   useEffect(() => {
+    if (cachedInstalled) return  // ya tenemos la respuesta
     let cancelled = false
     ;(async () => {
       try {
         const res = await api.get('/setup/status.php')
         const isInstalled = !!res.data?.data?.installed
-        if (!cancelled) setInstalled(isInstalled)
+        if (!cancelled) {
+          setInstalled(isInstalled)
+          if (isInstalled) window.localStorage.setItem('imagina_installed', '1')
+        }
       } catch { /* asumimos instalado si el endpoint no responde */ }
       if (!cancelled) setChecking(false)
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [cachedInstalled])
 
   useEffect(() => {
     if (checking) return

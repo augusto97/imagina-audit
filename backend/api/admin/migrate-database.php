@@ -16,6 +16,11 @@
  */
 require_once dirname(__DIR__) . '/bootstrap.php';
 Auth::requireAuth();
+// Operación larga (migración completa SQLite→MySQL). Liberamos el lock
+// de sesión PHP inmediatamente para que el admin pueda navegar el resto
+// del panel mientras la migración corre — mismo patrón que audit.php
+// (CLAUDE.md v2.0.8).
+if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
 
 $db = Database::getInstance();
 $currentDriver = $db->driver();
