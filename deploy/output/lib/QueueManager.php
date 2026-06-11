@@ -241,8 +241,22 @@ class QueueManager {
 
             $base = '';
             try {
-                $base = trim((string) Database::getInstance()->setting('app_url', ''));
-            } catch (Throwable $e) { /* DB no disponible */ }
+                // CUIDADO: Database::setting($key, $value) es un SETTER
+                // (upsert), no un getter. Usar scalar() para leer settings.
+                // El bug previo pasaba '' como value, sobrescribía app_url
+                // en cada kick, devolvía rowCount como int, y al castear a
+                // string daba "0"/"1" — la URL del kick quedaba inválida
+                // ("1/cron/drain-queue.php") y el self-call siempre fallaba.
+                $base = (string) Database::getInstance()->scalar(
+                    "SELECT value FROM settings WHERE `key` = 'app_url'"
+                );
+                $base = trim($base);
+                // Auto-clean: el bug previo pudo haber dejado "0"/"1" en el
+                // setting. Si vemos basura no-URL la ignoramos.
+                if ($base !== '' && !preg_match('#^https?://#i', $base)) {
+                    $base = '';
+                }
+            } catch (Throwable $e) { /* DB no disponible o tabla no existe */ }
             $base = rtrim($base, '/');
             if ($base === '') {
                 $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
