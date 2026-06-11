@@ -281,15 +281,9 @@ class Fetcher {
         $ch = curl_init();
         $responseHeaders = [];
 
-        // CURLOPT_MAXFILESIZE solo se honra cuando el servidor declara
-        // Content-Length. Con chunked encoding el body se descarga entero
-        // hasta el memory_limit. Defensa adicional con WRITEFUNCTION que
-        // aborta el transfer cuando supera MAX_RESPONSE_SIZE.
-        $bodyBuffer = '';
-        $aborted = false;
-
         $opts = [
             CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_CONNECTTIMEOUT => min(5, $timeout),
             CURLOPT_USERAGENT => self::USER_AGENT,
@@ -314,18 +308,6 @@ class Fetcher {
                 }
                 return $len;
             },
-            // Defensa real contra responses chunked sin Content-Length:
-            // si excede MAX_RESPONSE_SIZE, devolver != len aborta el transfer
-            // sin pre-llenar la memoria del worker.
-            CURLOPT_WRITEFUNCTION => function ($ch, $chunk) use (&$bodyBuffer, &$aborted) {
-                $len = strlen($chunk);
-                if (strlen($bodyBuffer) + $len > self::MAX_RESPONSE_SIZE) {
-                    $aborted = true;
-                    return 0; // != len → cURL aborta el handle
-                }
-                $bodyBuffer .= $chunk;
-                return $len;
-            },
         ];
 
         if ($dnsResolve !== null) {
@@ -348,7 +330,7 @@ class Fetcher {
         }
 
         $startTime = microtime(true);
-        @curl_exec($ch);  // body se acumula en $bodyBuffer vía WRITEFUNCTION
+        $responseBody = curl_exec($ch);
         $endTime = microtime(true);
 
         $responseTime = round(($endTime - $startTime) * 1000, 2); // milisegundos
@@ -367,17 +349,9 @@ class Fetcher {
         }
 
         if (curl_errno($ch)) {
-            // Si abortamos por tamaño, no es un error real del transfer —
-            // devolvemos lo que se descargó hasta el límite + 200 OK
-            // simulado para que el analyzer pueda decidir si trabaja con
-            // body truncado o saltar.
-            if ($aborted) {
-                Logger::info('Fetcher abortó response excediendo MAX_RESPONSE_SIZE', ['url' => $url, 'partial' => strlen($bodyBuffer)]);
-            } else {
-                Logger::warning('cURL error: ' . curl_error($ch), ['url' => $url]);
-                $statusCode = 0;
-                $bodyBuffer = '';
-            }
+            Logger::warning('cURL error: ' . curl_error($ch), ['url' => $url]);
+            $statusCode = 0;
+            $responseBody = '';
         }
 
         curl_close($ch);
@@ -385,7 +359,7 @@ class Fetcher {
         return self::createResult(
             $statusCode,
             $responseHeaders,
-            $bodyBuffer,
+            $responseBody ?: '',
             $finalUrl ?: $url,
             $responseTime,
             $httpVersion
