@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useAuditStore } from '@/store/auditStore'
@@ -43,12 +43,15 @@ export function useAudit() {
   // Token monotónico para identificar el scan activo. Cada nuevo scan
   // incrementa el ref; el polling guarda su valor inicial y aborta si
   // observa que el ref se ha movido.
+  //
+  // IMPORTANTE: NO invalidar al desmontar. useAudit() se llama desde
+  // múltiples componentes (AuditForm, ScanningAnimation, ResultsPage),
+  // y cada uno tiene su propio useEffect cleanup. Si un componente que
+  // arrancó el polling se desmonta (p.ej. HomePage→ScanningAnimation),
+  // el cleanup mataba el polling recién iniciado y nunca se hacía la
+  // primera petición a /scan-progress.php. Eso causaba el "5% para
+  // siempre" que el usuario reportaba.
   const activeTokenRef = useRef(0)
-
-  // Invalidar cualquier polling vivo al desmontar el componente.
-  useEffect(() => {
-    return () => { activeTokenRef.current++ }
-  }, [])
 
   const startPolling = useCallback(async (auditId: string, token: number): Promise<void> => {
     const deadline = Date.now() + POLL_TIMEOUT_MS

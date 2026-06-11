@@ -73,7 +73,8 @@
     "logout": "Cerrar sesión",
     "view_app": "Ver herramienta",
     "admin_panel": "Panel de Administración",
-    "sidebar_collapse": "Colapsar"
+    "sidebar_collapse": "Colapsar",
+    "diagnostics": "Diagnóstico"
   },
   "admin_backups": {
     "title": "Backups",
@@ -1615,7 +1616,15 @@
     "queue_cron_title": "Cron recomendado",
     "queue_cron_desc": "La cola se procesa sola mientras alguien observa un escaneo, pero el cron es la red de seguridad: garantiza que los audits encolados se drenen aunque nadie tenga la página abierta. Agrégalo en cPanel → Cron Jobs.",
     "queue_cron_frequency": "Frecuencia",
-    "queue_cron_note": "Copia el comando tal cual. La ruta ya está resuelta para esta instalación. Sin el cron la cola igual funciona, pero los audits pueden quedar esperando hasta que el próximo visitante haga polling."
+    "queue_cron_note": "Copia el comando tal cual. La ruta ya está resuelta para esta instalación. Sin el cron la cola igual funciona, pero los audits pueden quedar esperando hasta que el próximo visitante haga polling.",
+    "diag_title": "Diagnóstico del pipeline de escaneo",
+    "diag_subtitle": "Ejecuta el pipeline crítico del escaneo paso a paso en este servidor y reporta qué falla. Copia la salida y compártela en soporte.",
+    "diag_load_error": "No se pudo cargar el diagnóstico",
+    "diag_copy_for_support": "Copiar para soporte",
+    "diag_warn": "Advertencias",
+    "diag_fail": "Fallidos",
+    "diag_app_version": "App v{{version}}",
+    "diag_share_hint": "Pulsa \"Copiar para soporte\" y pega el JSON en el hilo de soporte. Incluye versión de PHP, extensiones, driver de DB, errores recientes en el log y los resultados reales de cada paso del pipeline en tu hosting."
   },
   "public": {
     "header_compare": "Comparar",

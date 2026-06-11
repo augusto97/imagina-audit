@@ -73,7 +73,8 @@
     "logout": "Logout",
     "view_app": "View app",
     "admin_panel": "Admin Panel",
-    "sidebar_collapse": "Collapse"
+    "sidebar_collapse": "Collapse",
+    "diagnostics": "Diagnostics"
   },
   "admin_backups": {
     "title": "Backups",
@@ -1615,7 +1616,15 @@
     "queue_cron_title": "Recommended cron job",
     "queue_cron_desc": "The queue processes itself while someone is watching a scan, but a cron is the safety net: it guarantees queued audits get drained even when nobody has the page open. Add this in cPanel → Cron Jobs.",
     "queue_cron_frequency": "Frequency",
-    "queue_cron_note": "Copy the command exactly. The path is already resolved for this installation. Without the cron the queue still works, but audits may sit waiting until the next visitor polls."
+    "queue_cron_note": "Copy the command exactly. The path is already resolved for this installation. Without the cron the queue still works, but audits may sit waiting until the next visitor polls.",
+    "diag_title": "Scan pipeline diagnostics",
+    "diag_subtitle": "Runs the critical scan pipeline step by step on this server and reports what fails. Copy the output and share it for support.",
+    "diag_load_error": "Could not load diagnostics",
+    "diag_copy_for_support": "Copy for support",
+    "diag_warn": "Warnings",
+    "diag_fail": "Failed",
+    "diag_app_version": "App v{{version}}",
+    "diag_share_hint": "Click \"Copy for support\" and paste the JSON in the support thread. It includes PHP version, extensions, DB driver, recent log errors, and the actual results of each pipeline step on your hosting."
   },
   "public": {
     "header_compare": "Compare",

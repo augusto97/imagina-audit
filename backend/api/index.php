@@ -175,6 +175,10 @@ switch ($endpoint) {
         require __DIR__ . '/admin/queue-actions.php';
         break;
 
+    case 'admin/diagnostics':
+        require __DIR__ . '/admin/diagnostics.php';
+        break;
+
     case 'admin/migrate-database':
         require __DIR__ . '/admin/migrate-database.php';
         break;
