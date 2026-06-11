@@ -6,9 +6,11 @@ This branch holds the **ready-to-install build artifact**. Nothing else.
 
 The latest packaged build sits at the root of this branch:
 
-- **`imagina-audit-v2.3.2.zip`** (~1.2 MB) — current
+- **`imagina-audit-v2.3.3.zip`** (~1.2 MB) — current
 
 ### Changelog
+
+- **v2.3.3** — fix del escaneo congelado en "5%". v2.3.0 cambió `Cache::set/setByName` de un `file_put_contents()` directo (sobrescribir en sitio) a un esquema atómico tmp + `rename()`. La sobrescritura directa preservaba el dueño/permisos del archivo existente; el tmp+rename crea un archivo NUEVO con el umask/dueño del que escribe. En el hosting del usuario eso dejó el archivo de progreso ilegible (o la escritura fallaba en silencio), así que `AuditProgress::get()` devolvía null en cada poll → `scan-progress.php` daba 404 → el frontend caía a su placeholder de 5% para siempre, aunque el worker del cron sí corría el scan. Fixes: **(1)** `Cache.php` revertido al `file_put_contents(LOCK_EX)` directo y probado (la rara lectura truncada que podía causar se auto-corrige en el siguiente poll de 1.5s). **(2)** `Fetcher.php` revertido de `CURLOPT_WRITEFUNCTION` a `CURLOPT_RETURNTRANSFER` (camino de fetch probado); el memo-cache por scan se mantiene (es aditivo y seguro). Junto con el fix de `kickDrain` de v2.3.2, los escaneos arrancan desde la app (no solo el cron) y su progreso es visible de punta a punta.
 
 - **v2.3.2** — fix crítico del `kickDrain`: la app no estaba disparando ningún escaneo, solo el cron del sistema procesaba la cola. Causa: `kickDrain` llamaba a `Database::setting('app_url', '')` pensando que era un getter, pero `setting($key, $value)` es un SETTER (upsert). Cada kick sobrescribía `app_url` con string vacío, recibía el `rowCount` (int 0 o 1) en lugar del valor, y construía la URL del self-call como `"0/cron/drain-queue.php"` o `"1/cron/..."` — ambas inválidas, curl fallaba siempre. Fix: leer con `scalar("SELECT value FROM settings WHERE key = 'app_url'")` y rechazar valores no-URL (auto-saneamiento de la basura `"0"`/`"1"` que pudo quedar de runs anteriores).
 
