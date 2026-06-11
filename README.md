@@ -6,9 +6,13 @@ This branch holds the **ready-to-install build artifact**. Nothing else.
 
 The latest packaged build sits at the root of this branch:
 
-- **`imagina-audit-v2.3.0.zip`** (~1.2 MB) — current
+- **`imagina-audit-v2.3.1.zip`** (~1.2 MB) — current
 
 ### Changelog
+
+- **v2.3.1** — fix audits que se quedaban encolados ("stuck at 5%") en hosting compartido. v2.3.0 cambió `kickDrain` para resolver la URL del self-call desde `SERVER_NAME` en vez de `HTTP_HOST` (por una preocupación de Host-spoofing). Pero en hosting compartido `SERVER_NAME` suele ser `localhost` o el nombre interno del vhost, no el dominio real → el self-kick HTTP apuntaba al host equivocado y nunca disparaba el drain. Con `shell_exec` deshabilitado (común en compartido) y sin cron configurado, los audits encolados quedaban congelados. Fix defense-in-depth: **(1)** la resolución de URL de `kickDrain` ahora es `app_url` setting > `HTTP_HOST` > `SERVER_NAME` > localhost (el token de cron se valida con `hash_equals` en el receptor, así que un Host forjado solo puede enrutar la llamada fire-and-forget a otro lado, nunca procesar trabajo). **(2)** `scan-progress.php` re-dispara el drain en cada poll mientras un job sigue `queued` con un slot libre — como el frontend hace polling cada ~1.5s, el propio polling impulsa la cola aunque `shell_exec` esté deshabilitado, el self-kick inicial haya fallado y no exista cron; el dequeue atómico de v2.3.0 hace que kicks solapados sean seguros. **(3)** `/admin/queue` ahora muestra una tarjeta con el **comando de cron exacto** (ruta resuelta) listo para copiar a cPanel → Cron Jobs.
+
+  **Recomendación de cron (red de seguridad):** en cPanel → Cron Jobs, cada 1 minuto: `php /ruta/a/tu/audit/cron/drain-queue.php` — el comando exacto con tu ruta aparece en `/admin/queue`.
 
 - **v2.3.0** — hardening transversal post-auditoría. Resultado de cinco agentes paralelos revisando core libs, seguridad, endpoints, analyzers y frontend.
 
