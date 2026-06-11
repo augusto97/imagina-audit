@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Loader2, Save, Server, AlertTriangle, CheckCircle } from 'lucide-react'
+import { Loader2, Save, Server, AlertTriangle, CheckCircle, Clock, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -34,6 +34,13 @@ interface QueueStatus {
     }
   }
   recommendationTable: Array<{ minMb: number; maxMb: number; concurrency: number; label: string }>
+  cron?: {
+    command: string
+    scriptPath: string
+    phpBinary: string
+    frequency: string
+    note: string
+  }
 }
 
 export default function SettingsQueue() {
@@ -119,6 +126,9 @@ export default function SettingsQueue() {
           {t('settings.queue_subtitle')}
         </p>
       </div>
+
+      {/* Cron recomendado */}
+      {status?.cron && <CronCard cron={status.cron} />}
 
       {/* Estado en vivo */}
       <Card>
@@ -467,6 +477,58 @@ function QueueRescueCard() {
             </Button>
           </div>
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Tarjeta con el comando de cron recomendado. La cola se procesa sola vía
+ * el polling del frontend, pero el cron es la red de seguridad: garantiza
+ * que los audits encolados se drenen aunque nadie tenga la página abierta.
+ */
+function CronCard({ cron }: { cron: NonNullable<QueueStatus['cron']> }) {
+  const { t } = useTranslation()
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(cron.command)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error(t('common.error'))
+    }
+  }
+
+  return (
+    <Card className="border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/[0.03]">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Clock className="h-5 w-5 text-[var(--accent-primary)]" />
+          {t('settings.queue_cron_title')}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-[var(--text-secondary)]">
+          {t('settings.queue_cron_desc')}
+        </p>
+        <div className="flex items-stretch gap-2">
+          <code className="flex-1 overflow-x-auto rounded-lg bg-[var(--bg-secondary)] px-3 py-2.5 font-mono text-xs text-[var(--text-primary)] whitespace-nowrap">
+            {cron.command}
+          </code>
+          <Button variant="outline" size="sm" onClick={copy} className="shrink-0">
+            {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+            {copied ? t('common.copied') : t('common.copy')}
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-tertiary)]">
+          <span>{t('settings.queue_cron_frequency')}: <b className="text-[var(--text-secondary)]">{cron.frequency}</b></span>
+          <span>PHP: <b className="text-[var(--text-secondary)]">{cron.phpBinary}</b></span>
+        </div>
+        <p className="text-xs text-[var(--text-tertiary)] leading-relaxed">
+          {t('settings.queue_cron_note')}
+        </p>
       </CardContent>
     </Card>
   )

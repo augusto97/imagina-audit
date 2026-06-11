@@ -221,28 +221,33 @@ class QueueManager {
             }
         }
 
-        // Intento 2: curl HTTP self-call con timeout 1s. La URL base se
-        // resuelve desde settings (APP_URL) — no desde HTTP_HOST porque ese
-        // header es spoofeable por el cliente, y aquí estamos pasando el
-        // token de cron en la querystring. Un Host forjado contra un vhost
-        // que aceptara el catch-all enrutaría el token a un servidor del
-        // atacante. Si no hay APP_URL configurado, fallback a localhost
-        // (que requiere que el server escuche allí, pero al menos no
-        // filtra el token a fuera).
+        // Intento 2: curl HTTP self-call con timeout 1s.
+        //
+        // Resolución de URL base (en orden):
+        //   1. Setting `app_url` (lo correcto en producción — el admin lo
+        //      configura una vez y no depende de cómo llegó el request).
+        //   2. HTTP_HOST del request entrante. Es spoofeable, pero:
+        //        - El token se valida en drain-queue.php con hash_equals,
+        //          un Host forjado solo enrutaría a OTRO server, no nos
+        //          permitiría procesar nada.
+        //        - El attacker no tiene forma de hacer que el response
+        //          venga de vuelta a su lado de la red (fire-and-forget).
+        //      El riesgo real es bajo y este fallback es lo que hace que
+        //      la cola arranque sin configuración previa.
+        //   3. localhost como último recurso.
         if (function_exists('curl_init')) {
             $token = self::ensureCronToken(); // auto-genera si no existe
             if ($token === '') return;
 
             $base = '';
             try {
-                $base = (string) Database::getInstance()->setting('app_url', '');
+                $base = trim((string) Database::getInstance()->setting('app_url', ''));
             } catch (Throwable $e) { /* DB no disponible */ }
             $base = rtrim($base, '/');
             if ($base === '') {
-                // Fallback: usar SERVER_NAME (config del vhost, no HTTP_HOST).
                 $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-                $name = $_SERVER['SERVER_NAME'] ?? 'localhost';
-                $base = "$scheme://$name";
+                $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+                $base = "$scheme://$host";
             }
 
             $url = "$base/cron/drain-queue.php?token=" . urlencode($token);

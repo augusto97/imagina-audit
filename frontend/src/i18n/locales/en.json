@@ -1611,7 +1611,11 @@
     "vulns_sev_low": "Low",
     "vulns_sev_medium": "Medium",
     "vulns_sev_high": "High",
-    "vulns_sev_critical": "Critical"
+    "vulns_sev_critical": "Critical",
+    "queue_cron_title": "Recommended cron job",
+    "queue_cron_desc": "The queue processes itself while someone is watching a scan, but a cron is the safety net: it guarantees queued audits get drained even when nobody has the page open. Add this in cPanel → Cron Jobs.",
+    "queue_cron_frequency": "Frequency",
+    "queue_cron_note": "Copy the command exactly. The path is already resolved for this installation. Without the cron the queue still works, but audits may sit waiting until the next visitor polls."
   },
   "public": {
     "header_compare": "Compare",

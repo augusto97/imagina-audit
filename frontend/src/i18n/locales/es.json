@@ -1611,7 +1611,11 @@
     "vulns_sev_low": "Bajo",
     "vulns_sev_medium": "Medio",
     "vulns_sev_high": "Alto",
-    "vulns_sev_critical": "Crítico"
+    "vulns_sev_critical": "Crítico",
+    "queue_cron_title": "Cron recomendado",
+    "queue_cron_desc": "La cola se procesa sola mientras alguien observa un escaneo, pero el cron es la red de seguridad: garantiza que los audits encolados se drenen aunque nadie tenga la página abierta. Agrégalo en cPanel → Cron Jobs.",
+    "queue_cron_frequency": "Frecuencia",
+    "queue_cron_note": "Copia el comando tal cual. La ruta ya está resuelta para esta instalación. Sin el cron la cola igual funciona, pero los audits pueden quedar esperando hasta que el próximo visitante haga polling."
   },
   "public": {
     "header_compare": "Comparar",

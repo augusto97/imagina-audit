@@ -30,6 +30,22 @@ if (!$state) {
 if (($state['status'] ?? '') === 'queued') {
     $state['position'] = QueueManager::getPosition($id);
     $state['totalInQueue'] = QueueManager::queuedCount();
+
+    // Auto-sanado de la cola: si este job sigue 'queued' pero hay un slot
+    // libre, el drain previo (kick de audit.php) no arrancó — re-disparamos
+    // aquí. Como el frontend hace polling cada ~1.5s, esto convierte el
+    // propio polling en el motor de la cola: aunque shell_exec esté
+    // deshabilitado y el self-kick HTTP haya fallado, cada poll le da otra
+    // oportunidad de arrancar. El dequeue es atómico, así que kicks
+    // solapados nunca producen doble procesamiento. Cuando el job pasa a
+    // 'running' dejamos de kickear (no hay slot libre o ya no está queued).
+    try {
+        if (QueueManager::runningCount() < QueueManager::getMaxConcurrent()) {
+            QueueManager::kickDrain();
+        }
+    } catch (Throwable $e) {
+        // El kick es best-effort; el cron de fallback drenará igualmente.
+    }
 }
 
 Response::success($state);

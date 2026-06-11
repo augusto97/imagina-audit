@@ -75,6 +75,21 @@ try {
         [$hourAgo]
     );
 
+    // Comando de cron recomendado, con la ruta real del script resuelta.
+    // El admin lo copia tal cual a cPanel → Cron Jobs. Es el fallback que
+    // garantiza que la cola se drene aunque el self-kick falle en este
+    // hosting (shell_exec deshabilitado + self-HTTP bloqueado).
+    $drainScript = realpath(dirname(__DIR__, 2) . '/cron/drain-queue.php')
+        ?: (dirname(__DIR__, 2) . '/cron/drain-queue.php');
+    $phpBin = PHP_BINARY && !str_contains(PHP_BINARY, 'fpm') ? PHP_BINARY : 'php';
+    $cronInfo = [
+        'command'   => sprintf('* * * * * %s %s', $phpBin, $drainScript),
+        'scriptPath' => $drainScript,
+        'phpBinary' => $phpBin,
+        'frequency' => 'cada 1 minuto',
+        'note'      => 'Configúralo en cPanel → Cron Jobs. La cola igual se procesa sin él (el propio polling la drena), pero el cron es la red de seguridad recomendada.',
+    ];
+
     Response::success([
         'concurrency' => [
             'running' => $running,
@@ -100,6 +115,7 @@ try {
         ], $problematicUrls),
         'system' => SystemInfo::snapshot(),
         'recommendationTable' => SystemInfo::recommendationTable(),
+        'cron' => $cronInfo,
     ]);
 } catch (Throwable $e) {
     Logger::error('queue-status falló: ' . $e->getMessage());
