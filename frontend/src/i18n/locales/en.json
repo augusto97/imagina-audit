@@ -1624,7 +1624,18 @@
     "diag_warn": "Warnings",
     "diag_fail": "Failed",
     "diag_app_version": "App v{{version}}",
-    "diag_share_hint": "Click \"Copy for support\" and paste the JSON in the support thread. It includes PHP version, extensions, DB driver, recent log errors, and the actual results of each pipeline step on your hosting."
+    "diag_share_hint": "Click \"Copy for support\" and paste the JSON in the support thread. It includes PHP version, extensions, DB driver, recent log errors, and the actual results of each pipeline step on your hosting.",
+    "leadcap_card": "Lead capture",
+    "leadcap_subtitle": "Choose when prospects hand over their contact details.",
+    "leadcap_mode_upfront": "Upfront (current)",
+    "leadcap_mode_upfront_desc": "The form asks for the URL and contact details together, before the scan.",
+    "leadcap_mode_gated": "Gated (after preview)",
+    "leadcap_mode_gated_desc": "The form asks only for the URL. After the scan the prospect sees the score and a blurred report, and must enter their details to unlock the full breakdown. Converts better.",
+    "leadcap_required_fields": "Required fields to unlock",
+    "leadcap_required_hint": "Unchecked fields still appear in the form but are optional. Email is the most useful for follow-up.",
+    "leadcap_field_email": "Email",
+    "leadcap_field_name": "Name",
+    "leadcap_field_whatsapp": "WhatsApp"
   },
   "public": {
     "header_compare": "Compare",
@@ -1735,6 +1746,23 @@
     "module_name_infrastructure": "Infrastructure",
     "module_name_conversion": "Conversion",
     "module_name_page_health": "Page health",
-    "module_name_wp_internal": "Internal analysis"
+    "module_name_wp_internal": "Internal analysis",
+    "gate_title": "Your full report is ready",
+    "gate_subtitle": "Your site scored {{score}}/100. Enter your details to unlock the full breakdown and the solutions plan.",
+    "gate_email_required": "Email is required",
+    "gate_email_invalid": "Enter a valid email",
+    "gate_name_required": "Name is required",
+    "gate_whatsapp_required": "WhatsApp is required",
+    "gate_unlocked": "Report unlocked!",
+    "gate_error": "Could not save your details. Please try again.",
+    "gate_email_ph": "Email (optional)",
+    "gate_email_ph_required": "Your email *",
+    "gate_name_ph": "Name (optional)",
+    "gate_name_ph_required": "Your name *",
+    "gate_whatsapp_ph": "WhatsApp (optional)",
+    "gate_whatsapp_ph_required": "Your WhatsApp *",
+    "gate_button": "Unlock full report",
+    "gate_privacy": "We only use your details to send you the report and follow up. No spam.",
+    "cta_whatsapp_message_audit": "Hi! I just audited {{domain}} and scored {{score}}/100. I'd like to know how to improve it."
   }
 }

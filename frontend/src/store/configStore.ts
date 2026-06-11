@@ -50,10 +50,18 @@ export interface PublicConfig {
   ctaButtonPlansText: string
   plans: Array<{ name: string; price: string; currency: string }>
   salesMessages: Record<string, string>
+  leadCapture: LeadCaptureCfg
   home: HomeCms
   form: FormCms
   header: HeaderCms
   footer: FooterCms
+}
+
+export interface LeadCaptureCfg {
+  mode: 'upfront' | 'gated'
+  requireEmail: boolean
+  requireName: boolean
+  requireWhatsapp: boolean
 }
 
 const DEFAULT_HOME: HomeCms = {

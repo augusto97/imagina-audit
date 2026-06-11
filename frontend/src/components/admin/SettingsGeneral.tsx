@@ -18,7 +18,7 @@ export default function SettingsGeneral() {
   const [testingEmail, setTestingEmail] = useState(false)
   const [origins, setOrigins] = useState<string[]>([])
   const [originInput, setOriginInput] = useState('')
-  const { register, handleSubmit, reset, watch } = useForm()
+  const { register, handleSubmit, reset, watch, setValue } = useForm()
 
   useEffect(() => {
     fetchSettings().then((data: Record<string, unknown>) => {
@@ -176,6 +176,65 @@ export default function SettingsGeneral() {
               <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
                 {t('settings.general_origins_empty')}
               </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Captura de leads */}
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('settings.leadcap_card')}</CardTitle>
+            <p className="text-sm text-[var(--text-secondary)]">{t('settings.leadcap_subtitle')}</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Selector de modo: upfront vs gated */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(['upfront', 'gated'] as const).map((mode) => {
+                const active = (watch('leadCaptureMode') || 'upfront') === mode
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setValue('leadCaptureMode', mode, { shouldDirty: true })}
+                    className={`rounded-xl border p-4 text-left transition-colors ${
+                      active
+                        ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/5 ring-1 ring-[var(--accent-primary)]'
+                        : 'border-[var(--border-default)] hover:border-[var(--border-hover)]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className={`h-3 w-3 rounded-full border ${active ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]' : 'border-[var(--text-tertiary)]'}`} />
+                      <span className="text-sm font-semibold text-[var(--text-primary)]">{t(`settings.leadcap_mode_${mode}`)}</span>
+                    </div>
+                    <p className="mt-1.5 text-xs text-[var(--text-secondary)]">{t(`settings.leadcap_mode_${mode}_desc`)}</p>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Campos obligatorios del gate — solo relevante en modo gated */}
+            {(watch('leadCaptureMode') || 'upfront') === 'gated' && (
+              <div className="rounded-xl border border-[var(--border-default)] p-4">
+                <p className="mb-3 text-xs font-medium text-[var(--text-secondary)]">{t('settings.leadcap_required_fields')}</p>
+                <div className="space-y-2.5">
+                  {([
+                    ['leadGateRequireEmail', 'leadcap_field_email'],
+                    ['leadGateRequireName', 'leadcap_field_name'],
+                    ['leadGateRequireWhatsapp', 'leadcap_field_whatsapp'],
+                  ] as const).map(([field, labelKey]) => (
+                    <label key={field} className="flex cursor-pointer items-center gap-2.5 text-sm text-[var(--text-primary)]">
+                      <input
+                        type="checkbox"
+                        checked={!!watch(field)}
+                        onChange={(e) => setValue(field, e.target.checked, { shouldDirty: true })}
+                        className="h-4 w-4 rounded border-[var(--border-default)] accent-[var(--accent-primary)]"
+                      />
+                      {t(`settings.${labelKey}`)}
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs text-[var(--text-tertiary)]">{t('settings.leadcap_required_hint')}</p>
+              </div>
             )}
           </CardContent>
         </Card>

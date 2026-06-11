@@ -618,33 +618,49 @@ class QueueManager {
             return;
         }
 
-        // Notificar email si hay lead
-        try {
-            $leadEmail = trim($leadData['leadEmail'] ?? '');
-            $leadWhatsapp = trim($leadData['leadWhatsapp'] ?? '');
-            if ($leadEmail || $leadWhatsapp) {
-                $db = Database::getInstance();
-                $notifRow = $db->queryOne("SELECT value FROM settings WHERE `key` = 'lead_notification_email'");
-                $notifEmail = $notifRow['value'] ?? '';
-                if (!empty($notifEmail) && filter_var($notifEmail, FILTER_VALIDATE_EMAIL)) {
-                    $score = $result['globalScore'];
-                    $leadName = trim($leadData['leadName'] ?? '') ?: 'No proporcionado';
-                    $leadCompany = trim($leadData['leadCompany'] ?? '') ?: 'No proporcionado';
-                    $subject = "Nuevo lead: {$result['domain']} (Score: $score/100)";
-                    $body = "Nuevo lead capturado en Imagina Audit\n\n"
-                        . "Sitio: {$result['url']}\n"
-                        . "Score: $score/100 ({$result['globalLevel']})\n\n"
-                        . "Nombre: $leadName\nEmail: " . ($leadEmail ?: 'No proporcionado') . "\n"
-                        . "WhatsApp: " . ($leadWhatsapp ?: 'No proporcionado') . "\n"
-                        . "Empresa: $leadCompany\nFecha: " . date('d/m/Y H:i') . "\n";
-                    Mailer::send($notifEmail, $subject, $body);
-                }
-            }
-        } catch (Throwable $e) {
-            Logger::warning('Error enviando notificación de lead: ' . $e->getMessage());
-        }
+        // Notificar email si hay lead (solo aplica en modo 'upfront' — en
+        // 'gated' el lead se captura después vía capture-lead.php, que
+        // dispara su propia notificación).
+        self::notifyLead([
+            'domain' => $result['domain'],
+            'url' => $result['url'],
+            'globalScore' => $result['globalScore'],
+            'globalLevel' => $result['globalLevel'],
+        ], $leadData);
 
         self::markCompleted($auditId);
         AuditProgress::completed($auditId, 12);
+    }
+
+    /**
+     * Envía la notificación de "nuevo lead" al email configurado en settings.
+     * No-op si no hay email/WhatsApp en el lead o si no hay destino configurado.
+     * Reutilizado por processJob (modo upfront) y capture-lead.php (modo gated).
+     */
+    public static function notifyLead(array $audit, array $leadData): void {
+        try {
+            $leadEmail = trim($leadData['leadEmail'] ?? '');
+            $leadWhatsapp = trim($leadData['leadWhatsapp'] ?? '');
+            if (!$leadEmail && !$leadWhatsapp) return;
+
+            $db = Database::getInstance();
+            $notifRow = $db->queryOne("SELECT value FROM settings WHERE `key` = 'lead_notification_email'");
+            $notifEmail = $notifRow['value'] ?? '';
+            if (empty($notifEmail) || !filter_var($notifEmail, FILTER_VALIDATE_EMAIL)) return;
+
+            $score = $audit['globalScore'] ?? '?';
+            $leadName = trim($leadData['leadName'] ?? '') ?: 'No proporcionado';
+            $leadCompany = trim($leadData['leadCompany'] ?? '') ?: 'No proporcionado';
+            $subject = "Nuevo lead: {$audit['domain']} (Score: $score/100)";
+            $body = "Nuevo lead capturado en Imagina Audit\n\n"
+                . "Sitio: {$audit['url']}\n"
+                . "Score: $score/100 ({$audit['globalLevel']})\n\n"
+                . "Nombre: $leadName\nEmail: " . ($leadEmail ?: 'No proporcionado') . "\n"
+                . "WhatsApp: " . ($leadWhatsapp ?: 'No proporcionado') . "\n"
+                . "Empresa: $leadCompany\nFecha: " . date('d/m/Y H:i') . "\n";
+            Mailer::send($notifEmail, $subject, $body);
+        } catch (Throwable $e) {
+            Logger::warning('Error enviando notificación de lead: ' . $e->getMessage());
+        }
     }
 }

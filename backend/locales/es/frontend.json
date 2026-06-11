@@ -1624,7 +1624,18 @@
     "diag_warn": "Advertencias",
     "diag_fail": "Fallidos",
     "diag_app_version": "App v{{version}}",
-    "diag_share_hint": "Pulsa \"Copiar para soporte\" y pega el JSON en el hilo de soporte. Incluye versión de PHP, extensiones, driver de DB, errores recientes en el log y los resultados reales de cada paso del pipeline en tu hosting."
+    "diag_share_hint": "Pulsa \"Copiar para soporte\" y pega el JSON en el hilo de soporte. Incluye versión de PHP, extensiones, driver de DB, errores recientes en el log y los resultados reales de cada paso del pipeline en tu hosting.",
+    "leadcap_card": "Captura de leads",
+    "leadcap_subtitle": "Elige cuándo los prospectos entregan sus datos de contacto.",
+    "leadcap_mode_upfront": "Por adelantado (actual)",
+    "leadcap_mode_upfront_desc": "El formulario pide la URL y los datos de contacto juntos, antes del escaneo.",
+    "leadcap_mode_gated": "Tras adelanto (gated)",
+    "leadcap_mode_gated_desc": "El formulario pide solo la URL. Tras el escaneo el prospecto ve el score y un informe difuminado, y debe ingresar sus datos para desbloquear el detalle completo. Convierte mejor.",
+    "leadcap_required_fields": "Campos obligatorios para desbloquear",
+    "leadcap_required_hint": "Los campos sin marcar igual aparecen en el formulario pero son opcionales. El email es el más útil para seguimiento.",
+    "leadcap_field_email": "Email",
+    "leadcap_field_name": "Nombre",
+    "leadcap_field_whatsapp": "WhatsApp"
   },
   "public": {
     "header_compare": "Comparar",
@@ -1735,6 +1746,23 @@
     "module_name_infrastructure": "Infraestructura",
     "module_name_conversion": "Conversión",
     "module_name_page_health": "Salud de Página",
-    "module_name_wp_internal": "Análisis Interno"
+    "module_name_wp_internal": "Análisis Interno",
+    "gate_title": "Tu informe completo está listo",
+    "gate_subtitle": "Tu sitio sacó {{score}}/100. Ingresa tus datos para desbloquear el detalle completo y el plan de soluciones.",
+    "gate_email_required": "El email es obligatorio",
+    "gate_email_invalid": "Ingresa un email válido",
+    "gate_name_required": "El nombre es obligatorio",
+    "gate_whatsapp_required": "El WhatsApp es obligatorio",
+    "gate_unlocked": "¡Informe desbloqueado!",
+    "gate_error": "No se pudieron guardar tus datos. Intenta nuevamente.",
+    "gate_email_ph": "Email (opcional)",
+    "gate_email_ph_required": "Tu email *",
+    "gate_name_ph": "Nombre (opcional)",
+    "gate_name_ph_required": "Tu nombre *",
+    "gate_whatsapp_ph": "WhatsApp (opcional)",
+    "gate_whatsapp_ph_required": "Tu WhatsApp *",
+    "gate_button": "Desbloquear informe completo",
+    "gate_privacy": "Solo usamos tus datos para enviarte el informe y dar seguimiento. Sin spam.",
+    "cta_whatsapp_message_audit": "¡Hola! Acabo de auditar {{domain}} y saqué {{score}}/100. Quiero saber cómo mejorarlo."
   }
 }

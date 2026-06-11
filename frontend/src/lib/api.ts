@@ -157,6 +157,19 @@ export async function getAuditResult(id: string): Promise<AuditResult> {
   return response.data.data
 }
 
+export interface CaptureLeadPayload {
+  auditId: string
+  leadEmail?: string
+  leadName?: string
+  leadWhatsapp?: string
+  leadCompany?: string
+}
+
+/** Captura datos de contacto de un lead y desbloquea el informe (modo gated). */
+export async function captureLead(payload: CaptureLeadPayload): Promise<void> {
+  await api.post('/capture-lead.php', payload)
+}
+
 /** Obtiene la configuración pública. Se pasa el idioma activo para que los
  *  fallbacks no editados desde admin vengan en el idioma correcto. */
 export async function getConfig(): Promise<typeof DEFAULT_CONFIG> {

@@ -22,12 +22,16 @@ type AuditFormData = {
 export default function AuditForm() {
   const { t } = useTranslation()
   const { startAudit, status } = useAudit()
-  const { home, form: formCfg } = useConfigStore((s) => s.config)
+  const { home, form: formCfg, leadCapture } = useConfigStore((s) => s.config)
   const [searchParams] = useSearchParams()
   // Si hay sesión de user, escondemos los campos de lead — ya tenemos su
   // identidad en el backend vía sesión. Para el público anónimo siguen ahí
   // como lead-capture del flujo CTA.
   const isAuthenticated = useUserAuthStore((s) => s.isAuthenticated)
+  // Modo 'gated': el formulario pide SOLO la URL. Los datos de contacto se
+  // capturan después, al desbloquear el informe completo en ResultsPage.
+  const gated = leadCapture?.mode === 'gated'
+  const showLeadFields = !isAuthenticated && !gated
   const isScanning = status === 'scanning'
   const microItems = (home.formMicrocopy || t('public.audit_form_microcopy_default'))
     .split(/\s*[·•|]\s*/).filter(Boolean)
@@ -97,9 +101,10 @@ export default function AuditForm() {
             )}
           </div>
 
-          {/* Campos opcionales de lead — solo para público anónimo. Los
-              usuarios logueados ya están identificados por sesión. */}
-          {!isAuthenticated && (
+          {/* Campos opcionales de lead — solo para público anónimo en modo
+              'upfront'. En 'gated' se piden después (al desbloquear el
+              informe). Los usuarios logueados ya están identificados. */}
+          {showLeadFields && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="relative">
                 <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" strokeWidth={1.5} />

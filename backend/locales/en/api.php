@@ -29,4 +29,11 @@ return [
     // ——— /api/scan-progress.php ————————————————————————————————
     'progress.id_required' => 'id is required',
     'progress.not_found'   => 'Progress not found or expired',
+
+    // ——— /api/capture-lead.php ————————————————————————————————
+    'lead.email_required'    => 'Email is required.',
+    'lead.email_invalid'     => 'The email is not valid.',
+    'lead.name_required'     => 'Name is required.',
+    'lead.whatsapp_required' => 'WhatsApp is required.',
+    'lead.capture_error'     => 'Could not save your details. Please try again.',
 ];

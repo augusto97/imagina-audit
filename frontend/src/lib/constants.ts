@@ -20,6 +20,12 @@ export const DEFAULT_CONFIG = {
     { name: 'Custom', price: 'Cotizar', currency: 'USD' },
   ],
   salesMessages: {} as Record<string, string>,
+  leadCapture: {
+    mode: 'upfront' as 'upfront' | 'gated',
+    requireEmail: true,
+    requireName: false,
+    requireWhatsapp: false,
+  },
 }
 
 /** Iconos de módulos (nombres de Lucide) */
