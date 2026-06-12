@@ -633,9 +633,56 @@ class QueueManager {
     }
 
     /**
-     * Envía la notificación de "nuevo lead" al email configurado en settings.
-     * No-op si no hay email/WhatsApp en el lead o si no hay destino configurado.
-     * Reutilizado por processJob (modo upfront) y capture-lead.php (modo gated).
+     * Envía al prospecto un email con el link a su informe completo.
+     * Lo usa el modo gated del bloque embed y el modo gated en general:
+     * tras dejar su email, recibe en su correo el acceso directo al audit.
+     * Refuerza el funnel (necesita poner un email real) y le da una razón
+     * para abrir el correo en la bandeja de entrada.
+     *
+     * Lee la URL base de settings.app_url; si no, falla en silencio sin
+     * bloquear el flujo (la notificación al admin ya se hizo).
+     */
+    public static function sendLeadAuditEmail(string $auditId, string $toEmail, array $audit): void {
+        if ($toEmail === '' || !filter_var($toEmail, FILTER_VALIDATE_EMAIL)) return;
+
+        try {
+            $db = Database::getInstance();
+
+            $base = (string) $db->scalar("SELECT value FROM settings WHERE `key` = 'app_url'");
+            $base = trim($base);
+            if ($base === '' || !preg_match('#^https?://#i', $base)) {
+                // Sin URL base no podemos armar un link absoluto que el
+                // cliente de email pueda hacer clickable. Mejor abortar
+                // que mandar un link relativo inservible.
+                Logger::warning('sendLeadAuditEmail saltado: settings.app_url vacío o inválido');
+                return;
+            }
+            $base = rtrim($base, '/');
+            $link = "$base/results/" . $auditId;
+
+            $domain = $audit['domain'] ?? '';
+            $score = $audit['globalScore'] ?? '?';
+            $companyName = (string) $db->scalar("SELECT value FROM settings WHERE `key` = 'company_name'") ?: 'Imagina Audit';
+
+            $subject = "Tu informe de $domain está listo (Score: $score/100)";
+            $body = "Hola,\n\n"
+                . "Gracias por usar $companyName. El informe completo de $domain ya está listo.\n\n"
+                . "Score global: $score/100\n\n"
+                . "Puedes ver el informe completo aquí:\n$link\n\n"
+                . "El informe incluye: análisis de seguridad, rendimiento, SEO, WordPress, móvil, infraestructura y conversión, con el plan de soluciones recomendado.\n\n"
+                . "Saludos,\nEl equipo de $companyName\n";
+
+            Mailer::send($toEmail, $subject, $body);
+        } catch (Throwable $e) {
+            Logger::warning('sendLeadAuditEmail error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Envía la notificación de "nuevo lead" al email del admin configurado
+     * en settings. No-op si no hay email/WhatsApp en el lead o si no hay
+     * destino configurado. Reutilizado por processJob (modo upfront) y
+     * capture-lead.php (modo gated / widget inline).
      */
     public static function notifyLead(array $audit, array $leadData): void {
         try {

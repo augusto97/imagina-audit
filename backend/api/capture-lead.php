@@ -81,18 +81,21 @@ try {
         [$leadName, $leadEmail, $leadWhatsapp, $leadCompany, $auditId]
     );
 
-    // Notificar al admin (mismo formato que el modo upfront).
-    QueueManager::notifyLead([
+    $auditMeta = [
         'domain' => $audit['domain'],
         'url' => $audit['url'],
         'globalScore' => $audit['global_score'],
         'globalLevel' => $audit['global_level'],
-    ], [
+    ];
+    // Notificar al admin (mismo formato que el modo upfront).
+    QueueManager::notifyLead($auditMeta, [
         'leadName' => $leadName,
         'leadEmail' => $leadEmail,
         'leadWhatsapp' => $leadWhatsapp,
         'leadCompany' => $leadCompany,
     ]);
+    // Enviar al prospecto el link de su informe completo por email.
+    QueueManager::sendLeadAuditEmail($auditId, $leadEmail, $auditMeta);
 
     Response::success(['unlocked' => true]);
 } catch (Throwable $e) {

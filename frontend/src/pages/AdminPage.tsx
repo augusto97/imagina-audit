@@ -27,6 +27,7 @@ import AdminDatabaseMigration from '@/components/admin/AdminDatabaseMigration'
 import AdminBackups from '@/components/admin/AdminBackups'
 import SystemHealth from '@/components/admin/SystemHealth'
 import Diagnostics from '@/components/admin/Diagnostics'
+import SettingsEmbed from '@/components/admin/SettingsEmbed'
 import VulnerabilityManager from '@/components/admin/VulnerabilityManager'
 import TechnicalReport from '@/components/admin/TechnicalReport'
 import SnapshotReport from '@/components/admin/SnapshotReport'
@@ -91,6 +92,7 @@ export default function AdminPage() {
         <Route path="backups" element={<AdminBackups />} />
         <Route path="health" element={<SystemHealth />} />
         <Route path="diagnostics" element={<Diagnostics />} />
+        <Route path="embed" element={<SettingsEmbed />} />
         <Route path="vulnerabilities" element={<VulnerabilityManager />} />
         <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Routes>
