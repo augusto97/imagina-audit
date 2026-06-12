@@ -1692,7 +1692,9 @@
     "embed_preview_bg": "Fondo de la página",
     "embed_preview_bg_light": "Claro",
     "embed_preview_bg_dark": "Oscuro",
-    "embed_preview_bg_pattern": "Patrón"
+    "embed_preview_bg_pattern": "Patrón",
+    "embed_preview_loading": "Cargando vista previa…",
+    "embed_preview_err": "No se pudo cargar el código del widget. Verifica que /widget/imagina-audit-widget.js esté desplegado en este servidor."
   },
   "public": {
     "header_compare": "Comparar",

@@ -41,37 +41,57 @@
       if (all[i].src && all[i].src.indexOf('imagina-audit-widget') !== -1) { script = all[i]; break; }
     }
   }
-  if (!script) { console.error('[ImaginaAudit] no se encontró el script tag'); return; }
 
-  var API = (script.getAttribute('data-api') || '').replace(/\/+$/, '');
-  var MODE = (script.getAttribute('data-mode') || 'floating').toLowerCase();
-  var TARGET = script.getAttribute('data-target') || '#imagina-audit-block';
-  var COLOR = script.getAttribute('data-color') || '#0CC0DF';
-  var THEME = (script.getAttribute('data-theme') || 'light').toLowerCase();
-  var STYLE = (script.getAttribute('data-style') || 'card').toLowerCase();
-  var POS = script.getAttribute('data-position') || 'bottom-right';
-  var LANG = (script.getAttribute('data-lang') || 'es').slice(0, 2);
-  var WHATSAPP = script.getAttribute('data-whatsapp') || '';
-  var GTM_EVENT = script.getAttribute('data-gtm-event') || '';
-  var GTAG_CONV = script.getAttribute('data-gtag-conversion') || '';
+  // Fallback de configuración por objeto global. Cuando el widget se
+  // inyecta INLINE (p.ej. el preview de /admin/embed, que descarga el
+  // código fresco y lo ejecuta sin un <script src>), no hay atributos
+  // data-* que leer del tag. En ese caso la config viene de
+  // window.IMAGINA_AUDIT_CONFIG = { 'data-api': ..., 'data-mode': ... }.
+  var GCFG = (typeof window !== 'undefined' && window.IMAGINA_AUDIT_CONFIG) ? window.IMAGINA_AUDIT_CONFIG : null;
+
+  if (!script && !GCFG) { console.error('[ImaginaAudit] no se encontró el script tag'); return; }
+
+  // Lectores unificados: primero el atributo del tag, luego el objeto global.
+  function ga(name) {
+    if (script && script.getAttribute && script.getAttribute(name) != null) return script.getAttribute(name);
+    if (GCFG && GCFG[name] != null) return GCFG[name];
+    return null;
+  }
+  function ha(name) {
+    if (script && script.hasAttribute && script.hasAttribute(name)) return true;
+    if (GCFG && Object.prototype.hasOwnProperty.call(GCFG, name)) return true;
+    return false;
+  }
+
+  var API = (ga('data-api') || '').replace(/\/+$/, '');
+  var MODE = (ga('data-mode') || 'floating').toLowerCase();
+  var TARGET = ga('data-target') || '#imagina-audit-block';
+  var COLOR = ga('data-color') || '#0CC0DF';
+  var THEME = (ga('data-theme') || 'light').toLowerCase();
+  var STYLE = (ga('data-style') || 'card').toLowerCase();
+  var POS = ga('data-position') || 'bottom-right';
+  var LANG = (ga('data-lang') || 'es').slice(0, 2);
+  var WHATSAPP = ga('data-whatsapp') || '';
+  var GTM_EVENT = ga('data-gtm-event') || '';
+  var GTAG_CONV = ga('data-gtag-conversion') || '';
 
   // Modo demo: el widget arranca directamente en el estado "preview" con
   // datos ficticios, sin escanear nada y sin tocar la red. Usado por
   // /admin/embed para que el admin vea el bloque completo sin pelearse
   // con un escaneo real.
-  var DEMO = (script.getAttribute('data-demo') || '').toLowerCase();
+  var DEMO = String(ga('data-demo') || '').toLowerCase();
   var IS_DEMO = DEMO === '1' || DEMO === 'true' || DEMO === 'yes';
   // Estado demo inicial: 'preview' (default) o 'form' (para previsualizar
   // el formulario de entrada con los estilos).
-  var DEMO_STATE = (script.getAttribute('data-demo-state') || 'preview').toLowerCase();
+  var DEMO_STATE = (ga('data-demo-state') || 'preview').toLowerCase();
 
   // Overrides explícitos de los campos requeridos del gate. Útil para el
   // preview del admin (donde queremos un resultado determinista que NO
   // dependa de la latencia de /api/config.php) y para escenarios donde
   // el sitio host quiera forzar campos sin tocar la config global.
-  function hasAttr(n) { return script.hasAttribute(n); }
+  function hasAttr(n) { return ha(n); }
   function attrBool(n) {
-    var v = (script.getAttribute(n) || '').toLowerCase();
+    var v = String(ga(n) || '').toLowerCase();
     return v === '1' || v === 'true' || v === 'yes';
   }
   var FORCE_REQ = {
@@ -352,8 +372,12 @@
     opts = opts || {};
     var auditId = null, auditResult = null;
 
-    // host es el contenedor externo; dentro montamos una .ia-card
-    host.className = rootClass() + (MODE === 'inline' ? ' ia-inline-root' : '');
+    // host es el contenedor externo; dentro montamos una .ia-card.
+    // Usamos classList.add (no host.className=) para NO pisar clases que
+    // el caller ya puso en el host — p.ej. el popup flotante lleva
+    // 'ia-show' y sobrescribir la className lo dejaba en display:none.
+    var hostClasses = (rootClass() + (MODE === 'inline' ? ' ia-inline-root' : '')).split(' ');
+    hostClasses.forEach(function (c) { if (c) host.classList.add(c); });
     var card = document.createElement('div');
     card.className = 'ia-card';
     host.appendChild(card);
@@ -670,12 +694,17 @@
     };
   }
 
-  // Para floating + demo: crea solo el popup, ya abierto, sin botón flotante.
+  // Para floating + demo: crea el botón flotante Y el popup abierto, para
+  // que el admin vea la experiencia completa de la burbuja.
   function initFloatingDemo(initialState) {
+    var btn = document.createElement('button');
+    btn.id = 'ia-w-btn'; btn.type = 'button'; btn.title = L.title; btn.innerHTML = ICON.shield;
+    document.body.appendChild(btn);
     var pop = document.createElement('div');
     pop.id = 'ia-w-pop'; pop.classList.add('ia-show');
     document.body.appendChild(pop);
     var app = makeApp(pop, { onClose: function () { pop.classList.remove('ia-show'); } });
+    btn.onclick = function () { pop.classList.toggle('ia-show'); };
     if (initialState === 'form') app.renderForm(); else app.renderPreview(demoResult());
     onConfigReady = app.maybeRerenderGate;
   }

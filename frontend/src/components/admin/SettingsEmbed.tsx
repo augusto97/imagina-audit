@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy, Check, Code2, BadgeInfo, MousePointer, LayoutPanelTop, Eye, Mail, User, MessageCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -76,42 +76,66 @@ export default function SettingsEmbed() {
     '>\n</script>' +
     (mode === 'inline' ? `\n<div id="${targetId}"></div>` : '')
 
-  // Preview en vivo: cargamos el widget REAL en un iframe aislado, en
-  // modo demo. El widget NO impone background — eso lo provee el host;
-  // aquí simulamos "el fondo del sitio donde se va a embeber" con el
-  // selector previewBg, totalmente independiente del data-theme del
-  // widget, así el admin ve tema oscuro sobre fondo claro o viceversa si
-  // su página lo necesita.
+  // Descargamos el código del widget FRESCO (cache:'no-store' + timestamp)
+  // y lo inyectamos INLINE en el iframe. Esto elimina el problema de caché:
+  // un <script src> se quedaba con la versión vieja del widget en el
+  // navegador, por eso "solo cambiaba el color" (lo único que el widget
+  // viejo soportaba). Inline = siempre el código actual del servidor.
+  const [widgetCode, setWidgetCode] = useState<string | null>(null)
+  const [widgetErr, setWidgetErr] = useState(false)
+  useEffect(() => {
+    let alive = true
+    setWidgetCode(null)
+    setWidgetErr(false)
+    fetch(widgetSrc + '?t=' + Date.now(), { cache: 'no-store' })
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error('http ' + r.status))))
+      .then((txt) => { if (alive) setWidgetCode(txt) })
+      .catch(() => { if (alive) setWidgetErr(true) })
+    return () => { alive = false }
+  }, [widgetSrc])
+
+  // Preview en vivo, en modo demo. El widget NO impone background — lo
+  // provee el host; aquí simulamos "el fondo del sitio donde se embeba"
+  // con previewBg, independiente del data-theme del widget.
   //
   // Forzamos data-require-* con la config real de Captura de leads para
   // que el demo muestre EXACTAMENTE los campos que el widget pedirá en
   // producción (sin race condition con /api/config.php).
+  //
+  // El preview respeta el MODO seleccionado: inline muestra el bloque,
+  // floating muestra la burbuja + popup abierto dentro del iframe.
   const previewSrcDoc = useMemo(() => {
+    if (!widgetCode) return ''
     const bgCss = previewBg === 'dark'
       ? '#0f1827'
       : previewBg === 'pattern'
       ? 'repeating-conic-gradient(#f8fafc 0% 25%, #eef2f7 0% 50%) 50%/24px 24px'
       : '#f4f6f9'
 
-    const pAttrs: Array<[string, string | undefined]> = [
-      ['src', widgetSrc],
-      ['data-api', apiBase],
-      ['data-mode', 'inline'],
-      ['data-target', '#ia-preview'],
-      ['data-theme', theme],
-      ['data-style', style],
-      ['data-color', color],
-      ['data-lang', lang],
-      ['data-whatsapp', whatsapp || undefined],
-      ['data-demo', '1'],
-      ['data-demo-state', previewState],
-      ['data-require-email', String(leadCapture?.requireEmail ?? true)],
-      ['data-require-name', String(leadCapture?.requireName ?? false)],
-      ['data-require-whatsapp', String(leadCapture?.requireWhatsapp ?? false)],
-    ]
-    const tag = pAttrs.filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${k}="${v}"`).join(' ')
-    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:28px 16px;background:${bgCss};min-height:100vh"><div id="ia-preview"></div><script ${tag}><\/script></body></html>`
-  }, [widgetSrc, apiBase, theme, style, color, lang, whatsapp, previewState, previewBg, leadCapture])
+    const cfg: Record<string, string> = {
+      'data-api': apiBase,
+      'data-mode': mode,
+      'data-target': '#ia-preview',
+      'data-position': position,
+      'data-theme': theme,
+      'data-style': style,
+      'data-color': color,
+      'data-lang': lang,
+      'data-demo': '1',
+      'data-demo-state': previewState,
+      'data-require-email': String(leadCapture?.requireEmail ?? true),
+      'data-require-name': String(leadCapture?.requireName ?? false),
+      'data-require-whatsapp': String(leadCapture?.requireWhatsapp ?? false),
+    }
+    if (whatsapp) cfg['data-whatsapp'] = whatsapp
+
+    // El contenedor #ia-preview solo lo usa el modo inline; en floating el
+    // widget se ancla al body del iframe. Damos altura para que la burbuja
+    // (position:fixed) quede abajo-derecha del iframe.
+    const cfgJson = JSON.stringify(cfg).replace(/</g, '\\u003c')
+    const codeSafe = widgetCode.replace(/<\/script>/gi, '<\\/script>')
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:28px 16px;background:${bgCss};min-height:100vh;box-sizing:border-box"><div id="ia-preview"></div><script>window.IMAGINA_AUDIT_CONFIG=${cfgJson};<\/script><script>${codeSafe}<\/script></body></html>`
+  }, [widgetCode, apiBase, mode, position, theme, style, color, lang, whatsapp, previewState, previewBg, leadCapture])
 
   const [copied, setCopied] = useState(false)
   const copy = async () => {
@@ -260,13 +284,23 @@ export default function SettingsEmbed() {
             </div>
           </div>
           <div className="overflow-hidden rounded-xl border border-[var(--border-default)]">
-            <iframe
-              key={`${theme}-${style}-${color}-${lang}-${previewState}-${previewBg}-${whatsapp}-${leadCapture?.requireWhatsapp}-${leadCapture?.requireName}-${leadCapture?.requireEmail}`}
-              title="preview"
-              srcDoc={previewSrcDoc}
-              className="block h-[720px] w-full border-0"
-              sandbox="allow-scripts allow-same-origin allow-popups"
-            />
+            {widgetErr ? (
+              <div className="flex h-[300px] items-center justify-center p-6 text-center text-sm text-[var(--text-secondary)]">
+                {t('settings.embed_preview_err')}
+              </div>
+            ) : !widgetCode ? (
+              <div className="flex h-[300px] items-center justify-center text-sm text-[var(--text-tertiary)]">
+                {t('settings.embed_preview_loading')}
+              </div>
+            ) : (
+              <iframe
+                key={`${mode}-${theme}-${style}-${color}-${lang}-${position}-${previewState}-${previewBg}-${whatsapp}-${leadCapture?.requireWhatsapp}-${leadCapture?.requireName}-${leadCapture?.requireEmail}`}
+                title="preview"
+                srcDoc={previewSrcDoc}
+                className="block h-[720px] w-full border-0"
+                sandbox="allow-scripts allow-same-origin allow-popups"
+              />
+            )}
           </div>
           <p className="mt-3 text-xs text-[var(--text-tertiary)]">{t('settings.embed_preview_hint')}</p>
         </CardContent>

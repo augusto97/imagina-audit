@@ -1692,7 +1692,9 @@
     "embed_preview_bg": "Host page background",
     "embed_preview_bg_light": "Light",
     "embed_preview_bg_dark": "Dark",
-    "embed_preview_bg_pattern": "Pattern"
+    "embed_preview_bg_pattern": "Pattern",
+    "embed_preview_loading": "Loading preview…",
+    "embed_preview_err": "Could not load the widget code. Make sure /widget/imagina-audit-widget.js is deployed on this server."
   },
   "public": {
     "header_compare": "Compare",
