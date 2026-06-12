@@ -35,6 +35,13 @@ export default function SettingsEmbed() {
   const [gtmEvent, setGtmEvent] = useState('imagina_audit_lead')
   const [gtagConv, setGtagConv] = useState('')
 
+  // Controles del preview (no se exportan al snippet — son solo para el
+  // admin que está mirando aquí). El fondo del preview simula la página
+  // host: el widget NO impone background, lo provee el sitio donde se
+  // embeba, así que aquí lo elegimos para evaluarlo bien.
+  const [previewState, setPreviewState] = useState<'preview' | 'form'>('preview')
+  const [previewBg, setPreviewBg] = useState<'light' | 'dark' | 'pattern'>('light')
+
   const apiBase = window.location.origin + '/api'
   const widgetSrc = window.location.origin + '/widget/imagina-audit-widget.js'
 
@@ -69,26 +76,42 @@ export default function SettingsEmbed() {
     '>\n</script>' +
     (mode === 'inline' ? `\n<div id="${targetId}"></div>` : '')
 
-  // Preview en vivo: cargamos el widget REAL dentro de un iframe aislado.
-  // Es el mismo JS que recibirá el sitio host, así que lo que se ve aquí
-  // es exactamente lo que verá el visitante (incluido el flujo de escaneo
-  // si se escribe una URL). Forzamos modo inline para que se vea el bloque.
+  // Preview en vivo: cargamos el widget REAL en un iframe aislado, en
+  // modo demo. El widget NO impone background — eso lo provee el host;
+  // aquí simulamos "el fondo del sitio donde se va a embeber" con el
+  // selector previewBg, totalmente independiente del data-theme del
+  // widget, así el admin ve tema oscuro sobre fondo claro o viceversa si
+  // su página lo necesita.
+  //
+  // Forzamos data-require-* con la config real de Captura de leads para
+  // que el demo muestre EXACTAMENTE los campos que el widget pedirá en
+  // producción (sin race condition con /api/config.php).
   const previewSrcDoc = useMemo(() => {
-    const bg = theme === 'dark' ? '#0B0F1A' : '#f1f5f9'
+    const bgCss = previewBg === 'dark'
+      ? '#0f1827'
+      : previewBg === 'pattern'
+      ? 'repeating-conic-gradient(#f8fafc 0% 25%, #eef2f7 0% 50%) 50%/24px 24px'
+      : '#f4f6f9'
+
     const pAttrs: Array<[string, string | undefined]> = [
       ['src', widgetSrc],
       ['data-api', apiBase],
       ['data-mode', 'inline'],
+      ['data-target', '#ia-preview'],
       ['data-theme', theme],
       ['data-style', style],
       ['data-color', color],
       ['data-lang', lang],
       ['data-whatsapp', whatsapp || undefined],
-      ['data-target', '#ia-preview'],
+      ['data-demo', '1'],
+      ['data-demo-state', previewState],
+      ['data-require-email', String(leadCapture?.requireEmail ?? true)],
+      ['data-require-name', String(leadCapture?.requireName ?? false)],
+      ['data-require-whatsapp', String(leadCapture?.requireWhatsapp ?? false)],
     ]
-    const tag = pAttrs.filter(([, v]) => v).map(([k, v]) => `${k}="${v}"`).join(' ')
-    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:24px 16px;background:${bg};min-height:100vh"><div id="ia-preview"></div><script ${tag}><\/script></body></html>`
-  }, [widgetSrc, apiBase, theme, style, color, lang, whatsapp])
+    const tag = pAttrs.filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${k}="${v}"`).join(' ')
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:28px 16px;background:${bgCss};min-height:100vh"><div id="ia-preview"></div><script ${tag}><\/script></body></html>`
+  }, [widgetSrc, apiBase, theme, style, color, lang, whatsapp, previewState, previewBg, leadCapture])
 
   const [copied, setCopied] = useState(false)
   const copy = async () => {
@@ -221,12 +244,27 @@ export default function SettingsEmbed() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Controles del preview */}
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <div className="inline-flex rounded-lg border border-[var(--border-default)] p-0.5 bg-white">
+              <PreviewSeg active={previewState === 'preview'} onClick={() => setPreviewState('preview')} label={t('settings.embed_preview_state_result')} />
+              <PreviewSeg active={previewState === 'form'} onClick={() => setPreviewState('form')} label={t('settings.embed_preview_state_form')} />
+            </div>
+            <div className="ml-auto inline-flex items-center gap-2">
+              <span className="text-[11px] text-[var(--text-tertiary)]">{t('settings.embed_preview_bg')}:</span>
+              <div className="inline-flex rounded-lg border border-[var(--border-default)] p-0.5 bg-white">
+                <PreviewSeg active={previewBg === 'light'} onClick={() => setPreviewBg('light')} label={t('settings.embed_preview_bg_light')} />
+                <PreviewSeg active={previewBg === 'dark'} onClick={() => setPreviewBg('dark')} label={t('settings.embed_preview_bg_dark')} />
+                <PreviewSeg active={previewBg === 'pattern'} onClick={() => setPreviewBg('pattern')} label={t('settings.embed_preview_bg_pattern')} />
+              </div>
+            </div>
+          </div>
           <div className="overflow-hidden rounded-xl border border-[var(--border-default)]">
             <iframe
-              key={`${theme}-${style}-${color}-${lang}`}
+              key={`${theme}-${style}-${color}-${lang}-${previewState}-${previewBg}-${whatsapp}-${leadCapture?.requireWhatsapp}-${leadCapture?.requireName}-${leadCapture?.requireEmail}`}
               title="preview"
               srcDoc={previewSrcDoc}
-              className="block h-[640px] w-full border-0"
+              className="block h-[720px] w-full border-0"
               sandbox="allow-scripts allow-same-origin allow-popups"
             />
           </div>
@@ -288,6 +326,20 @@ export default function SettingsEmbed() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function PreviewSeg({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+        active ? 'bg-[var(--accent-primary)] text-white' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+      }`}
+    >
+      {label}
+    </button>
   )
 }
 

@@ -1686,7 +1686,13 @@
     "embed_field_opt": "opcional",
     "embed_fields_hint": "Esto coincide con tu configuración de Captura de leads. Para cambiar qué campos son obligatorios, ve a Configuración → Captura de leads. El WhatsApp solo aparece aquí si lo marcaste como obligatorio.",
     "embed_preview_card": "Vista previa en vivo",
-    "embed_preview_hint": "Este es el widget real corriendo con tus opciones actuales. Escribe una URL y lanza un escaneo para ver el flujo completo. Cambiar tema, estilo o color lo recarga."
+    "embed_preview_hint": "Demo en vivo del widget con datos ficticios. El fondo de la página es solo una simulación — el widget no impone fondo, lo provee tu página. Cambia arriba el tema/estilo/color para ver el efecto; usa \"Formulario\" para previsualizar la vista del input de URL y \"Resultado\" para previsualizar la vista de auditoría + captura de lead.",
+    "embed_preview_state_form": "Formulario",
+    "embed_preview_state_result": "Resultado",
+    "embed_preview_bg": "Fondo de la página",
+    "embed_preview_bg_light": "Claro",
+    "embed_preview_bg_dark": "Oscuro",
+    "embed_preview_bg_pattern": "Patrón"
   },
   "public": {
     "header_compare": "Comparar",

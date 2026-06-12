@@ -1686,7 +1686,13 @@
     "embed_field_opt": "optional",
     "embed_fields_hint": "This matches your Lead Capture settings. To change which fields are required, go to Settings → Lead capture. WhatsApp only appears here if you marked it required.",
     "embed_preview_card": "Live preview",
-    "embed_preview_hint": "This is the real widget running with your current options. Type a URL and run a scan to see the full flow. Changing theme, style or color reloads it."
+    "embed_preview_hint": "A live demo of the widget with fake data. The host page background is just a simulation — the widget itself does not impose any background, your page provides it. Switch theme/style/color above to see the effect; use \"Form\" to preview the URL input view and \"Result\" to preview the audit + lead-capture view.",
+    "embed_preview_state_form": "Form",
+    "embed_preview_state_result": "Result",
+    "embed_preview_bg": "Host page background",
+    "embed_preview_bg_light": "Light",
+    "embed_preview_bg_dark": "Dark",
+    "embed_preview_bg_pattern": "Pattern"
   },
   "public": {
     "header_compare": "Compare",

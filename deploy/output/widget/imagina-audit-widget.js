@@ -55,20 +55,69 @@
   var GTM_EVENT = script.getAttribute('data-gtm-event') || '';
   var GTAG_CONV = script.getAttribute('data-gtag-conversion') || '';
 
-  if (!API) { console.error('[ImaginaAudit] data-api es obligatorio'); return; }
+  // Modo demo: el widget arranca directamente en el estado "preview" con
+  // datos ficticios, sin escanear nada y sin tocar la red. Usado por
+  // /admin/embed para que el admin vea el bloque completo sin pelearse
+  // con un escaneo real.
+  var DEMO = (script.getAttribute('data-demo') || '').toLowerCase();
+  var IS_DEMO = DEMO === '1' || DEMO === 'true' || DEMO === 'yes';
+  // Estado demo inicial: 'preview' (default) o 'form' (para previsualizar
+  // el formulario de entrada con los estilos).
+  var DEMO_STATE = (script.getAttribute('data-demo-state') || 'preview').toLowerCase();
+
+  // Overrides explícitos de los campos requeridos del gate. Útil para el
+  // preview del admin (donde queremos un resultado determinista que NO
+  // dependa de la latencia de /api/config.php) y para escenarios donde
+  // el sitio host quiera forzar campos sin tocar la config global.
+  function hasAttr(n) { return script.hasAttribute(n); }
+  function attrBool(n) {
+    var v = (script.getAttribute(n) || '').toLowerCase();
+    return v === '1' || v === 'true' || v === 'yes';
+  }
+  var FORCE_REQ = {
+    email: hasAttr('data-require-email') ? attrBool('data-require-email') : null,
+    name: hasAttr('data-require-name') ? attrBool('data-require-name') : null,
+    whatsapp: hasAttr('data-require-whatsapp') ? attrBool('data-require-whatsapp') : null,
+  };
+  var HAS_FORCE = FORCE_REQ.email !== null || FORCE_REQ.name !== null || FORCE_REQ.whatsapp !== null;
+
+  if (!API && !IS_DEMO) { console.error('[ImaginaAudit] data-api es obligatorio'); return; }
 
   // ─── Config del servidor (campos obligatorios del gate) ─────────────
   // La pedimos al arrancar; para cuando el visitante termina un escaneo
-  // (segundos) ya está resuelta. Si falla, caemos a "solo email".
+  // (segundos) ya está resuelta. Si llega tarde (gate ya renderizado),
+  // disparamos un callback registrado para re-renderizar el gate con los
+  // campos correctos — antes había una race condition que dejaba el
+  // WhatsApp escondido aunque estuviera marcado obligatorio.
   var serverCfg = null;
-  fetch(API + '/config.php')
-    .then(function (r) { return r.json(); })
-    .then(function (j) { if (j && j.success && j.data) serverCfg = j.data; })
-    .catch(function () { /* usaremos defaults */ });
+  var onConfigReady = null;
+  if (API && !HAS_FORCE) {
+    fetch(API + '/config.php')
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j && j.success && j.data) {
+          serverCfg = j.data;
+          if (typeof onConfigReady === 'function') onConfigReady();
+        }
+      })
+      .catch(function () { /* usaremos defaults */ });
+  }
 
   function gateReqs() {
+    // 1) Overrides explícitos vía data-require-* tienen prioridad absoluta.
+    //    Lo usa el preview del admin para reflejar la config sin esperar
+    //    al fetch async.
+    if (HAS_FORCE) {
+      return {
+        email:    FORCE_REQ.email    !== null ? FORCE_REQ.email    : true,
+        name:     FORCE_REQ.name     !== null ? FORCE_REQ.name     : false,
+        whatsapp: FORCE_REQ.whatsapp !== null ? FORCE_REQ.whatsapp : false,
+      };
+    }
+    // 2) Config del servidor.
     var lc = serverCfg && serverCfg.leadCapture;
     if (lc) return { email: !!lc.requireEmail, name: !!lc.requireName, whatsapp: !!lc.requireWhatsapp };
+    // 3) Fallback prudente.
     return { email: true, name: false, whatsapp: false };
   }
   function cfgPlaceholder(key, fallback) {
@@ -116,16 +165,32 @@
   var SEV = { critical: '#EF4444', warning: '#F59E0B', good: '#10B981', excellent: '#059669', info: '#6B7280', unknown: '#94A3B8' };
 
   // ─── Estilos (una vez por página) ───────────────────────────────────
+  // Diseño deliberadamente diferenciado por (theme × style) para que las
+  // 6 combinaciones se vean DISTINTAS desde el formulario inicial, no
+  // solo desde el preview post-scan.
+  //
+  // Theme (light/dark) controla texto, bordes y fondo del card.
+  // Style (card/gradient/minimal) controla el "marco" del widget:
+  //   card     — card sólido con borde + sombra suave.
+  //   gradient — card sólido + header pintado con degradado del acento.
+  //   minimal — sin marco, inputs con borde inferior, fondo transparente
+  //             (la página host provee el fondo).
+  //
+  // El widget NO impone fondo de página: solo se aplica al card. En
+  // minimal el card también es transparente y todo respira sobre el bg
+  // que defina la página donde se embeba.
   if (!document.getElementById('ia-w-styles')) {
     var st = document.createElement('style');
     st.id = 'ia-w-styles';
     var isRight = POS !== 'bottom-left';
     st.textContent = [
-      // Variables de tema (se setean en .ia-theme-*)
-      '.ia-root{--ia-accent:' + COLOR + ';font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}',
+      // Variables base
+      '.ia-root{--ia-accent:' + COLOR + ';--ia-accent-2:color-mix(in srgb,' + COLOR + ' 65%,#000);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}',
       '.ia-root *{box-sizing:border-box}',
-      '.ia-theme-light{--ia-bg:#ffffff;--ia-card:#ffffff;--ia-fg:#0f172a;--ia-muted:#64748b;--ia-faint:#94a3b8;--ia-border:#e7ebf0;--ia-soft:#f5f7fa;--ia-input:#ffffff;--ia-track:#eef2f6;--ia-shadow:0 8px 40px rgba(15,23,42,.10)}',
-      '.ia-theme-dark{--ia-bg:#0B0F1A;--ia-card:#111827;--ia-fg:#F1F5F9;--ia-muted:#94A3B8;--ia-faint:#64748b;--ia-border:#1f2a3b;--ia-soft:#161f2e;--ia-input:#1a2433;--ia-track:#1f2a3b;--ia-shadow:0 12px 48px rgba(0,0,0,.45)}',
+      // Theme: solo afecta colores propios del widget (texto, bordes,
+      // fondo del card). NO toca el fondo de la página.
+      '.ia-theme-light{--ia-card:#ffffff;--ia-fg:#0f172a;--ia-muted:#5a6776;--ia-faint:#94a3b8;--ia-border:#e5e9ee;--ia-soft:#f3f5f8;--ia-input-bg:#ffffff;--ia-input-bd:#dde2e8;--ia-track:#eef1f5;--ia-shadow:0 12px 36px -10px rgba(15,23,42,.18),0 4px 12px rgba(15,23,42,.06)}',
+      '.ia-theme-dark{--ia-card:#0f172a;--ia-fg:#f1f5f9;--ia-muted:#9aa6b8;--ia-faint:#5e6b80;--ia-border:#1e293b;--ia-soft:#162033;--ia-input-bg:#0b1322;--ia-input-bd:#27334a;--ia-track:#1e293b;--ia-shadow:0 18px 50px -10px rgba(0,0,0,.6),0 4px 16px rgba(0,0,0,.35)}',
 
       // Floating
       '#ia-w-btn{position:fixed;bottom:22px;' + (isRight ? 'right' : 'left') + ':22px;width:58px;height:58px;border-radius:50%;background:' + COLOR + ';color:#fff;border:none;cursor:pointer;z-index:2147483000;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 22px rgba(0,0,0,.28);transition:transform .2s,box-shadow .2s}',
@@ -135,28 +200,50 @@
       '#ia-w-pop.ia-show{display:block}',
       '@keyframes ia-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}',
 
-      // Contenedor (card)
-      '.ia-card{background:var(--ia-card);color:var(--ia-fg);border-radius:18px;overflow:hidden}',
-      '.ia-style-card .ia-card{border:1px solid var(--ia-border);box-shadow:var(--ia-shadow)}',
-      '.ia-style-minimal .ia-card{border:none;box-shadow:none;border-radius:12px}',
-      '.ia-style-gradient .ia-card{border:1px solid var(--ia-border);box-shadow:var(--ia-shadow)}',
-      '.ia-inline-root{max-width:520px;margin:0 auto}',
+      '.ia-inline-root{max-width:540px;margin:0 auto}',
 
-      // Header
-      '.ia-hd{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--ia-border)}',
-      '.ia-hd h3{margin:0;font-size:14px;font-weight:700;letter-spacing:.2px}',
-      '.ia-hd .ia-dom{font-size:12px;color:var(--ia-muted);font-weight:500;margin-top:2px}',
-      '.ia-x{background:none;border:none;cursor:pointer;color:var(--ia-faint);font-size:24px;line-height:1;padding:2px 6px;border-radius:8px}',
+      // ─── Estilo CARD (default): card sólido con borde + sombra ───
+      '.ia-style-card .ia-card{background:var(--ia-card);color:var(--ia-fg);border-radius:18px;overflow:hidden;border:1px solid var(--ia-border);box-shadow:var(--ia-shadow)}',
+      '.ia-style-card .ia-hd{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 22px 14px;border-bottom:1px solid var(--ia-border);background:var(--ia-card)}',
+
+      // ─── Estilo GRADIENT: card + header pintado con degradado ────
+      // El header con gradiente está SIEMPRE visible (forma y resultados),
+      // así el admin lo ve desde el formulario inicial.
+      '.ia-style-gradient .ia-card{background:var(--ia-card);color:var(--ia-fg);border-radius:18px;overflow:hidden;border:1px solid var(--ia-border);box-shadow:var(--ia-shadow)}',
+      '.ia-style-gradient .ia-hd{display:flex;justify-content:space-between;align-items:flex-start;padding:22px 22px 20px;background:linear-gradient(135deg,var(--ia-accent) 0%,var(--ia-accent-2) 100%);color:#fff;border-bottom:none}',
+      '.ia-style-gradient .ia-hd h3{color:#fff}',
+      '.ia-style-gradient .ia-hd .ia-dom{color:rgba(255,255,255,.85)}',
+      '.ia-style-gradient .ia-hd .ia-x{color:rgba(255,255,255,.78)}',
+      '.ia-style-gradient .ia-hd .ia-x:hover{color:#fff;background:rgba(255,255,255,.16)}',
+      '.ia-style-gradient .ia-bt{background:linear-gradient(135deg,var(--ia-accent) 0%,var(--ia-accent-2) 100%);box-shadow:0 6px 18px -6px color-mix(in srgb,var(--ia-accent) 70%,transparent)}',
+      '.ia-style-gradient .ia-sc-wrap{margin:-22px -22px 18px;padding:26px 22px 20px;background:linear-gradient(135deg,var(--ia-accent) 0%,var(--ia-accent-2) 100%);color:#fff}',
+      '.ia-style-gradient .ia-sc-wrap .ia-gauge-d{color:rgba(255,255,255,.85)}',
+      '.ia-style-gradient .ia-sc-wrap .ia-sev{background:rgba(255,255,255,.22)!important;color:#fff!important}',
+
+      // ─── Estilo MINIMAL: sin marco, transparente, inputs underlined ─
+      '.ia-style-minimal .ia-card{background:transparent;color:var(--ia-fg);border:none;box-shadow:none;border-radius:0;overflow:visible}',
+      '.ia-style-minimal .ia-hd{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 2px 14px;border-bottom:1px solid var(--ia-border);background:transparent}',
+      '.ia-style-minimal .ia-bd{padding:18px 2px 6px}',
+      '.ia-style-minimal .ia-in{border:none;border-bottom:1.5px solid var(--ia-input-bd);border-radius:0;padding:11px 0;background:transparent}',
+      '.ia-style-minimal .ia-in:focus{border-bottom-color:var(--ia-accent);box-shadow:none}',
+      '.ia-style-minimal .ia-bt{border-radius:10px}',
+      '.ia-style-minimal .ia-bo{border-radius:10px;border-width:1px}',
+
+      // ─── Cuerpo común ────────────────────────────────────────────
+      '.ia-card{color:var(--ia-fg)}',
+      '.ia-hd h3{margin:0;font-size:14.5px;font-weight:700;letter-spacing:.2px;line-height:1.2}',
+      '.ia-hd .ia-dom{font-size:12.5px;color:var(--ia-muted);font-weight:500;margin-top:3px}',
+      '.ia-x{background:none;border:none;cursor:pointer;color:var(--ia-faint);font-size:24px;line-height:1;padding:2px 8px;border-radius:8px}',
       '.ia-x:hover{color:var(--ia-fg);background:var(--ia-soft)}',
       '.ia-bd{padding:22px 22px 24px}',
       '.ia-lead{margin:0 0 16px;font-size:13.5px;color:var(--ia-muted);line-height:1.55}',
 
-      // Inputs
-      '.ia-fld{margin-bottom:12px}',
-      '.ia-lbl{display:block;font-size:11.5px;font-weight:600;color:var(--ia-muted);margin:0 0 5px;letter-spacing:.2px}',
-      '.ia-lbl .ia-opt{color:var(--ia-faint);font-weight:500}',
-      '.ia-req-star{color:#EF4444;margin-left:2px}',
-      '.ia-in{width:100%;padding:12px 14px;border:1.5px solid var(--ia-border);border-radius:11px;font-size:14.5px;color:var(--ia-fg);background:var(--ia-input);outline:none;transition:border-color .15s,box-shadow .15s;font-family:inherit}',
+      // Inputs (default card/gradient style)
+      '.ia-fld{margin-bottom:13px}',
+      '.ia-lbl{display:block;font-size:11.5px;font-weight:600;color:var(--ia-muted);margin:0 0 6px;letter-spacing:.3px;text-transform:uppercase}',
+      '.ia-lbl .ia-opt{color:var(--ia-faint);font-weight:500;text-transform:none;margin-left:4px}',
+      '.ia-req-star{color:#EF4444;margin-left:3px}',
+      '.ia-in{width:100%;padding:12px 14px;border:1.5px solid var(--ia-input-bd);border-radius:11px;font-size:14.5px;color:var(--ia-fg);background:var(--ia-input-bg);outline:none;transition:border-color .15s,box-shadow .15s;font-family:inherit}',
       '.ia-in::placeholder{color:var(--ia-faint)}',
       '.ia-in:focus{border-color:var(--ia-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--ia-accent) 18%,transparent)}',
       '.ia-in.ia-bad{border-color:#EF4444}',
@@ -181,21 +268,17 @@
       '@keyframes ia-rot{to{transform:rotate(360deg)}}',
 
       // Gauge
-      '.ia-gauge{position:relative;width:132px;height:132px;margin:6px auto 4px}',
+      '.ia-gauge{position:relative;width:140px;height:140px;margin:6px auto 6px}',
       '.ia-gauge svg{transform:rotate(-90deg)}',
       '.ia-gauge-ring{transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)}',
       '.ia-gauge-ctr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}',
-      '.ia-gauge-n{font-size:38px;font-weight:800;line-height:1;letter-spacing:-1px}',
-      '.ia-gauge-d{font-size:12px;color:var(--ia-faint);font-weight:600;margin-top:1px}',
-      '.ia-sev{display:inline-block;margin:8px auto 0;padding:4px 12px;border-radius:99px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}',
+      '.ia-gauge-n{font-size:40px;font-weight:800;line-height:1;letter-spacing:-1.2px}',
+      '.ia-gauge-d{font-size:12px;color:var(--ia-faint);font-weight:600;margin-top:2px}',
+      '.ia-sev{display:inline-block;margin:10px auto 0;padding:5px 13px;border-radius:99px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}',
       '.ia-sc-wrap{text-align:center}',
-      // gradient style: banda de color detrás del gauge
-      '.ia-style-gradient .ia-sc-wrap{margin:-22px -22px 18px;padding:26px 22px 20px;color:#fff}',
-      '.ia-style-gradient .ia-gauge-d{color:rgba(255,255,255,.8)}',
-      '.ia-style-gradient .ia-sev{background:rgba(255,255,255,.22)!important;color:#fff!important}',
 
       // Lista de problemas
-      '.ia-is-t{font-size:12px;font-weight:700;color:var(--ia-muted);text-transform:uppercase;letter-spacing:.6px;margin:18px 0 8px}',
+      '.ia-is-t{font-size:12px;font-weight:700;color:var(--ia-muted);text-transform:uppercase;letter-spacing:.6px;margin:20px 0 8px}',
       '.ia-is{list-style:none;padding:0;margin:0 0 4px}',
       '.ia-is li{font-size:13.5px;color:var(--ia-fg);padding:10px 0;border-bottom:1px solid var(--ia-border);display:flex;gap:10px;align-items:center}',
       '.ia-is li:last-child{border-bottom:none}',
@@ -204,7 +287,7 @@
 
       // Gate
       '.ia-gate{margin-top:22px;padding-top:20px;border-top:1px solid var(--ia-border)}',
-      '.ia-gate h4{margin:0 0 6px;font-size:17px;font-weight:700;text-align:center}',
+      '.ia-gate h4{margin:0 0 6px;font-size:17px;font-weight:700;text-align:center;color:var(--ia-fg)}',
       '.ia-gate-sub{margin:0 0 16px;font-size:13px;color:var(--ia-muted);text-align:center;line-height:1.5}',
       '.ia-priv{display:block;text-align:center;margin-top:11px;font-size:11px;color:var(--ia-faint)}',
       '.ia-err{color:#EF4444;font-size:12.5px;margin:8px 0 0;text-align:center}',
@@ -214,9 +297,7 @@
       '.ia-sent-ico{width:60px;height:60px;margin:0 auto 14px;border-radius:50%;background:color-mix(in srgb,#10B981 16%,transparent);display:flex;align-items:center;justify-content:center;color:#10B981}',
       '.ia-sent-ico svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:2.5}',
       '.ia-sent h4{margin:0 0 6px;font-size:18px;font-weight:700}',
-      '.ia-sent p{margin:0 0 18px;font-size:13.5px;color:var(--ia-muted);line-height:1.5}',
-      '.ia-pw{text-align:center;margin-top:14px;font-size:11px;color:var(--ia-faint)}',
-      '.ia-pw a{color:var(--ia-faint)}'
+      '.ia-sent p{margin:0 0 18px;font-size:13.5px;color:var(--ia-muted);line-height:1.5}'
     ].join('\n');
     document.head.appendChild(st);
   }
@@ -508,7 +589,16 @@
         });
     }
 
-    return { renderForm: renderForm };
+    // Si el gate ya estaba renderizado cuando llegó la config tardía,
+    // re-renderizamos el preview con los campos correctos (fix race
+    // condition que escondía WhatsApp).
+    function maybeRerenderGate() {
+      if (auditResult && card.querySelector('.ia-gate')) {
+        renderPreview(auditResult);
+      }
+    }
+
+    return { renderForm: renderForm, renderPreview: renderPreview, maybeRerenderGate: maybeRerenderGate };
   }
 
   // ─── Floating ────────────────────────────────────────────────────────
@@ -523,6 +613,7 @@
     document.body.appendChild(pop);
 
     var app = makeApp(pop, { onClose: function () { pop.classList.remove('ia-show'); } });
+    onConfigReady = app.maybeRerenderGate;
     btn.onclick = function () {
       if (pop.classList.contains('ia-show')) { pop.classList.remove('ia-show'); return; }
       app.renderForm(); pop.classList.add('ia-show');
@@ -534,10 +625,74 @@
     var target = document.querySelector(TARGET);
     if (!target) { console.error('[ImaginaAudit] no se encontró el contenedor', TARGET); return; }
     var app = makeApp(target, {});
+    onConfigReady = app.maybeRerenderGate;
     app.renderForm();
   }
 
-  function boot() { MODE === 'inline' ? initInline() : initFloating(); }
+  // ─── Datos de DEMO para el preview de /admin/embed ───────────────────
+  // Resultado ficticio realista (mismas formas que un AuditResult real)
+  // para que el admin vea el bloque completo sin tener que escanear.
+  function demoResult() {
+    var issues_es = [
+      'Headers de seguridad ausentes',
+      'Versión de WordPress desactualizada',
+      'Plugin Elementor desactualizado',
+      'XML-RPC habilitado',
+      'Imágenes sin texto alternativo',
+      'Falta meta description',
+      'Sin compresión Gzip/Brotli',
+      'SSL próximo a vencer',
+      'Login expuesto sin protección',
+      'Falta sitemap.xml'
+    ];
+    var issues_en = [
+      'Missing security headers',
+      'WordPress version outdated',
+      'Elementor plugin outdated',
+      'XML-RPC enabled',
+      'Images without alt text',
+      'Missing meta description',
+      'No Gzip/Brotli compression',
+      'SSL expiring soon',
+      'Exposed login',
+      'Missing sitemap.xml'
+    ];
+    var names = LANG === 'en' ? issues_en : issues_es;
+    var levels = ['critical', 'critical', 'critical', 'warning', 'warning', 'warning', 'critical', 'warning', 'critical', 'warning'];
+    var metrics = names.map(function (n, i) { return { level: levels[i], name: n }; });
+    return {
+      id: 'demo',
+      domain: LANG === 'en' ? 'your-site.com' : 'tu-sitio.com',
+      url: 'https://' + (LANG === 'en' ? 'your-site.com' : 'tu-sitio.com'),
+      globalScore: 51,
+      globalLevel: 'warning',
+      modules: [{ metrics: metrics }]
+    };
+  }
+
+  // Para floating + demo: crea solo el popup, ya abierto, sin botón flotante.
+  function initFloatingDemo(initialState) {
+    var pop = document.createElement('div');
+    pop.id = 'ia-w-pop'; pop.classList.add('ia-show');
+    document.body.appendChild(pop);
+    var app = makeApp(pop, { onClose: function () { pop.classList.remove('ia-show'); } });
+    if (initialState === 'form') app.renderForm(); else app.renderPreview(demoResult());
+    onConfigReady = app.maybeRerenderGate;
+  }
+  function initInlineDemo(initialState) {
+    var target = document.querySelector(TARGET);
+    if (!target) { console.error('[ImaginaAudit] no se encontró el contenedor', TARGET); return; }
+    var app = makeApp(target, {});
+    if (initialState === 'form') app.renderForm(); else app.renderPreview(demoResult());
+    onConfigReady = app.maybeRerenderGate;
+  }
+
+  function boot() {
+    if (IS_DEMO) {
+      return MODE === 'inline' ? initInlineDemo(DEMO_STATE) : initFloatingDemo(DEMO_STATE);
+    }
+    MODE === 'inline' ? initInline() : initFloating();
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
