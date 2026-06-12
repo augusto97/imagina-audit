@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy, Check, Code2, BadgeInfo, MousePointer, LayoutPanelTop } from 'lucide-react'
+import { Copy, Check, Code2, BadgeInfo, MousePointer, LayoutPanelTop, Eye, Mail, User, MessageCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 import { useConfigStore } from '@/store/configStore'
 
 type Mode = 'floating' | 'inline'
+type Theme = 'light' | 'dark'
+type Style = 'card' | 'gradient' | 'minimal'
 
 /**
  * Generador de snippets para embeber el widget en sitios externos.
@@ -20,9 +22,11 @@ type Mode = 'floating' | 'inline'
  */
 export default function SettingsEmbed() {
   const { t, i18n } = useTranslation()
-  const { companyWhatsapp, brandPrimaryColor } = useConfigStore((s) => s.config)
+  const { companyWhatsapp, brandPrimaryColor, leadCapture } = useConfigStore((s) => s.config)
 
   const [mode, setMode] = useState<Mode>('inline')
+  const [theme, setTheme] = useState<Theme>('light')
+  const [style, setStyle] = useState<Style>('card')
   const [color, setColor] = useState(brandPrimaryColor || '#0CC0DF')
   const [position, setPosition] = useState<'bottom-right' | 'bottom-left'>('bottom-right')
   const [lang, setLang] = useState((i18n.language || 'es').slice(0, 2))
@@ -34,10 +38,21 @@ export default function SettingsEmbed() {
   const apiBase = window.location.origin + '/api'
   const widgetSrc = window.location.origin + '/widget/imagina-audit-widget.js'
 
+  // Campos que el widget pedirá: el email y el nombre siempre se muestran;
+  // el WhatsApp solo si el admin lo marcó obligatorio en Captura de leads.
+  // Reflejamos exactamente lo que hará el widget para que no haya sorpresas.
+  const requiredFields = useMemo(() => ([
+    { key: 'email', icon: Mail, label: t('settings.embed_field_email'), required: leadCapture?.requireEmail ?? true, shown: true },
+    { key: 'name', icon: User, label: t('settings.embed_field_name'), required: leadCapture?.requireName ?? false, shown: true },
+    { key: 'whatsapp', icon: MessageCircle, label: t('settings.embed_field_whatsapp'), required: leadCapture?.requireWhatsapp ?? false, shown: leadCapture?.requireWhatsapp ?? false },
+  ]), [leadCapture, t])
+
   const attrs: Array<[string, string | undefined]> = [
     ['src', widgetSrc],
     ['data-api', apiBase],
     ['data-mode', mode],
+    ['data-theme', theme],
+    ['data-style', style],
     ['data-color', color],
     ['data-lang', lang],
     ['data-whatsapp', whatsapp || undefined],
@@ -53,6 +68,27 @@ export default function SettingsEmbed() {
       .join('\n  ') +
     '>\n</script>' +
     (mode === 'inline' ? `\n<div id="${targetId}"></div>` : '')
+
+  // Preview en vivo: cargamos el widget REAL dentro de un iframe aislado.
+  // Es el mismo JS que recibirá el sitio host, así que lo que se ve aquí
+  // es exactamente lo que verá el visitante (incluido el flujo de escaneo
+  // si se escribe una URL). Forzamos modo inline para que se vea el bloque.
+  const previewSrcDoc = useMemo(() => {
+    const bg = theme === 'dark' ? '#0B0F1A' : '#f1f5f9'
+    const pAttrs: Array<[string, string | undefined]> = [
+      ['src', widgetSrc],
+      ['data-api', apiBase],
+      ['data-mode', 'inline'],
+      ['data-theme', theme],
+      ['data-style', style],
+      ['data-color', color],
+      ['data-lang', lang],
+      ['data-whatsapp', whatsapp || undefined],
+      ['data-target', '#ia-preview'],
+    ]
+    const tag = pAttrs.filter(([, v]) => v).map(([k, v]) => `${k}="${v}"`).join(' ')
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:24px 16px;background:${bg};min-height:100vh"><div id="ia-preview"></div><script ${tag}><\/script></body></html>`
+  }, [widgetSrc, apiBase, theme, style, color, lang, whatsapp])
 
   const [copied, setCopied] = useState(false)
   const copy = async () => {
@@ -99,7 +135,27 @@ export default function SettingsEmbed() {
       {/* Estilo y opciones */}
       <Card>
         <CardHeader><CardTitle className="text-base">{t('settings.embed_style_card')}</CardTitle></CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2">
+        <CardContent className="space-y-4">
+          {/* Tema y estilo visual */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label className="text-xs">{t('settings.embed_theme')}</Label>
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                <SegBtn active={theme === 'light'} onClick={() => setTheme('light')} label={t('settings.embed_theme_light')} />
+                <SegBtn active={theme === 'dark'} onClick={() => setTheme('dark')} label={t('settings.embed_theme_dark')} />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">{t('settings.embed_style')}</Label>
+              <div className="mt-1 grid grid-cols-3 gap-2">
+                <SegBtn active={style === 'card'} onClick={() => setStyle('card')} label={t('settings.embed_style_cardv')} />
+                <SegBtn active={style === 'gradient'} onClick={() => setStyle('gradient')} label={t('settings.embed_style_gradient')} />
+                <SegBtn active={style === 'minimal'} onClick={() => setStyle('minimal')} label={t('settings.embed_style_minimal')} />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label className="text-xs">{t('settings.embed_color')}</Label>
             <div className="mt-1 flex gap-2">
@@ -135,6 +191,46 @@ export default function SettingsEmbed() {
             <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+573001234567" className="mt-1" />
             <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">{t('settings.embed_whatsapp_hint')}</p>
           </div>
+          </div>
+
+          {/* Aviso de campos de contacto que pedirá el widget */}
+          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] p-3">
+            <p className="text-xs font-medium text-[var(--text-primary)]">{t('settings.embed_fields_title')}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {requiredFields.filter((f) => f.shown).map((f) => (
+                <span key={f.key} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-white px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
+                  <f.icon className="h-3 w-3" />
+                  {f.label}
+                  {f.required
+                    ? <span className="font-semibold text-red-500">{t('settings.embed_field_req')}</span>
+                    : <span className="text-[var(--text-tertiary)]">{t('settings.embed_field_opt')}</span>}
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-[var(--text-tertiary)]">{t('settings.embed_fields_hint')}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Preview en vivo */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Eye className="h-5 w-5 text-[var(--accent-primary)]" />
+            {t('settings.embed_preview_card')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-hidden rounded-xl border border-[var(--border-default)]">
+            <iframe
+              key={`${theme}-${style}-${color}-${lang}`}
+              title="preview"
+              srcDoc={previewSrcDoc}
+              className="block h-[640px] w-full border-0"
+              sandbox="allow-scripts allow-same-origin allow-popups"
+            />
+          </div>
+          <p className="mt-3 text-xs text-[var(--text-tertiary)]">{t('settings.embed_preview_hint')}</p>
         </CardContent>
       </Card>
 
@@ -192,6 +288,22 @@ export default function SettingsEmbed() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function SegBtn({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-lg border px-2 py-2 text-xs font-medium transition-colors ${
+        active
+          ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/5 text-[var(--accent-primary)] ring-1 ring-[var(--accent-primary)]'
+          : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:border-[var(--border-hover)]'
+      }`}
+    >
+      {label}
+    </button>
   )
 }
 
