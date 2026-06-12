@@ -45,6 +45,40 @@ export default function SettingsEmbed() {
   const apiBase = window.location.origin + '/api'
   const widgetSrc = window.location.origin + '/widget/imagina-audit-widget.js'
 
+  // Descargamos el código del widget FRESCO (cache:'no-store' + timestamp)
+  // y lo inyectamos INLINE en el iframe. Esto elimina el problema de caché:
+  // un <script src> se quedaba con la versión vieja del widget en el
+  // navegador, por eso "solo cambiaba el color" (lo único que el widget
+  // viejo soportaba). Inline = siempre el código actual del servidor.
+  const [widgetCode, setWidgetCode] = useState<string | null>(null)
+  const [widgetErr, setWidgetErr] = useState(false)
+  useEffect(() => {
+    let alive = true
+    setWidgetCode(null)
+    setWidgetErr(false)
+    fetch(widgetSrc + '?t=' + Date.now(), { cache: 'no-store' })
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error('http ' + r.status))))
+      .then((txt) => { if (alive) setWidgetCode(txt) })
+      .catch(() => { if (alive) setWidgetErr(true) })
+    return () => { alive = false }
+  }, [widgetSrc])
+
+  // Debounce de inputs de texto que afectan al preview. Cada keystroke
+  // cambiaba la `key` del iframe → desmonte/remonte completo del bloque
+  // demo (parpadeo + pérdida de foco del campo activo del admin). Con el
+  // debounce, la `key` y el srcDoc se "congelan" hasta 350 ms después de
+  // que el usuario para de escribir.
+  function useDebounced<T>(value: T, delay = 350): T {
+    const [out, setOut] = useState(value)
+    useEffect(() => {
+      const id = window.setTimeout(() => setOut(value), delay)
+      return () => window.clearTimeout(id)
+    }, [value, delay])
+    return out
+  }
+  const dColor = useDebounced(color)
+  const dWhatsapp = useDebounced(whatsapp)
+
   // Campos que el widget pedirá: el email y el nombre siempre se muestran;
   // el WhatsApp solo si el admin lo marcó obligatorio en Captura de leads.
   // Reflejamos exactamente lo que hará el widget para que no haya sorpresas.
@@ -54,8 +88,27 @@ export default function SettingsEmbed() {
     { key: 'whatsapp', icon: MessageCircle, label: t('settings.embed_field_whatsapp'), required: leadCapture?.requireWhatsapp ?? false, shown: leadCapture?.requireWhatsapp ?? false },
   ]), [leadCapture, t])
 
+  // Hash corto del código del widget — sirve como cache-buster en el src
+  // del snippet. Cuando el widget cambia (nueva versión, nuevo despliegue)
+  // el hash cambia, el `<script src=…?v={hash}>` cambia, y el navegador
+  // del visitante refresca el JS en lugar de servir la versión vieja
+  // cacheada (causa exacta de "los estilos no aplican al pegar el código":
+  // el host servía la versión vieja del widget que NO conocía data-theme
+  // ni data-style, solo data-color, único atributo que parecía funcionar).
+  const widgetVer = useMemo(() => {
+    if (!widgetCode) return null
+    // FNV-1a 32-bit, ~3 KB/ms en JS — barato y suficientemente único.
+    let h = 2166136261
+    for (let i = 0; i < widgetCode.length; i++) {
+      h ^= widgetCode.charCodeAt(i)
+      h = Math.imul(h, 16777619)
+    }
+    return (h >>> 0).toString(36)
+  }, [widgetCode])
+  const widgetSrcVersioned = widgetVer ? `${widgetSrc}?v=${widgetVer}` : widgetSrc
+
   const attrs: Array<[string, string | undefined]> = [
-    ['src', widgetSrc],
+    ['src', widgetSrcVersioned],
     ['data-api', apiBase],
     ['data-mode', mode],
     ['data-theme', theme],
@@ -75,24 +128,6 @@ export default function SettingsEmbed() {
       .join('\n  ') +
     '>\n</script>' +
     (mode === 'inline' ? `\n<div id="${targetId}"></div>` : '')
-
-  // Descargamos el código del widget FRESCO (cache:'no-store' + timestamp)
-  // y lo inyectamos INLINE en el iframe. Esto elimina el problema de caché:
-  // un <script src> se quedaba con la versión vieja del widget en el
-  // navegador, por eso "solo cambiaba el color" (lo único que el widget
-  // viejo soportaba). Inline = siempre el código actual del servidor.
-  const [widgetCode, setWidgetCode] = useState<string | null>(null)
-  const [widgetErr, setWidgetErr] = useState(false)
-  useEffect(() => {
-    let alive = true
-    setWidgetCode(null)
-    setWidgetErr(false)
-    fetch(widgetSrc + '?t=' + Date.now(), { cache: 'no-store' })
-      .then((r) => (r.ok ? r.text() : Promise.reject(new Error('http ' + r.status))))
-      .then((txt) => { if (alive) setWidgetCode(txt) })
-      .catch(() => { if (alive) setWidgetErr(true) })
-    return () => { alive = false }
-  }, [widgetSrc])
 
   // Preview en vivo, en modo demo. El widget NO impone background — lo
   // provee el host; aquí simulamos "el fondo del sitio donde se embeba"
@@ -119,7 +154,7 @@ export default function SettingsEmbed() {
       'data-position': position,
       'data-theme': theme,
       'data-style': style,
-      'data-color': color,
+      'data-color': dColor,
       'data-lang': lang,
       'data-demo': '1',
       'data-demo-state': previewState,
@@ -127,7 +162,7 @@ export default function SettingsEmbed() {
       'data-require-name': String(leadCapture?.requireName ?? false),
       'data-require-whatsapp': String(leadCapture?.requireWhatsapp ?? false),
     }
-    if (whatsapp) cfg['data-whatsapp'] = whatsapp
+    if (dWhatsapp) cfg['data-whatsapp'] = dWhatsapp
 
     // El contenedor #ia-preview solo lo usa el modo inline; en floating el
     // widget se ancla al body del iframe. Damos altura para que la burbuja
@@ -135,7 +170,7 @@ export default function SettingsEmbed() {
     const cfgJson = JSON.stringify(cfg).replace(/</g, '\\u003c')
     const codeSafe = widgetCode.replace(/<\/script>/gi, '<\\/script>')
     return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:28px 16px;background:${bgCss};min-height:100vh;box-sizing:border-box"><div id="ia-preview"></div><script>window.IMAGINA_AUDIT_CONFIG=${cfgJson};<\/script><script>${codeSafe}<\/script></body></html>`
-  }, [widgetCode, apiBase, mode, position, theme, style, color, lang, whatsapp, previewState, previewBg, leadCapture])
+  }, [widgetCode, apiBase, mode, position, theme, style, dColor, lang, dWhatsapp, previewState, previewBg, leadCapture])
 
   const [copied, setCopied] = useState(false)
   const copy = async () => {
@@ -294,7 +329,7 @@ export default function SettingsEmbed() {
               </div>
             ) : (
               <iframe
-                key={`${mode}-${theme}-${style}-${color}-${lang}-${position}-${previewState}-${previewBg}-${whatsapp}-${leadCapture?.requireWhatsapp}-${leadCapture?.requireName}-${leadCapture?.requireEmail}`}
+                key={`${mode}-${theme}-${style}-${dColor}-${lang}-${position}-${previewState}-${previewBg}-${dWhatsapp}-${leadCapture?.requireWhatsapp}-${leadCapture?.requireName}-${leadCapture?.requireEmail}`}
                 title="preview"
                 srcDoc={previewSrcDoc}
                 className="block h-[720px] w-full border-0"
