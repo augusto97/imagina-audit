@@ -112,7 +112,12 @@ export default function SettingsGeneral() {
               <div><label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_company_whatsapp')}</label><Input {...register('companyWhatsapp')} placeholder="+573001234567" /></div>
               <div><label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_company_email')}</label><Input {...register('companyEmail')} type="email" /></div>
               <div><label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_company_plans_url')}</label><Input {...register('companyPlansUrl')} type="url" /></div>
-              <div><label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_company_logo_url')}</label><Input {...register('logoUrl')} type="url" /></div>
+              {/* logoUrl acepta tanto URLs absolutas como paths relativos
+                  (/uploads/logo-xxx.png que genera el upload del branding).
+                  type="url" HTML5 rechazaba el path relativo con "Ingresa
+                  una URL". type="text" porque ambos formatos son válidos
+                  como atributo src de <img>. */}
+              <div><label className="text-xs font-medium text-[var(--text-secondary)]">{t('settings.general_company_logo_url')}</label><Input {...register('logoUrl')} type="text" /></div>
             </div>
             {watch('logoUrl') && (
               <div className="mt-2"><img src={watch('logoUrl') as string} alt="Logo preview" className="h-10 object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} /></div>

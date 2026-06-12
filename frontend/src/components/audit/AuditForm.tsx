@@ -23,6 +23,7 @@ export default function AuditForm() {
   const { t } = useTranslation()
   const { startAudit, status } = useAudit()
   const { home, form: formCfg, leadCapture } = useConfigStore((s) => s.config)
+  const configLoaded = useConfigStore((s) => s.loaded)
   const [searchParams] = useSearchParams()
   // Si hay sesión de user, escondemos los campos de lead — ya tenemos su
   // identidad en el backend vía sesión. Para el público anónimo siguen ahí
@@ -30,8 +31,14 @@ export default function AuditForm() {
   const isAuthenticated = useUserAuthStore((s) => s.isAuthenticated)
   // Modo 'gated': el formulario pide SOLO la URL. Los datos de contacto se
   // capturan después, al desbloquear el informe completo en ResultsPage.
+  //
+  // IMPORTANTE: solo decidimos el modo cuando el config ya cargó desde el
+  // backend (`configLoaded`). Antes mostrábamos los campos por defecto y al
+  // llegar la respuesta de /api/config.php desaparecían en modo gated —
+  // flicker feo. Mientras carga, ocultamos los campos opcionales (caso
+  // seguro: el modo 'upfront' los reañade en el primer render real).
   const gated = leadCapture?.mode === 'gated'
-  const showLeadFields = !isAuthenticated && !gated
+  const showLeadFields = configLoaded && !isAuthenticated && !gated
   const isScanning = status === 'scanning'
   const microItems = (home.formMicrocopy || t('public.audit_form_microcopy_default'))
     .split(/\s*[·•|]\s*/).filter(Boolean)

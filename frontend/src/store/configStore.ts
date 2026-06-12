@@ -96,12 +96,47 @@ const DEFAULT_FOOTER: FooterCms = {
   privacyText: 'Política de privacidad',
 }
 
+// Cache de branding crítico (logo + color) en localStorage para evitar
+// el FOUC: antes el primer render usaba el logo default de la app, y al
+// llegar la respuesta de /api/config.php se sustituía por el real (flash
+// visible). Cacheamos esos campos para que el primer render ya use los
+// valores reales del último fetch exitoso.
+const CACHE_KEY = 'imagina_branding_cache_v1'
+type BrandingCache = Pick<PublicConfig, 'logoUrl' | 'logoCollapsedUrl' | 'faviconUrl' | 'brandPrimaryColor' | 'companyName'>
+
+function readBrandingCache(): Partial<BrandingCache> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as Partial<BrandingCache>
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch { return {} }
+}
+
+function writeBrandingCache(cfg: PublicConfig) {
+  if (typeof window === 'undefined') return
+  try {
+    const payload: BrandingCache = {
+      logoUrl: cfg.logoUrl,
+      logoCollapsedUrl: cfg.logoCollapsedUrl,
+      faviconUrl: cfg.faviconUrl,
+      brandPrimaryColor: cfg.brandPrimaryColor,
+      companyName: cfg.companyName,
+    }
+    localStorage.setItem(CACHE_KEY, JSON.stringify(payload))
+  } catch { /* private mode / quota */ }
+}
+
+const cachedBranding = readBrandingCache()
+
 const INITIAL: PublicConfig = {
   ...DEFAULT_CONFIG,
-  logoUrl: '',
-  logoCollapsedUrl: '',
-  faviconUrl: '',
-  brandPrimaryColor: '#3B82F6',
+  logoUrl: cachedBranding.logoUrl ?? '',
+  logoCollapsedUrl: cachedBranding.logoCollapsedUrl ?? '',
+  faviconUrl: cachedBranding.faviconUrl ?? '',
+  brandPrimaryColor: cachedBranding.brandPrimaryColor ?? '#3B82F6',
+  companyName: cachedBranding.companyName ?? DEFAULT_CONFIG.companyName,
   home: DEFAULT_HOME,
   form: DEFAULT_FORM,
   header: DEFAULT_HEADER,
@@ -160,6 +195,12 @@ function applyBrandingToDocument(cfg: PublicConfig) {
   }
 }
 
+// Aplicar el branding cacheado al DOM antes del primer render — así el
+// color primario y el favicon no parpadean entre el default y el real.
+if (cachedBranding.brandPrimaryColor || cachedBranding.faviconUrl) {
+  applyBrandingToDocument(INITIAL)
+}
+
 export const useConfigStore = create<ConfigStore>((set) => ({
   config: INITIAL,
   loaded: false,
@@ -175,6 +216,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
         footer: { ...DEFAULT_FOOTER, ...(data.footer ?? {}) },
       }
       applyBrandingToDocument(merged)
+      writeBrandingCache(merged)
       set({ config: merged, loaded: true })
     } catch {
       set({ loaded: true })
