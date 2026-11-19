@@ -144,4 +144,8 @@ return [
     'perf_lab.psi_timeout'      => 'PageSpeed no respondió a tiempo (más de 90 s). Inténtalo de nuevo.',
     'perf_lab.psi_no_score'     => 'PageSpeed respondió sin puntuación de rendimiento.',
     'perf_lab.server_timeout'   => 'El servidor cortó la medición varias veces (límite de tiempo del hosting). Revisa max_execution_time.',
+
+    // ——— /admin/update.php (actualizaciones) ——————————————————————
+    'update.invalid_repo'   => 'Repositorio inválido. Usa el formato propietario/repositorio.',
+    'update.invalid_action' => 'Acción no válida.',
 ];

@@ -229,3 +229,11 @@ Tras configurar todo:
 3. Lanza 4 audits seguidos desde distintas URLs — la 4ª debe aparecer
    con pantalla "Posición #1 en cola" y procesarse cuando alguna de
    las primeras 3 termine.
+
+## 11. Actualizaciones (desde v2.7.0)
+
+- **Panel:** Configuración → **Actualizaciones** (`/admin/updates`). La app revisa GitHub como mucho una vez por hora y, si hay una versión nueva, aparece un aviso en la cabecera del admin. «Instalar» hace: requisitos y espacio → descarga + sha256 → copia de la base → migraciones → `.env` (solo variables nuevas) → cambio de versión → verificación. Si la verificación falla, vuelve sola a la versión anterior.
+- **Automático (opcional):** activa «Instalar actualizaciones automáticamente» en ese panel. Requiere el cron de la cola (`cron/drain-queue.php`) y la **URL de la app** configurada en Configuración general.
+- **Instalación nueva sin terminal:** cada release publica `installer.php`. Súbelo solo a la carpeta pública vacía, ábrelo en el navegador y pulsa «Instalar».
+- **Rescate:** si una versión nueva no arrancara, `https://tu-dominio/update-rescue.php` vuelve a la anterior (con el token del panel, o sin él pasados 15 minutos de un cambio sin finalizar).
+- **Nginx:** asegúrate de que la regla de carpetas bloqueadas incluye `storage` (ver `deploy/nginx.conf`). Con Apache no hace falta nada.

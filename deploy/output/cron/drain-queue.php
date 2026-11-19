@@ -101,6 +101,10 @@ try {
         ]);
     }
     CronHealth::markRun('drain-queue', null, "processed=$processed");
+
+    // Actualizaciones: consulta GitHub como mucho 1 vez por hora y, si el
+    // admin activó la instalación automática, la dispara por HTTP.
+    UpdateManager::cronTick();
 } catch (Throwable $e) {
     Logger::error('drain-queue cron falló: ' . $e->getMessage());
     if (php_sapi_name() === 'cli') {

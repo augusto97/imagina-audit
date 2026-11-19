@@ -59,5 +59,9 @@ try {
     // silenciar — se loguea cuando Logger esté disponible
 }
 
+// Actualizador: la versión recién instalada finaliza el cambio y poda
+// versiones viejas en su primera petición (solo actúa si hay marcadores).
+try { UpdateManager::boot(); } catch (Throwable $e) { /* nunca bloquear la app */ }
+
 // CORS
 Response::cors();

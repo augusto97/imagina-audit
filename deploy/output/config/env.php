@@ -4,42 +4,19 @@
  * Compatible con hosting compartido (sin vlucas/dotenv)
  */
 
+require_once dirname(__DIR__) . '/lib/EnvFile.php';
+
+/**
+ * Carga el .env con el parser dotenv de EnvFile (nunca como script de
+ * shell). Las variables ya presentes en el entorno real tienen prioridad.
+ */
 function loadEnv(string $path): void {
-    if (!file_exists($path)) {
-        return;
-    }
-
-    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if ($lines === false) {
-        return;
-    }
-
-    foreach ($lines as $line) {
-        // Ignorar comentarios
-        $line = trim($line);
-        if ($line === '' || str_starts_with($line, '#')) {
-            continue;
-        }
-
-        // Separar key=value
-        $pos = strpos($line, '=');
-        if ($pos === false) {
-            continue;
-        }
-
-        $key = trim(substr($line, 0, $pos));
-        $value = trim(substr($line, $pos + 1));
-
-        // Remover comillas
-        if ((str_starts_with($value, '"') && str_ends_with($value, '"')) ||
-            (str_starts_with($value, "'") && str_ends_with($value, "'"))) {
-            $value = substr($value, 1, -1);
-        }
-
+    foreach (EnvFile::parseFile($path) as $key => $value) {
         // Solo establecer si no existe ya en el entorno
         if (!isset($_ENV[$key]) && getenv($key) === false) {
             $_ENV[$key] = $value;
-            putenv("$key=$value");
+            // putenv no admite saltos de línea de forma fiable; $_ENV basta.
+            if (!str_contains($value, "\n")) @putenv("$key=$value");
         }
     }
 }

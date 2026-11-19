@@ -330,6 +330,32 @@ $run('Último audit_job de la tabla', function () {
 });
 
 // ─── Compilar resultado ──────────────────────────────────────────────
+// ─── Actualizador ────────────────────────────────────────────────────
+$run('Actualizador (GitHub Releases)', function () {
+    $um = UpdateManager::forApp();
+    $wd = $um->workDir();
+    $problems = [];
+    if (!extension_loaded('zip')) $problems[] = 'falta la extensión zip';
+    if (!extension_loaded('curl')) $problems[] = 'falta la extensión curl';
+    if (!is_dir($wd) || !is_writable($wd)) $problems[] = 'carpeta de trabajo no escribible';
+    if (!is_writable(dirname(__DIR__, 2))) $problems[] = 'la raíz de la app no es escribible';
+    $st = $um->status();
+    return [
+        'status' => $problems ? 'warn' : 'ok',
+        'detail' => [
+            'installed' => $st['installed'],
+            'latest' => $st['latest']['release']['version'] ?? null,
+            'lastCheckError' => $st['latest']['error'] ?? null,
+            'state' => $st['state']['status'] ?? 'idle',
+            'workDir' => $wd,
+            'workDirInsideWebRoot' => $st['workDirInsideWebRoot'],
+            'repo' => UpdateManager::configuredRepo(),
+            'autoInstall' => UpdateManager::autoInstallEnabled(),
+            'problems' => $problems,
+        ],
+    ];
+});
+
 $summary = [
     'ok' => 0, 'warn' => 0, 'fail' => 0, 'skip' => 0,
 ];
@@ -340,7 +366,7 @@ foreach ($checks as $c) {
 Response::success([
     'timestamp' => date('c'),
     'app' => [
-        'version' => AppVersion::CURRENT,
+        'version' => AppVersion::current(),
     ],
     'summary' => $summary,
     'checks' => $checks,

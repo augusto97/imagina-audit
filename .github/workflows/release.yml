@@ -1,0 +1,93 @@
+# Publica un release en GitHub cada vez que cambia el archivo VERSION en main.
+#
+#   1. Corre las pruebas (PHPUnit) y compila (deploy/build.sh, que incluye el
+#      typecheck de TypeScript).
+#   2. Si el tag vX.Y.Z ya existe, no hace nada (re-merges sin cambiar
+#      VERSION no publican nada).
+#   3. Empaqueta deploy/output en imagina-audit-X.Y.Z.zip, calcula su
+#      .sha256 y publica el release con: zip, .sha256, manifest.json e
+#      installer.php. Las notas salen de la sección "## vX.Y.Z" de CHANGELOG.md.
+#
+# Las instalaciones consultan este release desde /admin/updates.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Leer VERSION
+        id: ver
+        run: |
+          V="$(tr -d ' \r\n' < VERSION)"
+          if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "VERSION inválida: '$V'"; exit 1; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$V" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "El release v$V ya existe: no se publica nada."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: shivammathur/setup-php@v2
+        if: steps.ver.outputs.exists == 'false'
+        with:
+          php-version: '8.2'
+          extensions: zip, pdo_sqlite, sqlite3, curl, mbstring, openssl
+          tools: composer
+
+      - uses: actions/setup-node@v4
+        if: steps.ver.outputs.exists == 'false'
+        with:
+          node-version: '22'
+
+      - name: Pruebas backend (PHPUnit)
+        if: steps.ver.outputs.exists == 'false'
+        working-directory: backend
+        run: |
+          composer install --no-interaction --no-progress
+          ./vendor/bin/phpunit
+
+      - name: Compilar (typecheck + build)
+        if: steps.ver.outputs.exists == 'false'
+        run: bash deploy/build.sh
+
+      - name: Empaquetar
+        if: steps.ver.outputs.exists == 'false'
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          test "$(cat deploy/output/VERSION)" = "$V"
+          test -f deploy/output/manifest.json
+          mkdir -p dist-release
+          (cd deploy/output && zip -rq "../../dist-release/imagina-audit-$V.zip" . -x '.env')
+          (cd dist-release && sha256sum "imagina-audit-$V.zip" > "imagina-audit-$V.zip.sha256")
+          cp deploy/output/manifest.json dist-release/manifest.json
+          cp deploy/installer.php dist-release/installer.php
+          # Notas: sección "## vX.Y.Z" de CHANGELOG.md (hasta la siguiente "## v")
+          awk -v v="## v$V" 'index($0, v) == 1 {p=1; next} /^## v/ {if (p) exit} p' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "Versión $V" > notes.md; fi
+          ls -la dist-release
+
+      - name: Publicar release
+        if: steps.ver.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          gh release create "v$V" dist-release/* \
+            --title "v$V" \
+            --notes-file notes.md \
+            --target "$GITHUB_SHA"

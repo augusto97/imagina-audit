@@ -36,6 +36,10 @@ try {
     Logger::error('Error inicializando DB: ' . $e->getMessage());
 }
 
+// Actualizador: la versión recién instalada finaliza el cambio y poda
+// versiones viejas en su primera petición (solo actúa si hay marcadores).
+try { UpdateManager::boot(); } catch (Throwable $e) { /* nunca bloquear la app */ }
+
 // Headers CORS
 Response::cors();
 
@@ -180,6 +184,9 @@ switch ($endpoint) {
         break;
     case 'admin/perf-lab':
         require __DIR__ . '/admin/perf-lab.php';
+        break;
+    case 'admin/update':
+        require __DIR__ . '/admin/update.php';
         break;
 
     case 'admin/migrate-database':

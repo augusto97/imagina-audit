@@ -144,4 +144,8 @@ return [
     'perf_lab.psi_timeout'      => 'PageSpeed did not respond in time (over 90 s). Please try again.',
     'perf_lab.psi_no_score'     => 'PageSpeed responded without a performance score.',
     'perf_lab.server_timeout'   => 'The server cut the measurement several times (hosting time limit). Check max_execution_time.',
+
+    // ——— /admin/update.php (updates) ———————————————————————————
+    'update.invalid_repo'   => 'Invalid repository. Use the owner/repository format.',
+    'update.invalid_action' => 'Invalid action.',
 ];
