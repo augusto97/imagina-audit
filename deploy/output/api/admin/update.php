@@ -5,6 +5,7 @@
  *   GET  ?action=status            → versión instalada, último release (consulta
  *                                     GitHub si pasó más de 1 h), estado, historial
  *   POST {action:'check'}          → fuerza la consulta a GitHub
+ *   POST {action:'exposure'}       → repite la comprobación de carpetas expuestas
  *   POST {action:'begin'}          → inicia la instalación del último release
  *   POST {action:'step'}           → ejecuta el siguiente paso
  *   POST {action:'cancel'}         → cancela (solo antes del cambio de versión)
@@ -21,6 +22,14 @@ session_write_close();
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $um = UpdateManager::forApp();
 
+$exposure = function (bool $force) use ($um) {
+    try {
+        return ExposureCheck::run(dirname(__DIR__, 2), QueueManager::appBaseUrl(), $um->workDir() . '/exposure.json', $force);
+    } catch (Throwable $e) {
+        return null;
+    }
+};
+
 $withStatus = function (array $extra = []) use ($um) {
     $out = $um->status();
     $db = Database::getInstance();
@@ -36,7 +45,9 @@ try {
     if ($method === 'GET') {
         // Consulta perezosa: como mucho una vez por hora al abrir el admin.
         $um->checkLatest(false);
-        Response::success($withStatus());
+        // ?light=1 (aviso de la cabecera del admin): sin comprobación de carpetas.
+        $extra = empty($_GET['light']) ? ['exposure' => $exposure(false)] : [];
+        Response::success($withStatus($extra));
     }
     if ($method !== 'POST') {
         Response::error(Translator::t('api.common.method_not_allowed'), 405);
@@ -47,6 +58,10 @@ try {
         case 'check':
             $um->checkLatest(true);
             Response::success($withStatus());
+            break;
+
+        case 'exposure':
+            Response::success($withStatus(['exposure' => $exposure(true)]));
             break;
 
         case 'begin':

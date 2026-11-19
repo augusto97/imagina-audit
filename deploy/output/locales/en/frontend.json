@@ -1975,7 +1975,6 @@
     "repo_label": "Releases repository (GitHub)",
     "repo_hint": "owner/repository format. Packages are only downloaded from GitHub over HTTPS and verified with sha256.",
     "safety": "Before switching versions: database backup, migrations run with the new code and an app health check. If the check fails, the current version is restored automatically. Your .env, uploads, backups and database are never touched.",
-    "workdir_inside": "The work folder is inside the web root (storage/updates). If you use Nginx, make sure /storage is blocked (see deploy/nginx.conf).",
     "previous_title": "Previous version kept",
     "previous_hint": "You can go back to v{{v}} if something isn't right. The database is not touched (the pre-update backup stays in Backups).",
     "rollback": "Go back to v{{v}}",
@@ -1992,6 +1991,19 @@
     "status_running": "running",
     "status_switched": "verifying",
     "status_idle": "—",
-    "badge": "New version v{{v}}"
+    "badge": "New version v{{v}}",
+    "exposure_title": "Internal folder protection",
+    "exposure_recheck": "Check again",
+    "exposure_ok": "No internal folder or the .env file can be downloaded from the internet (detected server: {{server}}).",
+    "exposure_server_unknown": "unknown",
+    "exposure_bad": "Files can be downloaded from the internet in: {{list}}. These hold database backups, logs or configuration: they must be blocked.",
+    "exposure_fix_nginx": "Your server is Nginx, which doesn't read the app's .htaccess files. In ServerAvatar open the application → Nginx / Custom config, paste this block, save and press \"Check again\":",
+    "exposure_fix_unknown": "If your server is Nginx, paste this block into its configuration (in ServerAvatar: application → Nginx / Custom config). If it's Apache or LiteSpeed, re-upload the .htaccess files of those folders. Then press \"Check again\".",
+    "exposure_fix_apache": "Your server is {{server}}: the .htaccess files protecting those folders are missing or ignored (AllowOverride). Re-extract the current version's zip or ask your host to allow .htaccess; then press \"Check again\".",
+    "exposure_unreachable": "Could not check: the server doesn't allow the app to call itself. Check the app URL in General settings.",
+    "exposure_copy": "Copy",
+    "exposure_hint": "The app tries to download a test file from each internal folder through its own public URL, just like any visitor would. Last check: {{date}}.",
+    "check_failed": "Could not check for new versions",
+    "see_notes": "See what's new on GitHub"
   }
 }

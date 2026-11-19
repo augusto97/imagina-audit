@@ -60,11 +60,25 @@ class ReleaseSource
      */
     public function latest(): ?array
     {
-        [$status, $body] = $this->request("{$this->apiBase}/repos/{$this->repo}/releases/latest", 1_000_000, true);
+        try {
+            [$status, $body] = $this->request("{$this->apiBase}/repos/{$this->repo}/releases/latest", 1_000_000, true);
+        } catch (RuntimeException $e) {
+            $status = 0;
+            $body = '';
+            $netError = $e->getMessage();
+        }
         if ($status === 404) return null;
         if ($status !== 200) {
-            $msg = json_decode($body, true)['message'] ?? '';
-            throw new RuntimeException("GitHub respondió HTTP $status" . ($msg ? ": $msg" : ''));
+            $msg = $netError ?? (json_decode($body, true)['message'] ?? '');
+            // La API sin token permite 60 consultas/hora por IP, y en hosting
+            // compartido esa IP la comparten muchos sitios. Si la API no
+            // responde, leer el manifest por la URL de descarga directa
+            // (github.com/…/releases/latest/download/…), que no tiene ese límite.
+            if ($this->apiBase === self::DEFAULT_API) {
+                $fallback = $this->latestFromDownloadUrls();
+                if ($fallback) return $fallback;
+            }
+            throw new RuntimeException('GitHub respondió ' . ($status ? "HTTP $status" : 'con un error de red') . ($msg ? ": $msg" : ''));
         }
         $data = json_decode($body, true);
         if (!is_array($data)) throw new RuntimeException('Respuesta de GitHub ilegible.');
@@ -105,6 +119,37 @@ class ReleaseSource
             'zip' => ['name' => $zipName] + $assets[$zipName],
             'sha256Url' => $assets["$zipName.sha256"]['url'],
             'manifest' => $manifest,
+        ];
+    }
+
+    /**
+     * Alternativa sin la API: el manifest del último release tiene la
+     * versión, y los nombres de los assets son fijos. No trae notas ni
+     * tamaño del zip (la integridad la sigue garantizando el sha256).
+     */
+    private function latestFromDownloadUrls(): ?array
+    {
+        try {
+            $raw = $this->fetchText("https://github.com/{$this->repo}/releases/latest/download/manifest.json", 200_000);
+        } catch (Throwable $e) {
+            return null;
+        }
+        $m = json_decode($raw, true);
+        $version = is_array($m) ? (string) ($m['version'] ?? '') : '';
+        if (!AppVersion::isValid($version)) return null;
+        $dl = "https://github.com/{$this->repo}/releases/download/v$version";
+        $zipName = "imagina-audit-$version.zip";
+        return [
+            'version' => $version,
+            'tag' => "v$version",
+            'name' => "v$version",
+            'body' => '',
+            'publishedAt' => (string) ($m['builtAt'] ?? ''),
+            'htmlUrl' => "https://github.com/{$this->repo}/releases/tag/v$version",
+            'zip' => ['name' => $zipName, 'url' => "$dl/$zipName", 'size' => 0],
+            'sha256Url' => "$dl/$zipName.sha256",
+            'manifest' => $m,
+            'viaFallback' => true,
         ];
     }
 
