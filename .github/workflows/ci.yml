@@ -1,0 +1,32 @@
+# Pruebas en cada push a ramas de trabajo y en pull requests hacia main.
+name: CI
+
+on:
+  push:
+    branches-ignore: [main, release]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: zip, pdo_sqlite, sqlite3, curl, mbstring, openssl
+          tools: composer
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: PHPUnit
+        working-directory: backend
+        run: |
+          composer install --no-interaction --no-progress
+          ./vendor/bin/phpunit
+      - name: Typecheck frontend
+        working-directory: frontend
+        run: |
+          npm install --legacy-peer-deps --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.app.json

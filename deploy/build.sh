@@ -142,6 +142,27 @@ Options -Indexes
 EOF
 
 echo "[3/3] .htaccess creado"
+
+# 4. Versión + metadatos del actualizador
+APP_VERSION="$(tr -d ' \r\n' < "$PROJECT_DIR/VERSION")"
+if ! [[ "$APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "ERROR: VERSION inválida: '$APP_VERSION' (formato X.Y.Z)"; exit 1
+fi
+echo "$APP_VERSION" > "$DEPLOY_DIR/VERSION"
+# La versión también se compila dentro del código PHP: si tras actualizar
+# OPcache sirviera código viejo, el health-check lo detecta.
+cat > "$DEPLOY_DIR/lib/BuildInfo.php" << PHPEOF
+<?php
+/** Generado por deploy/build.sh — no editar a mano. */
+final class BuildInfo
+{
+    public const VERSION = '$APP_VERSION';
+}
+PHPEOF
+# Rescate del actualizador (autónomo, en la raíz)
+cp "$PROJECT_DIR/backend/update-rescue.php" "$DEPLOY_DIR/update-rescue.php"
+# manifest.json: entradas de código, requisitos y hash del .htaccess
+php "$SCRIPT_DIR/make-manifest.php" "$DEPLOY_DIR"
 echo ""
 echo "=== Build completado ==="
 echo "Sube el contenido de deploy/output/ a tu hosting."

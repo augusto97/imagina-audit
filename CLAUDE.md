@@ -3,7 +3,7 @@
 
 ---
 
-## 0. SESSION HANDOFF — Estado actual del proyecto (2026-11-19, v2.6.0)
+## 0. SESSION HANDOFF — Estado actual del proyecto (2026-11-19, v2.7.0)
 
 > Esta sección la mantiene Claude al final de cada conversación larga para
 > que la siguiente sesión retome sin reconstruir contexto. Reemplazar
@@ -11,14 +11,20 @@
 
 ### Versión y ramas
 
-- **v2.6.0** — zip en la rama `release` como `imagina-audit-v2.6.0.zip`.
-- Versión: fuente única en `backend/lib/AppVersion.php` (la usan install.php y /admin/diagnostics).
-- Rama de trabajo: `claude/analyze-wordpress-audit-app-D9hQR`. `main` se actualiza solo cuando el usuario lo pide.
-- **Rama `release`** es orphan: solo `imagina-audit-v{X.Y.Z}.zip` + `README.md` (changelog).
-  Proceso: `bash deploy/build.sh` → `cd deploy/output && zip -rq /tmp/release.zip .` →
-  `git checkout release` → `git mv` zip viejo al nombre nuevo → `cp` el nuevo → changelog → commit → push.
-- El usuario NO tiene terminal (trabaja desde GitHub web y actualiza extrayendo el zip en ServerAvatar/PHP-FPM).
-  Nunca pedirle comandos locales. Las migraciones se aplican solas en cada request (`bootstrap.php` → `initSchema()`).
+- **v2.7.0** — primera versión con **actualizador automático desde GitHub Releases**.
+- Versión: fuente única en el archivo **`VERSION`** (raíz del repo). `deploy/build.sh` la copia al paquete
+  y genera `lib/BuildInfo.php`; `AppVersion::current()` la lee. Notas de cada versión en **`CHANGELOG.md`**
+  (sección `## vX.Y.Z`).
+- **Publicar una versión:** subir `VERSION` + añadir su sección en `CHANGELOG.md` en la rama de trabajo →
+  fusionar a `main` → el workflow `.github/workflows/release.yml` corre PHPUnit + build y crea el release
+  `vX.Y.Z` con `imagina-audit-X.Y.Z.zip`, `.sha256`, `manifest.json` e `installer.php`. Si el tag ya
+  existe no hace nada. `ci.yml` corre pruebas + typecheck en ramas de trabajo y PRs.
+- Rama de trabajo: `claude/analyze-wordpress-audit-app-D9hQR`. `main` se actualiza cuando el usuario lo pide.
+- **Rama `release`** (orphan, zip + README) se mantiene durante la transición (1–2 versiones) y luego se retira.
+  ¡Ojo! al hacer checkout de `release`, `git add -A` arrastra `node_modules`/`vendor` (no tiene .gitignore):
+  usar un `git worktree` aparte y añadir solo el zip y el README.
+- El usuario NO tiene terminal (GitHub web + panel ServerAvatar). Nunca pedirle comandos locales.
+  Las migraciones se aplican solas en cada request (`bootstrap.php` → `initSchema()`).
 
 ### Verificación antes de entregar (obligatorio — el usuario sufrió releases rotos)
 
@@ -51,6 +57,16 @@
   `ignore_user_abort`, reintento de rondas muertas a los 150 s, corte tras `runs+2` intentos). Cliente PSI
   compartido con el auditor en `lib/PageSpeed.php`. Vista de waterfall reutilizable en
   `components/admin/waterfall/WaterfallView.tsx` (la usan WaterfallPage y el laboratorio).
+- **Actualizador** (v2.7.0, `/admin/updates`): `lib/UpdateManager.php` (máquina de estados por pasos:
+  preflight → download → extract → backup → migrate → env → switch → finalize), `lib/ReleaseSource.php`
+  (GitHub, solo HTTPS + hosts de GitHub), `lib/EnvFile.php` (dotenv, nunca `source`), `api/admin/update.php`,
+  `api/update-migrate.php` (corre el Migrator del paquete NUEVO en otra petición: no mezclar clases de dos
+  versiones), `api/update-auto.php` (instalación automática disparada por `cron/drain-queue.php` →
+  `UpdateManager::cronTick()`), `update-rescue.php` (raíz, autónomo, revierte el journal). Sin symlinks:
+  se renombran las carpetas de código de la raíz; carpeta de trabajo en `../imagina_audit_data/updates`
+  (o `storage/updates`). Conserva 3 versiones previas y 5 copias de la base; la poda la hace la versión
+  nueva al arrancar (`UpdateManager::boot()` en bootstrap/index). Health: `/api/health.php?ready=1&expect=X`.
+  Pruebas: `tests/Unit/UpdateManagerTest.php`, `EnvFileTest.php`.
 - **i18n**: `frontend/src/i18n/locales/{en,es}.json` debe quedar idéntico a `backend/locales/{en,es}/frontend.json`
   (el backend sirve overrides dinámicos desde ese espejo).
 
@@ -73,7 +89,7 @@
 
 ### Archivos clave
 
-`backend/lib/{Database,Migrator,QueueManager,Scoring,PageSpeed,PerfLab,AppVersion}.php`,
+`backend/lib/{Database,Migrator,QueueManager,Scoring,PageSpeed,PerfLab,AppVersion,UpdateManager,ReleaseSource,EnvFile}.php`,
 `backend/config/defaults.php`, `backend/api/bootstrap.php`, `frontend/src/pages/AdminPage.tsx`,
 `frontend/src/components/admin/AdminSidebar.tsx`, `deploy/build.sh`.
 

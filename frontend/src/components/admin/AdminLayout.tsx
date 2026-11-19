@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Menu, X, PanelLeftClose, PanelLeft, ExternalLink, LogOut, Settings } from 'lucide-react'
+import { Menu, X, PanelLeftClose, PanelLeft, ExternalLink, LogOut, Settings, Download } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
+import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { useConfigStore } from '@/store/configStore'
@@ -20,6 +21,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const { t } = useTranslation()
   const companyName = useConfigStore((s) => s.config.companyName)
   const navigate = useNavigate()
+  // Aviso de versión nueva: el backend consulta GitHub como mucho 1 vez/hora.
+  const [newVersion, setNewVersion] = useState<string | null>(null)
+  useEffect(() => {
+    api.get('/admin/update.php')
+      .then((r) => {
+        const d = r.data?.data
+        setNewVersion(d?.updateAvailable ? (d.latest?.release?.version ?? null) : null)
+      })
+      .catch(() => { /* sin aviso si falla */ })
+  }, [])
 
   return (
     <div className="flex h-screen bg-white">
@@ -67,6 +78,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <span className="text-[13px] font-medium text-[#404040]">{companyName || 'Imagina Audit'}</span>
           </div>
           <div className="flex items-center gap-1">
+            {newVersion && (
+              <Link to="/admin/updates" className="mr-1 flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-200">
+                <Download className="h-3 w-3" />
+                <span>{t('updates.badge', { v: newVersion })}</span>
+              </Link>
+            )}
             <LanguageSwitcher variant="compact" align="right" />
             <a href="/" target="_blank" rel="noreferrer">
               <Button variant="ghost" size="sm" className="text-[#666] text-xs h-7 px-2 hover:text-[#404040] hover:bg-[#ebebeb]">

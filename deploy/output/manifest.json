@@ -1,0 +1,39 @@
+{
+    "name": "imagina-audit",
+    "version": "2.7.0",
+    "builtAt": "2026-11-19T16:03:42+00:00",
+    "minPhp": "8.0.0",
+    "requiredExtensions": [
+        "curl",
+        "json",
+        "mbstring",
+        "openssl",
+        "pdo",
+        "zip"
+    ],
+    "entries": [
+        ".env.example",
+        ".htaccess",
+        ".htaccess.backend",
+        "VERSION",
+        "analyzers",
+        "api",
+        "assets",
+        "config",
+        "cron",
+        "data",
+        "database",
+        "index.html",
+        "lib",
+        "locales",
+        "update-rescue.php",
+        "widget"
+    ],
+    "fileCount": 278,
+    "uncompressedBytes": 4442295,
+    "htaccessSha256": "4fe4fa98d19037016cc5d3d88c7fcc7240b4c36107b33f4dd9ee69dfb1d420b7",
+    "autoInstall": true,
+    "notices": [
+        "Si usas Nginx (no Apache): añade 'storage' y 'imagina_audit_data' a la regla que bloquea carpetas sensibles (ver deploy/nginx.conf). Con Apache no hace falta nada."
+    ]
+}
