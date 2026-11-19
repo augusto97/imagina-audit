@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { formatSize, type ResourceBreakdownItem } from './helpers'
 
 const BREAKDOWN_COLORS: Record<string, string> = {
@@ -16,6 +17,7 @@ const BREAKDOWN_COLORS: Record<string, string> = {
  * Desglose del peso y número de requests por tipo de recurso.
  */
 export function PageDetailsSection({ data }: { data: ResourceBreakdownItem[] }) {
+  const { t } = useTranslation()
   const total = data.find(d => d.resourceType === 'total')
   const items = data.filter(d => d.resourceType !== 'total' && d.transferSize > 0)
   const maxSize = Math.max(...items.map(d => d.transferSize), 1)
@@ -24,12 +26,12 @@ export function PageDetailsSection({ data }: { data: ResourceBreakdownItem[] }) 
 
   return (
     <div className="mt-8 space-y-4">
-      <h2 className="text-lg font-bold text-gray-900">Page Details</h2>
+      <h2 className="text-lg font-bold text-gray-900">{t('settings.wf_page_details')}</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {/* Size by type */}
         <div>
           <div className="flex items-baseline justify-between mb-3">
-            <span className="text-sm font-medium text-gray-700">Total Page Size</span>
+            <span className="text-sm font-medium text-gray-700">{t('settings.wf_total_size')}</span>
             <span className="text-lg font-bold text-gray-900">{formatSize(totalSize)}</span>
           </div>
           <div className="flex h-6 rounded overflow-hidden mb-3">
@@ -55,7 +57,7 @@ export function PageDetailsSection({ data }: { data: ResourceBreakdownItem[] }) 
         {/* Requests by type */}
         <div>
           <div className="flex items-baseline justify-between mb-3">
-            <span className="text-sm font-medium text-gray-700">Total Page Requests</span>
+            <span className="text-sm font-medium text-gray-700">{t('settings.wf_total_requests')}</span>
             <span className="text-lg font-bold text-gray-900">{totalReqs}</span>
           </div>
           <div className="flex h-6 rounded overflow-hidden mb-3">

@@ -32,6 +32,7 @@ import VulnerabilityManager from '@/components/admin/VulnerabilityManager'
 import TechnicalReport from '@/components/admin/TechnicalReport'
 import SnapshotReport from '@/components/admin/SnapshotReport'
 import WaterfallPage from '@/components/admin/WaterfallPage'
+import PerfLab from '@/components/admin/PerfLab'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   state = { error: null as string | null }
@@ -76,6 +77,7 @@ export default function AdminPage() {
         <Route path="leads/:id/report" element={<TechnicalReport />} />
         <Route path="leads/:id/internal" element={<SnapshotReport />} />
         <Route path="leads/:id/waterfall" element={<WaterfallPage />} />
+        <Route path="performance-lab" element={<PerfLab />} />
         <Route path="settings" element={<SettingsGeneral />} />
         <Route path="branding" element={<SettingsBranding />} />
         <Route path="plugin-vault" element={<SettingsPluginVault />} />

@@ -136,4 +136,12 @@ return [
     'projects.fetch_error'  => 'Failed to load projects.',
     'projects.delete_error' => 'Failed to delete the project.',
     'projects.not_found'    => 'Project not found.',
+
+    // ——— /admin/perf-lab.php (Performance lab) ——————————————————
+    'perf_lab.not_found'        => 'Test not found.',
+    'perf_lab.invalid_strategy' => 'Invalid device.',
+    'perf_lab.invalid_action'   => 'Invalid action.',
+    'perf_lab.psi_timeout'      => 'PageSpeed did not respond in time (over 90 s). Please try again.',
+    'perf_lab.psi_no_score'     => 'PageSpeed responded without a performance score.',
+    'perf_lab.server_timeout'   => 'The server cut the measurement several times (hosting time limit). Check max_execution_time.',
 ];

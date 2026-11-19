@@ -37,6 +37,7 @@ class CrossDbMigrator
         'vulnerabilities',
         'rate_limits',
         'login_attempts',  // migración 0002 — sin esto los intentos fallidos del admin no se migran
+        'perf_runs',       // migración 0004 — laboratorio de rendimiento
     ];
 
     private const BATCH_SIZE = 200;
@@ -46,7 +47,7 @@ class CrossDbMigrator
     // a ~400MB, OOM-eando workers de hosting compartido a 256M. Batch
     // adaptativo: estas usan 20.
     private const HEAVY_BATCH = 20;
-    private const HEAVY_TABLES = ['audits', 'wp_snapshots'];
+    private const HEAVY_TABLES = ['audits', 'wp_snapshots', 'perf_runs'];
 
     private PDO $source;   // SQLite
     private PDO $target;   // MySQL

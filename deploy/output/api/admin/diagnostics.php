@@ -340,7 +340,7 @@ foreach ($checks as $c) {
 Response::success([
     'timestamp' => date('c'),
     'app' => [
-        'version' => '2.3.3',
+        'version' => AppVersion::CURRENT,
     ],
     'summary' => $summary,
     'checks' => $checks,

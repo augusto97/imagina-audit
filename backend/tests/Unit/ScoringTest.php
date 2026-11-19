@@ -9,15 +9,16 @@ final class ScoringTest extends TestCase
 {
     public static function levelThresholds(): array
     {
-        // score, expected level (umbrales por defecto: ex=90, g=70, w=50, c=30)
+        // score, expected level (umbrales por defecto v2.1.0+: ex=92, g=80, w=60 — config/defaults.php)
         return [
-            'excellent boundary' => [90, 'excellent'],
+            'excellent boundary' => [92, 'excellent'],
             'just excellent'     => [95, 'excellent'],
-            'good boundary'      => [70, 'good'],
+            'just below excel.'  => [91, 'good'],
+            'good boundary'      => [80, 'good'],
             'upper good'         => [89, 'good'],
-            'warning boundary'   => [50, 'warning'],
-            'upper warning'      => [69, 'warning'],
-            'just below warning' => [49, 'critical'],
+            'warning boundary'   => [60, 'warning'],
+            'upper warning'      => [79, 'warning'],
+            'just below warning' => [59, 'critical'],
             'zero'               => [0, 'critical'],
             'hundred'            => [100, 'excellent'],
         ];

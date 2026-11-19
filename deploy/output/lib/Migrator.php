@@ -15,7 +15,7 @@
  *     `schema_migrations(version INT PRIMARY KEY, name TEXT, applied_at)`.
  *
  *   - El SQL admite placeholders cross-driver: {{NOW}}, {{AUTO_PK}},
- *     {{BOOL}}, {{JSON}}, {{INT}}, {{BIGINT}}, {{TEXT_LONG}},
+ *     {{BOOL}}, {{JSON}}, {{INT}}, {{BIGINT}}, {{TEXT_LONG}}, {{BLOB}},
  *     {{TABLE_OPTIONS}}. El Migrator los reemplaza según el driver activo
  *     antes de ejecutar.
  *
@@ -339,6 +339,9 @@ class Migrator
                 '{{INT}}'           => 'INT',
                 '{{BIGINT}}'        => 'BIGINT',
                 '{{TEXT_LONG}}'     => 'MEDIUMTEXT',
+                // Blobs binarios (gzip de JsonStore). Nunca JSON: MySQL
+                // valida el contenido y rechaza los bytes gzip (ver 0003).
+                '{{BLOB}}'          => 'LONGBLOB',
                 '{{TABLE_OPTIONS}}' => ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci',
             ]
             : [
@@ -349,6 +352,7 @@ class Migrator
                 '{{INT}}'           => 'INTEGER',
                 '{{BIGINT}}'        => 'INTEGER',
                 '{{TEXT_LONG}}'     => 'TEXT',
+                '{{BLOB}}'          => 'BLOB',
                 '{{TABLE_OPTIONS}}' => '',
             ];
         return strtr($sql, $replacements);
