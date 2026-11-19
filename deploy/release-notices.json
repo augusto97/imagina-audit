@@ -1,9 +1,4 @@
 {
-  "_doc": "Avisos por versión que el panel de actualizaciones muestra ANTES de instalar (cambios que el actualizador no puede hacer, p.ej. nginx). 'autoInstall': false obliga a instalar esa versión a mano desde el panel.",
-  "2.7.0": {
-    "autoInstall": true,
-    "notices": [
-      "Si usas Nginx (no Apache): añade 'storage' y 'imagina_audit_data' a la regla que bloquea carpetas sensibles (ver deploy/nginx.conf). Con Apache no hace falta nada."
-    ]
-  }
+  "_doc": "Avisos por versión que el panel de actualizaciones muestra ANTES de instalarla (cambios que el actualizador no puede hacer por sí mismo). Lo que la app pueda comprobar sola (p.ej. carpetas expuestas) NO va aquí: se detecta en vivo con ExposureCheck. 'autoInstall': false obliga a instalar esa versión a mano desde el panel.",
+  "2.7.1": { "autoInstall": true, "notices": [] }
 }

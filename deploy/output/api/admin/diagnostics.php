@@ -356,6 +356,16 @@ $run('Actualizador (GitHub Releases)', function () {
     ];
 });
 
+// ─── Carpetas internas expuestas a internet ─────────────────────────
+$run('Carpetas internas protegidas (descarga real por HTTP)', function () {
+    $r = ExposureCheck::run(dirname(__DIR__, 2), QueueManager::appBaseUrl(), null, true);
+    $bad = $r['exposed'] || $r['envExposed'];
+    return [
+        'status' => !$r['reachable'] ? 'skip' : ($bad ? 'fail' : 'ok'),
+        'detail' => $r,
+    ];
+});
+
 $summary = [
     'ok' => 0, 'warn' => 0, 'fail' => 0, 'skip' => 0,
 ];

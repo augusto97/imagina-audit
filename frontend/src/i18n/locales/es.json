@@ -1975,7 +1975,6 @@
     "repo_label": "Repositorio de releases (GitHub)",
     "repo_hint": "Formato propietario/repositorio. Solo se descargan paquetes de GitHub por HTTPS y verificados con sha256.",
     "safety": "Antes de cambiar de versión: copia de la base, migraciones probadas con el código nuevo y verificación de la app. Si la verificación falla, se restaura la versión actual sin intervención. Tu .env, subidas, backups y base de datos nunca se tocan.",
-    "workdir_inside": "La carpeta de trabajo está dentro de la web (storage/updates). Si usas Nginx, asegúrate de bloquear /storage (ver deploy/nginx.conf).",
     "previous_title": "Versión anterior guardada",
     "previous_hint": "Puedes volver a v{{v}} si algo no te convence. La base de datos no se toca (la copia previa sigue en Backups).",
     "rollback": "Volver a v{{v}}",
@@ -1992,6 +1991,19 @@
     "status_running": "en curso",
     "status_switched": "en verificación",
     "status_idle": "—",
-    "badge": "Nueva versión v{{v}}"
+    "badge": "Nueva versión v{{v}}",
+    "exposure_title": "Protección de carpetas internas",
+    "exposure_recheck": "Comprobar de nuevo",
+    "exposure_ok": "Ninguna carpeta interna ni el .env se pueden descargar desde internet (servidor detectado: {{server}}).",
+    "exposure_server_unknown": "no identificado",
+    "exposure_bad": "Desde internet se pueden descargar archivos de: {{list}}. Ahí hay copias de la base, registros o configuración: hay que bloquearlo.",
+    "exposure_fix_nginx": "Tu servidor es Nginx, que no lee los .htaccess de la app. En ServerAvatar abre la aplicación → Nginx / Custom config, pega este bloque, guarda y pulsa «Comprobar de nuevo»:",
+    "exposure_fix_unknown": "Si tu servidor es Nginx, pega este bloque en su configuración (en ServerAvatar: aplicación → Nginx / Custom config). Si es Apache o LiteSpeed, vuelve a subir los archivos .htaccess de esas carpetas. Después pulsa «Comprobar de nuevo».",
+    "exposure_fix_apache": "Tu servidor es {{server}}: los archivos .htaccess que protegen esas carpetas faltan o el servidor los ignora (AllowOverride). Vuelve a extraer el zip de la versión actual o pide a tu hosting que permita .htaccess; después pulsa «Comprobar de nuevo».",
+    "exposure_unreachable": "No se pudo comprobar: el servidor no permite que la app se llame a sí misma. Revisa la URL de la app en Configuración general.",
+    "exposure_copy": "Copiar",
+    "exposure_hint": "La app intenta descargar un archivo de prueba de cada carpeta interna desde su propia URL pública, como lo haría cualquier visitante. Última comprobación: {{date}}.",
+    "check_failed": "No se pudo comprobar si hay versiones nuevas",
+    "see_notes": "Ver novedades en GitHub"
   }
 }

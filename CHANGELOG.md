@@ -5,6 +5,12 @@ Cada versión se publica automáticamente como GitHub Release al fusionar a
 correspondiente de este archivo. El historial anterior a v2.6.0 está en el
 README de la rama `release`.
 
+## v2.7.1
+
+- **Protección de carpetas comprobada en vivo** (Configuración → Actualizaciones y Diagnóstico): la app intenta descargar un archivo de prueba de cada carpeta interna (`storage`, `cache`, `logs`, `lib`, `config`, `data`, `database`, `analyzers`) y el `.env` desde su propia URL pública, como lo haría cualquier visitante. Si algo es accesible, dice exactamente qué, detecta el servidor (Nginx, Apache, LiteSpeed) y da el bloque listo para copiar; si todo está protegido, lo confirma. Sustituye al aviso genérico sobre Nginx, que ya no aparece.
+- Los avisos de una versión solo se muestran mientras esa versión está pendiente de instalar.
+- **Consulta de versiones más robusta:** si la API de GitHub limita las consultas (60/hora por IP, compartida en hosting compartido), el actualizador lee el último release por la URL de descarga directa, sin ese límite. Si aun así no puede comprobarlo, el panel lo dice en lugar de mostrar «Estás al día».
+
 ## v2.7.0
 
 **Actualizaciones automáticas desde GitHub Releases.**

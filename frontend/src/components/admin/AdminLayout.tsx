@@ -24,7 +24,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   // Aviso de versión nueva: el backend consulta GitHub como mucho 1 vez/hora.
   const [newVersion, setNewVersion] = useState<string | null>(null)
   useEffect(() => {
-    api.get('/admin/update.php')
+    api.get('/admin/update.php', { params: { light: 1 } })
       .then((r) => {
         const d = r.data?.data
         setNewVersion(d?.updateAvailable ? (d.latest?.release?.version ?? null) : null)

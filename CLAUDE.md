@@ -3,7 +3,7 @@
 
 ---
 
-## 0. SESSION HANDOFF — Estado actual del proyecto (2026-11-19, v2.7.0)
+## 0. SESSION HANDOFF — Estado actual del proyecto (2026-11-19, v2.7.1)
 
 > Esta sección la mantiene Claude al final de cada conversación larga para
 > que la siguiente sesión retome sin reconstruir contexto. Reemplazar
@@ -11,7 +11,7 @@
 
 ### Versión y ramas
 
-- **v2.7.0** — primera versión con **actualizador automático desde GitHub Releases**.
+- **v2.7.1** (v2.7.0 = primera versión con **actualizador automático desde GitHub Releases**).
 - Versión: fuente única en el archivo **`VERSION`** (raíz del repo). `deploy/build.sh` la copia al paquete
   y genera `lib/BuildInfo.php`; `AppVersion::current()` la lee. Notas de cada versión en **`CHANGELOG.md`**
   (sección `## vX.Y.Z`).
@@ -66,7 +66,10 @@
   se renombran las carpetas de código de la raíz; carpeta de trabajo en `../imagina_audit_data/updates`
   (o `storage/updates`). Conserva 3 versiones previas y 5 copias de la base; la poda la hace la versión
   nueva al arrancar (`UpdateManager::boot()` en bootstrap/index). Health: `/api/health.php?ready=1&expect=X`.
-  Pruebas: `tests/Unit/UpdateManagerTest.php`, `EnvFileTest.php`.
+  `lib/ExposureCheck.php` (v2.7.1): comprueba por HTTP real si carpetas internas / .env se pueden descargar
+  (nunca incluir `cron/`: la cola se dispara por HTTP). `ReleaseSource` cae a la URL de descarga directa
+  si la API de GitHub está limitada (60/h por IP).
+  Pruebas: `tests/Unit/UpdateManagerTest.php`, `EnvFileTest.php`, `ExposureCheckTest.php`.
 - **i18n**: `frontend/src/i18n/locales/{en,es}.json` debe quedar idéntico a `backend/locales/{en,es}/frontend.json`
   (el backend sirve overrides dinámicos desde ese espejo).
 

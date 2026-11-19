@@ -4,7 +4,7 @@ import axios from 'axios'
 import { toast } from 'sonner'
 import {
   Download, RefreshCw, Loader2, CheckCircle2, XCircle, Circle, AlertTriangle, ExternalLink,
-  RotateCcw, ShieldCheck, History, Settings2, Undo2,
+  RotateCcw, ShieldCheck, ShieldAlert, History, Settings2, Undo2, Copy,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -44,6 +44,16 @@ interface UpdState {
   verified?: boolean
 }
 
+interface Exposure {
+  checkedAt: number
+  reachable: boolean
+  server: string
+  exposed: string[]
+  protected: string[]
+  envExposed: boolean
+  nginxSnippet: string | null
+}
+
 interface HistoryItem { id: string; kind: string; from: string; to: string; status: UpdStatus; finishedAt: number; error: string | null }
 
 interface UpdStatusResponse {
@@ -58,6 +68,7 @@ interface UpdStatusResponse {
   workDir: string
   workDirInsideWebRoot: boolean
   settings: { repo: string; autoInstall: boolean; appUrlConfigured: boolean }
+  exposure?: Exposure | null
 }
 
 type ApiError = { response?: { status?: number; data?: { error?: string } } }
@@ -99,7 +110,7 @@ export default function AdminUpdates() {
     try {
       const res = await api.get<{ data: UpdStatusResponse }>(ENDPOINT)
       if (!mounted.current) return null
-      setData(res.data.data)
+      setData((prev) => ({ ...res.data.data, exposure: res.data.data.exposure ?? prev?.exposure }))
       setState(res.data.data.state)
       setRepo(res.data.data.settings.repo)
       return res.data.data
@@ -209,7 +220,7 @@ export default function AdminUpdates() {
     setChecking(true)
     try {
       const r = await api.post<{ data: UpdStatusResponse }>(ENDPOINT, { action: 'check' })
-      setData(r.data.data)
+      setData((prev) => ({ ...r.data.data, exposure: r.data.data.exposure ?? prev?.exposure }))
       setState(r.data.data.state)
       if (r.data.data.latest?.error) toast.error(r.data.data.latest.error)
       else toast.success(r.data.data.updateAvailable ? t('updates.found', { v: r.data.data.latest?.release?.version }) : t('updates.up_to_date'))
@@ -230,6 +241,23 @@ export default function AdminUpdates() {
     } catch (err) {
       toast.error((err as ApiError).response?.data?.error || t('updates.step_error'))
     }
+  }
+
+  const [checkingExposure, setCheckingExposure] = useState(false)
+  const recheckExposure = async () => {
+    setCheckingExposure(true)
+    try {
+      const r = await api.post<{ data: UpdStatusResponse }>(ENDPOINT, { action: 'exposure' }, { timeout: 60000 })
+      setData(r.data.data)
+    } catch (err) {
+      toast.error((err as ApiError).response?.data?.error || t('updates.load_error'))
+    } finally {
+      setCheckingExposure(false)
+    }
+  }
+
+  const copySnippet = async (text: string) => {
+    try { await navigator.clipboard.writeText(text); toast.success(t('common.copied')) } catch { /* sin portapapeles */ }
   }
 
   const cancel = async () => {
@@ -259,7 +287,7 @@ export default function AdminUpdates() {
   const saveSettings = async (patch: { repo?: string; autoInstall?: boolean }) => {
     try {
       const r = await api.post<{ data: UpdStatusResponse }>(ENDPOINT, { action: 'settings', ...patch })
-      setData(r.data.data)
+      setData((prev) => ({ ...r.data.data, exposure: r.data.data.exposure ?? prev?.exposure }))
       setRepo(r.data.data.settings.repo)
       toast.success(t('updates.settings_saved'))
     } catch (err) {
@@ -275,7 +303,10 @@ export default function AdminUpdates() {
   const active = state.status === 'running' || state.status === 'switched'
   const currentIdx = STEPS.indexOf((state.step ?? 'preflight') as typeof STEPS[number])
   const canCancel = state.status === 'running' && currentIdx >= 0 && currentIdx < STEPS.indexOf('switch')
-  const notices = active ? (state.notices ?? []) : (rel?.manifest?.notices ?? [])
+  // Los avisos del release solo tienen sentido antes de instalarlo.
+  const notices = active ? (state.notices ?? []) : (data.updateAvailable ? (rel?.manifest?.notices ?? []) : [])
+  const exp = data.exposure ?? null
+  const expBad = !!exp && (exp.exposed.length > 0 || exp.envExposed)
   const showResult = !active && state.id && ['completed', 'failed', 'cancelled', 'rolled_back'].includes(state.status)
 
   return (
@@ -306,7 +337,14 @@ export default function AdminUpdates() {
               <p className="flex flex-wrap items-center gap-2 text-sm">
                 <Badge variant="success">{t('updates.available', { v: rel.version })}</Badge>
                 <span className="text-xs text-[var(--text-tertiary)]">{t('updates.published', { date: fmtDate(rel.publishedAt, i18n.language) })}</span>
+                {!rel.body && rel.htmlUrl && (
+                  <a href={rel.htmlUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-[var(--accent-primary)] hover:underline">
+                    {t('updates.see_notes')} <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
               </p>
+            ) : !rel && data.latest?.error ? (
+              <p className="flex items-center gap-1.5 text-sm text-amber-700"><AlertTriangle className="h-4 w-4" /> {t('updates.check_failed')}</p>
             ) : (
               <p className="flex items-center gap-1.5 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4" /> {t('updates.up_to_date')}</p>
             )}
@@ -413,6 +451,50 @@ export default function AdminUpdates() {
         </Card>
       )}
 
+      {/* Protección de carpetas: comprobación real por HTTP */}
+      {exp && (
+        <Card className={`border-0 shadow-sm ${expBad ? 'bg-red-50' : ''}`}>
+          <CardContent className="space-y-2 p-4 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-2 font-semibold text-[var(--text-primary)]">
+                {expBad ? <ShieldAlert className="h-4 w-4 text-red-600" /> : <ShieldCheck className="h-4 w-4 text-emerald-600" />}
+                {t('updates.exposure_title')}
+              </p>
+              <Button variant="outline" size="sm" onClick={recheckExposure} disabled={checkingExposure}>
+                {checkingExposure ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} {t('updates.exposure_recheck')}
+              </Button>
+            </div>
+            {!exp.reachable ? (
+              <p className="text-[var(--text-secondary)]">{t('updates.exposure_unreachable')}</p>
+            ) : expBad ? (
+              <>
+                <p className="text-red-700">
+                  {t('updates.exposure_bad', { list: [...exp.exposed.map((d) => `/${d}/`), ...(exp.envExposed ? ['.env'] : [])].join(', ') })}
+                </p>
+                {exp.server === 'Nginx' || exp.server === 'Cloudflare' || exp.server === '' ? (
+                  <>
+                    <p className="text-xs text-[var(--text-secondary)]">{t(exp.server === 'Nginx' ? 'updates.exposure_fix_nginx' : 'updates.exposure_fix_unknown')}</p>
+                    {exp.nginxSnippet && (
+                      <div className="relative">
+                        <pre className="overflow-x-auto rounded-md bg-gray-900 p-3 text-[11px] leading-relaxed text-gray-100">{exp.nginxSnippet}</pre>
+                        <Button variant="secondary" size="sm" className="absolute right-2 top-2 h-7" onClick={() => copySnippet(exp.nginxSnippet!)}>
+                          <Copy className="h-3 w-3" /> {t('updates.exposure_copy')}
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-[var(--text-secondary)]">{t('updates.exposure_fix_apache', { server: exp.server })}</p>
+                )}
+              </>
+            ) : (
+              <p className="text-emerald-700">{t('updates.exposure_ok', { server: exp.server || t('updates.exposure_server_unknown') })}</p>
+            )}
+            <p className="text-xs text-[var(--text-tertiary)]">{t('updates.exposure_hint', { date: fmtDate(exp.checkedAt, i18n.language) })}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Ajustes */}
       <Card className="border-0 shadow-sm">
         <CardContent className="space-y-4 p-4">
@@ -439,7 +521,6 @@ export default function AdminUpdates() {
             <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
             <span>{t('updates.safety')}</span>
           </div>
-          {data.workDirInsideWebRoot && <p className="text-xs text-amber-700">{t('updates.workdir_inside')}</p>}
         </CardContent>
       </Card>
 

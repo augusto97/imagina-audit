@@ -236,4 +236,4 @@ Tras configurar todo:
 - **Automático (opcional):** activa «Instalar actualizaciones automáticamente» en ese panel. Requiere el cron de la cola (`cron/drain-queue.php`) y la **URL de la app** configurada en Configuración general.
 - **Instalación nueva sin terminal:** cada release publica `installer.php`. Súbelo solo a la carpeta pública vacía, ábrelo en el navegador y pulsa «Instalar».
 - **Rescate:** si una versión nueva no arrancara, `https://tu-dominio/update-rescue.php` vuelve a la anterior (con el token del panel, o sin él pasados 15 minutos de un cambio sin finalizar).
-- **Nginx:** asegúrate de que la regla de carpetas bloqueadas incluye `storage` (ver `deploy/nginx.conf`). Con Apache no hace falta nada.
+- **Carpetas protegidas:** el panel de Actualizaciones comprueba en vivo (por HTTP) que ninguna carpeta interna ni el `.env` se puedan descargar, y si hace falta muestra el bloque exacto para Nginx (ver también `deploy/nginx.conf`).
