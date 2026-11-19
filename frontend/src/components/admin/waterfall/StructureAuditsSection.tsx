@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
 import type { LighthouseAudit } from './helpers'
 
@@ -14,6 +15,7 @@ const IMPACT_COLORS: Record<string, { bg: string; text: string; label: string }>
  * estado local para el audit expandido y el toggle de "mostrar aprobados".
  */
 export function StructureAuditsSection({ audits }: { audits: LighthouseAudit[] }) {
+  const { t } = useTranslation()
   const [expandedAudit, setExpandedAudit] = useState<string | null>(null)
   const [showNone, setShowNone] = useState(false)
 
@@ -22,14 +24,14 @@ export function StructureAuditsSection({ audits }: { audits: LighthouseAudit[] }
 
   return (
     <div className="mt-8 space-y-4">
-      <h2 className="text-lg font-bold text-gray-900">Structure Audits</h2>
-      <p className="text-xs text-gray-500">Lighthouse performance audits sorted by impact. Click to expand.</p>
+      <h2 className="text-lg font-bold text-gray-900">{t('settings.wf_structure_title')}</h2>
+      <p className="text-xs text-gray-500">{t('settings.wf_structure_hint')}</p>
 
       <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <div className="grid grid-cols-[60px_1fr_auto] gap-0 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
-          <div className="px-3 py-2">Impact</div>
-          <div className="px-3 py-2">Audit</div>
-          <div className="px-3 py-2 text-right">Value</div>
+        <div className="grid grid-cols-[76px_1fr_auto] gap-0 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
+          <div className="px-3 py-2">{t('settings.wf_col_impact')}</div>
+          <div className="px-3 py-2">{t('settings.wf_col_audit')}</div>
+          <div className="px-3 py-2 text-right">{t('settings.wf_col_value')}</div>
         </div>
 
         {withImpact.map(a => {
@@ -38,11 +40,11 @@ export function StructureAuditsSection({ audits }: { audits: LighthouseAudit[] }
           return (
             <div key={a.id}>
               <div
-                className={`grid grid-cols-[60px_1fr_auto] gap-0 border-b border-gray-100 text-xs cursor-pointer ${isOpen ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                className={`grid grid-cols-[76px_1fr_auto] gap-0 border-b border-gray-100 text-xs cursor-pointer ${isOpen ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
                 onClick={() => setExpandedAudit(isOpen ? null : a.id)}
               >
                 <div className="px-3 py-2.5">
-                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${style.bg} ${style.text}`}>{style.label}</span>
+                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${style.bg} ${style.text}`}>{t(`settings.wf_impact_${a.impact in IMPACT_COLORS ? a.impact : 'none'}`, style.label)}</span>
                 </div>
                 <div className="px-3 py-2.5 text-gray-700">{a.title}</div>
                 <div className="px-3 py-2.5 text-right text-gray-500">{a.displayValue}</div>
@@ -62,16 +64,16 @@ export function StructureAuditsSection({ audits }: { audits: LighthouseAudit[] }
             className="px-3 py-2 text-xs text-center text-gray-400 cursor-pointer hover:bg-gray-50 border-b border-gray-100"
             onClick={() => setShowNone(!showNone)}
           >
-            {showNone ? 'Hide' : 'Show'} {noImpact.length} passed audits {showNone ? '▲' : '▼'}
+            {showNone ? t('settings.wf_hide_passed', { count: noImpact.length }) : t('settings.wf_show_passed', { count: noImpact.length })} {showNone ? '▲' : '▼'}
           </div>
         )}
 
         {showNone && noImpact.map(a => {
           const style = IMPACT_COLORS[a.impact] || IMPACT_COLORS.none
           return (
-            <div key={a.id} className="grid grid-cols-[60px_1fr_auto] gap-0 border-b border-gray-100 text-xs">
+            <div key={a.id} className="grid grid-cols-[76px_1fr_auto] gap-0 border-b border-gray-100 text-xs">
               <div className="px-3 py-2">
-                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${style.bg} ${style.text}`}>{style.label}</span>
+                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${style.bg} ${style.text}`}>{t(`settings.wf_impact_${a.impact in IMPACT_COLORS ? a.impact : 'none'}`, style.label)}</span>
               </div>
               <div className="px-3 py-2 text-gray-500">{a.title}</div>
               <div className="px-3 py-2 text-right text-gray-400">{a.displayValue}</div>

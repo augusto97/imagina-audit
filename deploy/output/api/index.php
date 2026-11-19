@@ -178,6 +178,9 @@ switch ($endpoint) {
     case 'admin/diagnostics':
         require __DIR__ . '/admin/diagnostics.php';
         break;
+    case 'admin/perf-lab':
+        require __DIR__ . '/admin/perf-lab.php';
+        break;
 
     case 'admin/migrate-database':
         require __DIR__ . '/admin/migrate-database.php';

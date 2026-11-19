@@ -41,6 +41,7 @@ SQL to handle differences:
 | `{{INT}}`          | `INT`                                                      | `INTEGER`                       |
 | `{{BIGINT}}`       | `BIGINT`                                                   | `INTEGER`                       |
 | `{{TEXT_LONG}}`    | `MEDIUMTEXT`                                               | `TEXT`                          |
+| `{{BLOB}}`         | `LONGBLOB`                                                 | `BLOB`                          |
 | `{{TABLE_OPTIONS}}`| ` ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci` | (empty)              |
 
 ### Driver-conditional blocks

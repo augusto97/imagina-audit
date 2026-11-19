@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard, Users, Settings, MessageSquare,
-  CreditCard, SlidersHorizontal, ShieldAlert, Shield, ShieldCheck, Server, Archive, Activity, Palette, Home, Package, Languages, UserCog, Gauge, Folder, Globe2, Database, Stethoscope, Code2,
+  CreditCard, SlidersHorizontal, ShieldAlert, Shield, ShieldCheck, Server, Archive, Activity, Palette, Home, Package, Languages, UserCog, Gauge, Folder, Globe2, Database, Stethoscope, Code2, FlaskConical,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
@@ -17,6 +17,7 @@ const NAV_SECTIONS = [
     items: [
       { to: '/admin/dashboard',   icon: LayoutDashboard, labelKey: 'nav.dashboard' },
       { to: '/admin/leads',       icon: Users,           labelKey: 'nav.leads' },
+      { to: '/admin/performance-lab', icon: FlaskConical,  labelKey: 'nav.perf_lab' },
       { to: '/admin/users',       icon: UserCog,         labelKey: 'nav.users' },
       { to: '/admin/user-plans',  icon: Gauge,           labelKey: 'nav.user_plans' },
       { to: '/admin/projects',    icon: Folder,          labelKey: 'nav.admin_projects' },

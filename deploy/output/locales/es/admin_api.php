@@ -136,4 +136,12 @@ return [
     'projects.fetch_error'  => 'Error al cargar los proyectos.',
     'projects.delete_error' => 'Error al eliminar el proyecto.',
     'projects.not_found'    => 'Proyecto no encontrado.',
+
+    // ——— /admin/perf-lab.php (Laboratorio de rendimiento) ——————————
+    'perf_lab.not_found'        => 'Prueba no encontrada.',
+    'perf_lab.invalid_strategy' => 'Dispositivo no válido.',
+    'perf_lab.invalid_action'   => 'Acción no válida.',
+    'perf_lab.psi_timeout'      => 'PageSpeed no respondió a tiempo (más de 90 s). Inténtalo de nuevo.',
+    'perf_lab.psi_no_score'     => 'PageSpeed respondió sin puntuación de rendimiento.',
+    'perf_lab.server_timeout'   => 'El servidor cortó la medición varias veces (límite de tiempo del hosting). Revisa max_execution_time.',
 ];

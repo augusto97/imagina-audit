@@ -3,198 +3,79 @@
 
 ---
 
-## 0. SESSION HANDOFF — Estado actual del proyecto (2026-05-19, v2.2.1)
+## 0. SESSION HANDOFF — Estado actual del proyecto (2026-11-19, v2.6.0)
 
 > Esta sección la mantiene Claude al final de cada conversación larga para
 > que la siguiente sesión retome sin reconstruir contexto. Reemplazar
 > contenido completo en cada update — NO acumular logs aquí.
 
-### Versión actual
+### Versión y ramas
 
-- **v2.2.1** — zip publicado en la rama `release` como `imagina-audit-v2.2.1.zip`.
-- Rama de trabajo: `claude/analyze-wordpress-audit-app-D9hQR`.
+- **v2.6.0** — zip en la rama `release` como `imagina-audit-v2.6.0.zip`.
+- Versión: fuente única en `backend/lib/AppVersion.php` (la usan install.php y /admin/diagnostics).
+- Rama de trabajo: `claude/analyze-wordpress-audit-app-D9hQR`. `main` se actualiza solo cuando el usuario lo pide.
+- **Rama `release`** es orphan: solo `imagina-audit-v{X.Y.Z}.zip` + `README.md` (changelog).
+  Proceso: `bash deploy/build.sh` → `cd deploy/output && zip -rq /tmp/release.zip .` →
+  `git checkout release` → `git mv` zip viejo al nombre nuevo → `cp` el nuevo → changelog → commit → push.
+- El usuario NO tiene terminal (trabaja desde GitHub web y actualiza extrayendo el zip en ServerAvatar/PHP-FPM).
+  Nunca pedirle comandos locales. Las migraciones se aplican solas en cada request (`bootstrap.php` → `initSchema()`).
 
-### Modelo de release
+### Verificación antes de entregar (obligatorio — el usuario sufrió releases rotos)
 
-- **Rama `release`** es orphan (sin historia compartida). Solo contiene
-  `imagina-audit-v{X.Y.Z}.zip` + `README.md` con changelog.
-- Para nueva versión: `bash deploy/build.sh` → `cd deploy/output && zip -rq /tmp/release.zip .` →
-  `git checkout release` → `git mv` el zip viejo al nombre nuevo → `cp` el nuevo →
-  actualizar README.md → commit → push → `git checkout` rama de trabajo.
-- `install.php` guarda la versión en `data/.installed` JSON.
+1. `php -l` de cada PHP tocado.
+2. Typecheck REAL: `cd frontend && ./node_modules/.bin/tsc --noEmit -p tsconfig.app.json`
+   (`tsc --noEmit` a secas NO revisa nada: tsconfig.json es de solución con `files: []`).
+   Instalar deps con `npm install --legacy-peer-deps`.
+3. Lógica de backend end-to-end contra SQLite y MariaDB reales (se puede `apt-get install mariadb-server`).
+4. UI en Chromium headless (Playwright preinstalado) contra `php -S` con un router que sirva `deploy/output`.
+   La cuota pública de PageSpeed desde el sandbox está agotada (429): simular PSI con un `Fetcher` stub
+   cargado vía `require_once` al inicio del router (no con `-d auto_prepend_file`, no se aplica a workers).
 
-### Stack realmente desplegado (P7 completo)
+### Arquitectura clave
 
-- **DB cross-driver:** SQLite (default fallback) o MySQL 5.7+/MariaDB 10.3+
-  vía `DB_DRIVER` en `.env`. Wizard `/setup` lo configura automáticamente
-  en primera carga.
-- **Migrator versionado:** `backend/database/migrations/NNNN_*.sql`.
-  Tabla `schema_migrations` trackea estado. CLI: `php backend/database/migrate.php up/status/rollback`.
-- **3 migraciones aplicadas:** `0001_initial`, `0002_admin_login_attempts`,
-  `0003_json_columns_to_blob` (esta última crítica: cambia `JSON` →
-  `LONGBLOB` porque JsonStore::encode emite gzip binary).
-- **Setup wizard `/setup`** — 3 pasos (DB + admin + review). Idempotente:
-  si `data/.installed` existe O (DB conectada + admin existe + migraciones
-  aplicadas), considera la app instalada y auto-recrea el flag.
-- **Migración SQLite → MySQL desde panel:** `/admin/database`. CLI:
-  `php backend/database/migrate-from-sqlite.php`.
-- **Slow query log:** `SLOW_QUERY_THRESHOLD_MS` (default 200ms) → logs/.
-- **Retry con backoff:** `Database::traced()` retrying en transient errors
-  (MySQL 2006/2013/1205/1213, SQLite BUSY/LOCKED). Sentinel object para
-  distinguir "null válido" de "loop sin éxito".
-- **Backup/restore:** `/admin/backups` + cron `cron/backup.php`.
-  `Backup.php` driver-aware (mysqldump si disponible, sino PHP-side).
-
-### Queue queue-only (v2.0.8)
-
-- `audit.php` SIEMPRE encola, **nunca ejecuta inline**. Responde 202 en ms.
-- `drain-queue.php` corre el scan completo (orchestrator + save + email).
-- Kick async: `QueueManager::kickDrain()` intenta `shell_exec`, fallback a
-  `curl` HTTP a `/cron/drain-queue.php?token=X`.
-- `QueueManager::ensureCronToken()` **auto-genera** el token en settings si
-  falta — kicks HTTP funcionan en installs frescas sin editar `.env`.
-- **Cron recomendado:** `* * * * * php /path/audit/cron/drain-queue.php`.
-- Panel de rescate manual en `/admin/queue` (4 botones: drain-now,
-  reset-running, clear-failures all/by URL, delete-job).
-- `session_write_close()` se llama JUSTO después de Auth::checkAuth() —
-  antes de ese fix, el lock de sesión bloqueaba todo el admin durante un scan.
-
-### Scoring restructurado (v2.1.0 + v2.2.0)
-
-Antes los scores salían inflados (sitios con problemas reales puntuaban 85
-"good"). Recalibrado a "scoring honesto":
-
-1. **Umbrales:** Excellent ≥92, Good ≥80, Warning ≥60, Critical <40.
-2. **Per-metric weights** (en defaults.php → `scoring_metric_weights`):
-   SSL 3×, LCP 3×, X-Powered-By 0.5×, etc.
-3. **Critical-cap por módulo:** si hay ≥1 métrica crítica, el módulo no
-   sale del cap (security=50, wordpress=55, performance=65...).
-4. **Exponential penalty:** 0/1/2/3/4+ críticos → 0/-3/-8/-15/-25 al global.
-5. **Disabled metrics/modules:** admin puede excluir métricas o módulos
-   completos del cálculo desde `/admin/scoring`.
-
-Todo configurable desde **`/admin/scoring`** (UI con sliders + toggles +
-acordeones por módulo + preview en vivo recalculando un audit reciente).
-
-**Re-evaluación automática:** `audit-status.php` y `admin/lead-detail.php`
-corren `Scoring::recalculate()` al leer — audits viejos muestran el score
-nuevo coherente con la config actual.
-
-Catálogo de métricas: `backend/data/metrics-catalog.json` (estático, ~70
-métricas en 8 módulos) + merge con métricas vistas en audits recientes.
-
-### Sistema de traducciones (P6)
-
-- **Backend strings:** `backend/locales/{lang}/{namespace}.php` arrays flat.
-  Editables desde `/admin/translations` (overrides en tabla `translations`).
-- **Frontend strings:** `frontend/src/i18n/locales/{lang}.json` (bundleados
-  en build) + override dinámico vía `/api/frontend-locales?lang=X` que
-  mezcla base JSON + DB overrides (namespace `frontend`).
-- **Idiomas dinámicos:** tabla `languages` con flags `is_active` /
-  `is_public`. UI en `/admin/languages` para crear/editar/eliminar.
-- **Export/import packs:** botones en cada card de idioma con 3 modos de
-  merge (`fill_missing` / `smart_merge` / `replace_all`) + preview.
-- **AI translate pipeline:** Claude/ChatGPT/Google providers (config en
-  settings). Botones per-key y bulk en `/admin/translations`.
+- **DB cross-driver** (SQLite/MySQL) vía `Database` + Dialects. `$db->setting($k,$v)` es SETTER (upsert);
+  leer con `$db->scalar(...)` sobre `settings` (columna key entre backticks). Placeholders de migración:
+  `{{AUTO_PK}} {{NOW}} {{INT}} {{BOOL}} {{JSON}} {{TEXT_LONG}} {{BLOB}} {{TABLE_OPTIONS}}`. Blobs gzip
+  (JsonStore) SIEMPRE en `{{BLOB}}`/LONGBLOB, nunca JSON. Migraciones 0001–0004 aplicadas.
+- **Cola queue-only**: `audit.php` encola y responde 202; `QueueManager::kickDrain()` + `cron/drain-queue.php`;
+  `scan-progress.php` re-kickea mientras hay jobs `queued`. Dequeue atómico.
+- `session_write_close()` justo después de `Auth::requireAuth()` en endpoints lentos.
+- **Scoring honesto** configurable en `/admin/scoring`; `Scoring::recalculate()` al leer.
+- **Captura de leads** upfront/gated (`/admin/settings`); gating solo para visitantes no logueados.
+- **Widget embebible** (`frontend/public/widget/imagina-audit-widget.js`, `/admin/embed`): modos floating/inline,
+  temas/estilos, conversiones GTM/gtag, snippet con `?v={hash}` para invalidar caché.
+- **/admin/diagnostics**: pipeline de escaneo paso a paso con JSON copiable para soporte.
+- **Laboratorio de rendimiento** (v2.6.0, `/admin/performance-lab`): mediciones solo-PSI repetidas
+  (1 o mediana de 3; móvil/escritorio/ambos), sin lead/informe/caché. `lib/PerfLab.php` + `api/admin/perf-lab.php`
+  + tabla `perf_runs`. Ejecución por rondas guiadas por el navegador (`action=step`, reclamo atómico,
+  `ignore_user_abort`, reintento de rondas muertas a los 150 s, corte tras `runs+2` intentos). Cliente PSI
+  compartido con el auditor en `lib/PageSpeed.php`. Vista de waterfall reutilizable en
+  `components/admin/waterfall/WaterfallView.tsx` (la usan WaterfallPage y el laboratorio).
+- **i18n**: `frontend/src/i18n/locales/{en,es}.json` debe quedar idéntico a `backend/locales/{en,es}/frontend.json`
+  (el backend sirve overrides dinámicos desde ese espejo).
 
 ### Reglas críticas (no romper)
 
-1. **Toda nueva query DB cross-driver.** Sin `INSERT OR IGNORE/REPLACE`,
-   sin `datetime('now')`, sin `AUTOINCREMENT` literal. Usar
-   `$db->upsert()`, `$db->setting()`, `$db->now()`, `$db->nowMinus()`,
-   `$db->startOfMonth()`. Backticks en `\`key\`` (palabra reservada MySQL).
-2. **Migraciones inmutables una vez en producción.** Para corregir, nueva.
-3. **Anti-patterns conocidos (ya removidos, no reintroducir):**
-   - `sqlite_master` o `PRAGMA table_info` sin branch por driver (diag.php).
-   - `ROW_NUMBER() OVER` (no soportado en MySQL 5.7).
-   - Columnas `JSON` para blobs gzip — usar `LONGBLOB`.
-   - `Auth::checkAuth()` sin `session_write_close()` después en endpoints
-     que tarden >1s.
-   - `isset($var)` para detectar success cuando la función puede retornar
-     null válido — usar sentinel object.
-4. **Foreign keys siempre ON.** `BIGINT` (signed) en PK/FK para que matchee.
-5. **Transacciones explícitas en mutaciones multi-tabla** (`$db->transaction(fn)`).
+1. Toda query cross-driver: sin `INSERT OR IGNORE/REPLACE`, `datetime('now')`, `AUTOINCREMENT` literal,
+   `ROW_NUMBER() OVER`, `sqlite_master` sin branch. Backticks en `` `key` ``.
+2. Migraciones inmutables una vez publicadas; corregir con una nueva.
+3. Timestamps comparados con `nowMinus()` → escribirlos desde PHP (`date('Y-m-d H:i:s')`, todo en UTC).
+4. FKs ON, PK/FK `BIGINT` signed. Transacciones explícitas en mutaciones multi-tabla.
+5. No usar `isset()` para detectar éxito si la función puede devolver null válido (sentinel).
+6. No añadir cleanup en unmount que cancele polling compartido entre componentes (bug v2.3.4).
 
-### Bugs resueltos en las últimas 8 versiones (referencia rápida)
+### Pendientes / ideas
 
-| Ver | Bug | Causa raíz |
-|-----|-----|-----------|
-| v2.0.1 | Error 1005 FK al crear users | `BIGINT UNSIGNED` PK vs `BIGINT` FK no matcheaba |
-| v2.0.2 | `key` reservado en MySQL + URL loop /admin/login/dashboard/dashboard | Faltaron backticks + Navigate con path relativo |
-| v2.0.3 | Setup reaparecía cada upload | `.installed` se borraba en re-upload; ahora check de "instalado funcional" (DB+admin) |
-| v2.0.4 | Dashboard 500 "Query failed without exception" | `isset(null)` es false en mi retry wrapper — sentinel object |
-| v2.0.5 | /admin/health "Table sqlite_master doesn't exist" en MySQL | diag.php usaba sqlite_master sin branch driver |
-| v2.0.6 | /admin/vulnerabilities vacío + Refresh API daba 0/0 | Seed JSON nunca cargaba (eliminé seed.php) + updater sin audits = 0 plugins. Auto-seed + baseline. |
-| v2.0.7 | "Error guardando el resultado" mid-scan en MySQL | Columnas `JSON` rechazan blobs gzip. Migración 0003 → LONGBLOB. |
-| v2.0.8 | Admin bloqueado durante scan | Session lock + scan inline. Ahora queue-only + session_write_close post-auth. |
-| v2.1.0 | Scores inflados (85=good) | 4 palancas nuevas: thresholds, per-metric weights, critical-cap, exponential penalty. |
-| v2.2.0 | Tunables de scoring sin UI | Admin page `/admin/scoring` con sliders + toggles + preview. |
-| v2.2.1 | Audits congelados en cola; URL "blacklisted" | `CRON_SECRET_TOKEN` no autogenerado → kick HTTP 403. Cache `audit_jobs failed` retenía URLs. Auto-token + panel de rescate. |
+- Wiki/base de conocimiento de soluciones para el informe técnico (propuesta "fase 1", no iniciada).
+- CI contra MySQL real (tests actuales en `backend/tests/Unit` corren contra SQLite).
+- Validar `backend/data/metrics-catalog.json` contra las métricas que emiten los analyzers.
+- `deploy/DEPLOY.md`: sección "la cola se atasca" → `/admin/queue` + `/admin/diagnostics`.
 
-### Pendiente cuando se retome la conversación
+### Archivos clave
 
-1. **Auditoría de traducciones** (la que iba a hacer Sonnet 4.6):
-   - `frontend/src/i18n/locales/en.json` vs `es.json` — listar gaps + añadir ES.
-   - `backend/locales/en/*.php` vs `backend/locales/es/*.php` — lo mismo.
-   - Grep en `frontend/src/components/admin/**/*.tsx` por strings hardcodeadas
-     en JSX (no usan `t('...')`). Especial atención a archivos modificados
-     en P7-v2.2.1: `DashboardPage.tsx` (tiene "Dashboard error", "Retry"
-     hardcoded), `SettingsScoring.tsx`, `SettingsQueue.tsx` (panel rescue
-     usa `t()` pero el componente padre puede tener huecos),
-     `AdminLanguages.tsx`, `AdminBackups.tsx`, `AdminDatabaseMigration.tsx`,
-     `SetupPage.tsx`, `AdminLogin.tsx`.
-   - Después de cada batch: `cd frontend && npx tsc --noEmit`.
-   - Al final: `bash deploy/build.sh` + commit `i18n: complete ES translations`
-     + push a `claude/analyze-wordpress-audit-app-D9hQR`.
-   - **NO actualizar release ni bumpear versión** — el user lo hace al juntar
-     varios cambios para el próximo zip.
-
-2. **Tests automatizados contra MySQL real en CI** — los tests existentes
-   (`tests/Unit/{Dialect,Database,Migrator}Test.php`) corren contra SQLite.
-   Idealmente CI corre la suite contra los dos drivers.
-
-3. **Métricas y módulos del catálogo** — `data/metrics-catalog.json` tiene
-   ~70 métricas hardcodeadas. Validar que coincidan con las que emiten los
-   analyzers reales. Cualquier desfase saldrá en `/admin/scoring` como
-   "métrica detectada en audits" sin entrar en el catálogo estático.
-
-4. **Documentación al comprador** — `deploy/DEPLOY.md` cubre install
-   básico. Falta una sección "qué hacer si la cola se atasca" apuntando
-   a `/admin/queue` rescue panel y al cron de `drain-queue.php`.
-
-### Comandos útiles para retomar
-
-```bash
-# Estado actual
-git log --oneline -10
-git status
-
-# Build + zip release
-bash deploy/build.sh
-cd deploy/output && zip -rq /tmp/release.zip . && cd ..
-
-# Tests backend (requiere composer install)
-cd backend && composer install && ./vendor/bin/phpunit
-
-# Typecheck frontend
-cd frontend && npx tsc --noEmit
-
-# Smoke test del migrator
-DB_DRIVER=sqlite DB_SQLITE_PATH=/tmp/test.db php backend/database/migrate.php status
-```
-
-### Archivos clave para orientarse
-
-- `P7_PRODUCTION_DATABASE.md` — plan original de migración a MySQL (ahora
-  cumplido y con decisiones confirmadas en sección 9).
-- `backend/lib/Database.php` — wrapper cross-driver con helpers
-  (now, nowMinus, startOfMonth, today, setting, settingIfMissing, upsert,
-  transaction, bool, json, retry-with-backoff).
-- `backend/lib/Scoring.php` — todo el sistema de scoring con `recalculate()`
-  para re-evaluar audits al leer.
-- `backend/lib/QueueManager.php` — queue + drain + kickDrain + ensureCronToken.
-- `backend/config/defaults.php` — todos los settings con sus defaults (los
-  que ven en admin son overrides DB sobre estos).
+`backend/lib/{Database,Migrator,QueueManager,Scoring,PageSpeed,PerfLab,AppVersion}.php`,
+`backend/config/defaults.php`, `backend/api/bootstrap.php`, `frontend/src/pages/AdminPage.tsx`,
+`frontend/src/components/admin/AdminSidebar.tsx`, `deploy/build.sh`.
 
 ---
 
