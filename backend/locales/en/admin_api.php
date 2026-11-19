@@ -51,8 +51,9 @@ return [
     'retention.months_invalid' => 'months must be between 1 and 120',
 
     // ——— /admin/settings.php ————————————————————————————————————
-    'settings.save_error'  => 'Failed to save the configuration.',
-    'settings.fetch_error' => 'Failed to retrieve the configuration.',
+    'settings.save_error'         => 'Failed to save the configuration.',
+    'settings.fetch_error'        => 'Failed to retrieve the configuration.',
+    'settings.password_too_short' => 'Password must be at least 10 characters.',
 
     // ——— /admin/snapshot.php ————————————————————————————————————
     'snapshot.audit_id_required'    => 'auditId is required',

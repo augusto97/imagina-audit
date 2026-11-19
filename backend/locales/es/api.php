@@ -27,4 +27,11 @@ return [
     // ——— /api/scan-progress.php ————————————————————————————————
     'progress.id_required' => 'id requerido',
     'progress.not_found'   => 'Progreso no encontrado o expirado',
+
+    // ——— /api/capture-lead.php ————————————————————————————————
+    'lead.email_required'    => 'El email es obligatorio.',
+    'lead.email_invalid'     => 'El email no es válido.',
+    'lead.name_required'     => 'El nombre es obligatorio.',
+    'lead.whatsapp_required' => 'El WhatsApp es obligatorio.',
+    'lead.capture_error'     => 'No se pudieron guardar tus datos. Intenta nuevamente.',
 ];

@@ -41,6 +41,12 @@ $i18n = function (string $dbKey, string $localeKey, string $fallback) use ($sett
     return Translator::has($localeKey) ? Translator::t($localeKey) : $fallback;
 };
 
+/** Lee un booleano de settings (DB guarda '1'/'0'); si no existe, el default PHP. */
+$boolSetting = function (string $dbKey, bool $default) use ($settings): bool {
+    if (!isset($settings[$dbKey])) return $default;
+    return $settings[$dbKey] === '1' || $settings[$dbKey] === 'true';
+};
+
 $config = [
     'companyName' => $settings['company_name'] ?? $defaults['company_name'],
     'companyUrl' => $settings['company_url'] ?? $defaults['company_url'],
@@ -82,6 +88,12 @@ $config = [
         'placeholderName'     => $settings['form_placeholder_name']     ?? $defaults['form_placeholder_name'],
         'placeholderEmail'    => $settings['form_placeholder_email']    ?? $defaults['form_placeholder_email'],
         'placeholderWhatsapp' => $settings['form_placeholder_whatsapp'] ?? $defaults['form_placeholder_whatsapp'],
+    ],
+    'leadCapture' => [
+        'mode' => $settings['lead_capture_mode'] ?? $defaults['lead_capture_mode'],
+        'requireEmail'    => $boolSetting('lead_gate_require_email',    $defaults['lead_gate_require_email']),
+        'requireName'     => $boolSetting('lead_gate_require_name',     $defaults['lead_gate_require_name']),
+        'requireWhatsapp' => $boolSetting('lead_gate_require_whatsapp', $defaults['lead_gate_require_whatsapp']),
     ],
     'header' => [
         'compareText'  => $settings['header_compare_text']  ?? $defaults['header_compare_text'],

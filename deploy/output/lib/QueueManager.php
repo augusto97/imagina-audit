@@ -75,12 +75,39 @@ class QueueManager {
                 [$url, $db->nowMinus($windowMin * 60)]
             );
             if ($row && !empty($row['error_message'])) {
-                return $row['error_message'];
+                $msg = $row['error_message'];
+                // No envenenamos el cache con errores de infraestructura.
+                // Causa raíz del bug v2.2.1: un "Job huérfano…" o "Error
+                // guardando el resultado" hacía que la URL apareciera
+                // "blacklisteada" 10 min, aunque el sitio estaba ok. La
+                // mitigación de aquel commit (panel de rescate manual) era
+                // el síntoma — esto es la causa.
+                if (self::isInfrastructureError($msg)) return null;
+                return $msg;
             }
         } catch (Throwable $e) {
             Logger::warning('findRecentFailure falló: ' . $e->getMessage());
         }
         return null;
+    }
+
+    /**
+     * Decide si un error_message representa un fallo de infraestructura
+     * (cosa nuestra) en vez de un fallo del sitio auditado. Para los
+     * primeros, no envenenamos el failure-cache: que la próxima request
+     * lo intente de nuevo.
+     */
+    public static function isInfrastructureError(string $msg): bool {
+        $needles = [
+            'Job huérfano',
+            'Error guardando',
+            'Abandonado tras',
+            'proceso PHP murió',
+        ];
+        foreach ($needles as $n) {
+            if (stripos($msg, $n) !== false) return true;
+        }
+        return false;
     }
 
     /**
@@ -195,12 +222,49 @@ class QueueManager {
         }
 
         // Intento 2: curl HTTP self-call con timeout 1s.
+        //
+        // Resolución de URL base (en orden):
+        //   1. Setting `app_url` (lo correcto en producción — el admin lo
+        //      configura una vez y no depende de cómo llegó el request).
+        //   2. HTTP_HOST del request entrante. Es spoofeable, pero:
+        //        - El token se valida en drain-queue.php con hash_equals,
+        //          un Host forjado solo enrutaría a OTRO server, no nos
+        //          permitiría procesar nada.
+        //        - El attacker no tiene forma de hacer que el response
+        //          venga de vuelta a su lado de la red (fire-and-forget).
+        //      El riesgo real es bajo y este fallback es lo que hace que
+        //      la cola arranque sin configuración previa.
+        //   3. localhost como último recurso.
         if (function_exists('curl_init')) {
             $token = self::ensureCronToken(); // auto-genera si no existe
             if ($token === '') return;
-            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-            $url = "$scheme://$host/cron/drain-queue.php?token=" . urlencode($token);
+
+            $base = '';
+            try {
+                // CUIDADO: Database::setting($key, $value) es un SETTER
+                // (upsert), no un getter. Usar scalar() para leer settings.
+                // El bug previo pasaba '' como value, sobrescribía app_url
+                // en cada kick, devolvía rowCount como int, y al castear a
+                // string daba "0"/"1" — la URL del kick quedaba inválida
+                // ("1/cron/drain-queue.php") y el self-call siempre fallaba.
+                $base = (string) Database::getInstance()->scalar(
+                    "SELECT value FROM settings WHERE `key` = 'app_url'"
+                );
+                $base = trim($base);
+                // Auto-clean: el bug previo pudo haber dejado "0"/"1" en el
+                // setting. Si vemos basura no-URL la ignoramos.
+                if ($base !== '' && !preg_match('#^https?://#i', $base)) {
+                    $base = '';
+                }
+            } catch (Throwable $e) { /* DB no disponible o tabla no existe */ }
+            $base = rtrim($base, '/');
+            if ($base === '') {
+                $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+                $base = "$scheme://$host";
+            }
+
+            $url = "$base/cron/drain-queue.php?token=" . urlencode($token);
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
@@ -304,57 +368,64 @@ class QueueManager {
      */
     public static function dequeueNext(): ?array {
         $db = Database::getInstance();
-        $pdo = $db->getPdo();
 
         try {
-            $pdo->beginTransaction();
-
-            // Re-verificar slot dentro de la transacción
+            // Check de capacidad fuera de transacción — es solo una pista
+            // (race-y por naturaleza); la atomicidad real del claim vive en
+            // el UPDATE condicional de abajo.
             $running = (int) $db->scalar("SELECT COUNT(*) FROM audit_jobs WHERE status = 'running'");
             $max = self::getMaxConcurrent();
-            if ($running >= $max) {
-                $pdo->rollback();
-                return null;
-            }
+            if ($running >= $max) return null;
 
-            $job = $db->queryOne(
-                "SELECT * FROM audit_jobs WHERE status = 'queued' ORDER BY created_at ASC LIMIT 1"
-            );
-            if (!$job) {
-                $pdo->rollback();
-                return null;
-            }
-
-            // Defensa: si el job ya superó max attempts, marcarlo failed y pasar.
-            // Ocurre si un job quedó running, se reapeó, se re-encoló manual y
-            // falla de nuevo. No queremos retry eterno de URLs problemáticas.
+            // Loop: leemos el primer 'queued', intentamos claim atómico con
+            // UPDATE condicional (`AND status='queued'`). Si rowCount() es 0,
+            // otro worker se lo llevó — probamos con el siguiente. Sin esto,
+            // dos drainers (cron + kickDrain) toman el mismo job, lo procesan
+            // doble, y el segundo INSERT en `audits` falla con PK duplicada
+            // → envenena el failure-cache. Causa raíz del bug v2.2.1 que
+            // mitigamos con el panel de rescate.
             $defaults = require dirname(__DIR__) . '/config/defaults.php';
             $maxAttempts = (int) ($defaults['audit_max_attempts'] ?? 3);
-            $now = $db->now();
-            if (((int) $job['attempts']) >= $maxAttempts) {
-                // CONCAT funciona en MySQL y SQLite (vía sqlite_compat); para
-                // evitar la dependencia, computamos el mensaje en PHP.
-                $msg = 'Abandonado tras ' . (int) $job['attempts'] . ' intentos.';
-                $db->execute(
-                    "UPDATE audit_jobs SET status = 'failed', error_message = ?, completed_at = $now WHERE id = ?",
-                    [$msg, $job['id']]
+            $maxProbes = 20;  // defensa anti loop infinito
+            for ($i = 0; $i < $maxProbes; $i++) {
+                $job = $db->queryOne(
+                    "SELECT * FROM audit_jobs WHERE status = 'queued' ORDER BY created_at ASC LIMIT 1"
                 );
-                $pdo->commit();
-                AuditProgress::failed($job['audit_id'], 'El análisis falló repetidamente y fue abandonado. Contacta a soporte si persiste.');
-                // Recursive call para intentar el siguiente; evita bucle porque
-                // este job ya se marcó failed y no volverá a salir del query.
-                return self::dequeueNext();
-            }
+                if (!$job) return null;
 
-            $db->execute(
-                "UPDATE audit_jobs SET status = 'running', started_at = $now, attempts = attempts + 1 WHERE id = ?",
-                [$job['id']]
-            );
-            $pdo->commit();
-            $job['attempts'] = ((int) $job['attempts']) + 1;
-            return $job;
+                $now = $db->now();
+                if (((int) $job['attempts']) >= $maxAttempts) {
+                    // El job ya gastó sus intentos — claim condicional para
+                    // marcarlo failed y seguir.
+                    $msg = 'Abandonado tras ' . (int) $job['attempts'] . ' intentos.';
+                    $marked = $db->execute(
+                        "UPDATE audit_jobs SET status = 'failed', error_message = ?, completed_at = $now WHERE id = ? AND status = 'queued'",
+                        [$msg, $job['id']]
+                    );
+                    if ($marked > 0) {
+                        AuditProgress::failed($job['audit_id'], 'El análisis falló repetidamente y fue abandonado. Contacta a soporte si persiste.');
+                    }
+                    continue;
+                }
+
+                // Claim atómico: solo gana el primer worker que ejecute el
+                // UPDATE. rowCount=1 → es nuestro; rowCount=0 → otro worker
+                // se adelantó, probar siguiente.
+                $claimed = $db->execute(
+                    "UPDATE audit_jobs SET status = 'running', started_at = $now, attempts = attempts + 1 WHERE id = ? AND status = 'queued'",
+                    [$job['id']]
+                );
+                if ($claimed === 0) continue;
+
+                $job['status'] = 'running';
+                $job['attempts'] = ((int) $job['attempts']) + 1;
+                $job['started_at'] = date('Y-m-d H:i:s');
+                return $job;
+            }
+            // Si tras 20 probes no logramos claim, probablemente hay
+            // contention extrema o jobs corruptos — el cron volverá a probar.
+            return null;
         } catch (Throwable $e) {
-            try { $pdo->rollback(); } catch (Throwable $e2) {}
             Logger::error('dequeueNext falló: ' . $e->getMessage());
             return null;
         }
@@ -438,6 +509,17 @@ class QueueManager {
         $url = $job['url'];
         $leadData = json_decode($job['lead_data_json'] ?? '[]', true) ?: [];
         $ip = $job['ip_address'] ?? 'unknown';
+
+        // Restaurar el idioma del request original. Sin esto, el worker
+        // (CLI o HTTP kick) cae al DEFAULT_LANG ('en') y todos los strings
+        // del result_json (nombre de métrica, descripción, recomendación,
+        // imaginaSolution) acaban en inglés aunque el visitante pidió el
+        // scan en español. Ver audit.php donde se persiste `lang` dentro
+        // de lead_data_json justo para este momento.
+        $jobLang = $leadData['lang'] ?? null;
+        if (is_string($jobLang) && $jobLang !== '') {
+            Translator::setLang($jobLang);
+        }
 
         // Si otro audit con la misma URL falló mientras este esperaba en cola,
         // no lo re-ejecutamos — devolvemos el mismo error.
@@ -536,33 +618,96 @@ class QueueManager {
             return;
         }
 
-        // Notificar email si hay lead
-        try {
-            $leadEmail = trim($leadData['leadEmail'] ?? '');
-            $leadWhatsapp = trim($leadData['leadWhatsapp'] ?? '');
-            if ($leadEmail || $leadWhatsapp) {
-                $db = Database::getInstance();
-                $notifRow = $db->queryOne("SELECT value FROM settings WHERE `key` = 'lead_notification_email'");
-                $notifEmail = $notifRow['value'] ?? '';
-                if (!empty($notifEmail) && filter_var($notifEmail, FILTER_VALIDATE_EMAIL)) {
-                    $score = $result['globalScore'];
-                    $leadName = trim($leadData['leadName'] ?? '') ?: 'No proporcionado';
-                    $leadCompany = trim($leadData['leadCompany'] ?? '') ?: 'No proporcionado';
-                    $subject = "Nuevo lead: {$result['domain']} (Score: $score/100)";
-                    $body = "Nuevo lead capturado en Imagina Audit\n\n"
-                        . "Sitio: {$result['url']}\n"
-                        . "Score: $score/100 ({$result['globalLevel']})\n\n"
-                        . "Nombre: $leadName\nEmail: " . ($leadEmail ?: 'No proporcionado') . "\n"
-                        . "WhatsApp: " . ($leadWhatsapp ?: 'No proporcionado') . "\n"
-                        . "Empresa: $leadCompany\nFecha: " . date('d/m/Y H:i') . "\n";
-                    Mailer::send($notifEmail, $subject, $body);
-                }
-            }
-        } catch (Throwable $e) {
-            Logger::warning('Error enviando notificación de lead: ' . $e->getMessage());
-        }
+        // Notificar email si hay lead (solo aplica en modo 'upfront' — en
+        // 'gated' el lead se captura después vía capture-lead.php, que
+        // dispara su propia notificación).
+        self::notifyLead([
+            'domain' => $result['domain'],
+            'url' => $result['url'],
+            'globalScore' => $result['globalScore'],
+            'globalLevel' => $result['globalLevel'],
+        ], $leadData);
 
         self::markCompleted($auditId);
         AuditProgress::completed($auditId, 12);
+    }
+
+    /**
+     * Envía al prospecto un email con el link a su informe completo.
+     * Lo usa el modo gated del bloque embed y el modo gated en general:
+     * tras dejar su email, recibe en su correo el acceso directo al audit.
+     * Refuerza el funnel (necesita poner un email real) y le da una razón
+     * para abrir el correo en la bandeja de entrada.
+     *
+     * Lee la URL base de settings.app_url; si no, falla en silencio sin
+     * bloquear el flujo (la notificación al admin ya se hizo).
+     */
+    public static function sendLeadAuditEmail(string $auditId, string $toEmail, array $audit): void {
+        if ($toEmail === '' || !filter_var($toEmail, FILTER_VALIDATE_EMAIL)) return;
+
+        try {
+            $db = Database::getInstance();
+
+            $base = (string) $db->scalar("SELECT value FROM settings WHERE `key` = 'app_url'");
+            $base = trim($base);
+            if ($base === '' || !preg_match('#^https?://#i', $base)) {
+                // Sin URL base no podemos armar un link absoluto que el
+                // cliente de email pueda hacer clickable. Mejor abortar
+                // que mandar un link relativo inservible.
+                Logger::warning('sendLeadAuditEmail saltado: settings.app_url vacío o inválido');
+                return;
+            }
+            $base = rtrim($base, '/');
+            $link = "$base/results/" . $auditId;
+
+            $domain = $audit['domain'] ?? '';
+            $score = $audit['globalScore'] ?? '?';
+            $companyName = (string) $db->scalar("SELECT value FROM settings WHERE `key` = 'company_name'") ?: 'Imagina Audit';
+
+            $subject = "Tu informe de $domain está listo (Score: $score/100)";
+            $body = "Hola,\n\n"
+                . "Gracias por usar $companyName. El informe completo de $domain ya está listo.\n\n"
+                . "Score global: $score/100\n\n"
+                . "Puedes ver el informe completo aquí:\n$link\n\n"
+                . "El informe incluye: análisis de seguridad, rendimiento, SEO, WordPress, móvil, infraestructura y conversión, con el plan de soluciones recomendado.\n\n"
+                . "Saludos,\nEl equipo de $companyName\n";
+
+            Mailer::send($toEmail, $subject, $body);
+        } catch (Throwable $e) {
+            Logger::warning('sendLeadAuditEmail error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Envía la notificación de "nuevo lead" al email del admin configurado
+     * en settings. No-op si no hay email/WhatsApp en el lead o si no hay
+     * destino configurado. Reutilizado por processJob (modo upfront) y
+     * capture-lead.php (modo gated / widget inline).
+     */
+    public static function notifyLead(array $audit, array $leadData): void {
+        try {
+            $leadEmail = trim($leadData['leadEmail'] ?? '');
+            $leadWhatsapp = trim($leadData['leadWhatsapp'] ?? '');
+            if (!$leadEmail && !$leadWhatsapp) return;
+
+            $db = Database::getInstance();
+            $notifRow = $db->queryOne("SELECT value FROM settings WHERE `key` = 'lead_notification_email'");
+            $notifEmail = $notifRow['value'] ?? '';
+            if (empty($notifEmail) || !filter_var($notifEmail, FILTER_VALIDATE_EMAIL)) return;
+
+            $score = $audit['globalScore'] ?? '?';
+            $leadName = trim($leadData['leadName'] ?? '') ?: 'No proporcionado';
+            $leadCompany = trim($leadData['leadCompany'] ?? '') ?: 'No proporcionado';
+            $subject = "Nuevo lead: {$audit['domain']} (Score: $score/100)";
+            $body = "Nuevo lead capturado en Imagina Audit\n\n"
+                . "Sitio: {$audit['url']}\n"
+                . "Score: $score/100 ({$audit['globalLevel']})\n\n"
+                . "Nombre: $leadName\nEmail: " . ($leadEmail ?: 'No proporcionado') . "\n"
+                . "WhatsApp: " . ($leadWhatsapp ?: 'No proporcionado') . "\n"
+                . "Empresa: $leadCompany\nFecha: " . date('d/m/Y H:i') . "\n";
+            Mailer::send($notifEmail, $subject, $body);
+        } catch (Throwable $e) {
+            Logger::warning('Error enviando notificación de lead: ' . $e->getMessage());
+        }
     }
 }

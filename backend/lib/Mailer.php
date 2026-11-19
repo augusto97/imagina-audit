@@ -134,17 +134,46 @@ class Mailer {
             }
         }
 
+        // Sanitizar headers: cualquier CR/LF en $to/$subject/$fromName
+        // permitiría inyectar headers o terminar DATA prematuramente.
+        // Lo limpiamos a nivel header antes de meterlo al stream.
+        $sanitizeHeader = static fn(string $s): string => str_replace(["\r", "\n"], '', $s);
+        $to = $sanitizeHeader($to);
+        $subject = $sanitizeHeader($subject);
+        $fromName = $sanitizeHeader($fromName);
+        $fromEmail = $sanitizeHeader($fromEmail);
+
         // MAIL FROM
         self::smtpWrite($socket, "MAIL FROM:<$fromEmail>");
-        self::smtpRead($socket);
+        $mailFromResp = self::smtpRead($socket);
+        if (strpos($mailFromResp, '250') === false) {
+            fclose($socket);
+            Logger::error('SMTP MAIL FROM rechazado: ' . trim($mailFromResp));
+            return false;
+        }
 
         // RCPT TO
         self::smtpWrite($socket, "RCPT TO:<$to>");
-        self::smtpRead($socket);
+        $rcptResp = self::smtpRead($socket);
+        if (strpos($rcptResp, '250') === false) {
+            fclose($socket);
+            Logger::error('SMTP RCPT TO rechazado: ' . trim($rcptResp));
+            return false;
+        }
 
         // DATA
         self::smtpWrite($socket, "DATA");
-        self::smtpRead($socket);
+        $dataResp = self::smtpRead($socket);
+        if (strpos($dataResp, '354') === false) {
+            fclose($socket);
+            Logger::error('SMTP DATA rechazado: ' . trim($dataResp));
+            return false;
+        }
+
+        // Dot-stuffing: cualquier línea del body que empiece con '.' debe
+        // doblarse a '..' — sin esto un body con una línea "." terminaría
+        // el comando DATA prematuramente.
+        $stuffedBody = preg_replace('/(^|\r\n)\./', '$1..', $body) ?? $body;
 
         // Construir mensaje
         $message = "From: $fromName <$fromEmail>\r\n"
@@ -154,7 +183,7 @@ class Mailer {
             . "Content-Type: text/plain; charset=UTF-8\r\n"
             . "Date: " . date('r') . "\r\n"
             . "\r\n"
-            . $body . "\r\n"
+            . $stuffedBody . "\r\n"
             . ".";
 
         self::smtpWrite($socket, $message);

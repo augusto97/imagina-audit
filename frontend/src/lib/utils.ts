@@ -10,10 +10,14 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Formatea un número como moneda
+ * Formatea un número como moneda usando el idioma activo de i18n.
+ * Antes hardcodeaba 'es-CO' — un usuario con UI en inglés veía el
+ * impacto económico formateado a la colombiana ($1.234.567 en vez
+ * de $1,234,567).
  */
 export function formatCurrency(amount: number, currency = 'USD'): string {
-  return new Intl.NumberFormat('es-CO', {
+  const locale = i18n.language || 'en-US'
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
     minimumFractionDigits: 0,

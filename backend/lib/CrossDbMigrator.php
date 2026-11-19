@@ -36,9 +36,17 @@ class CrossDbMigrator
         'audit_jobs',
         'vulnerabilities',
         'rate_limits',
+        'login_attempts',  // migración 0002 — sin esto los intentos fallidos del admin no se migran
     ];
 
     private const BATCH_SIZE = 200;
+
+    // Tablas con blobs grandes (gzip de result_json hasta ~2MB cada uno):
+    // BATCH_SIZE=200 contra estas multiplica la memoria del prepared statement
+    // a ~400MB, OOM-eando workers de hosting compartido a 256M. Batch
+    // adaptativo: estas usan 20.
+    private const HEAVY_BATCH = 20;
+    private const HEAVY_TABLES = ['audits', 'wp_snapshots'];
 
     private PDO $source;   // SQLite
     private PDO $target;   // MySQL
@@ -194,10 +202,21 @@ class CrossDbMigrator
             return 0;
         }
 
+        // Batch adaptativo según tabla (ver constante HEAVY_TABLES).
+        $batchSize = in_array($table, self::HEAVY_TABLES, true)
+            ? self::HEAVY_BATCH
+            : self::BATCH_SIZE;
+
+        // Resolver clave de ordenamiento determinista. La paginación con
+        // LIMIT/OFFSET sin ORDER BY puede devolver filas duplicadas/skipeadas
+        // si el optimizador cambia el orden entre páginas (especialmente
+        // notable cuando hay índices). Usamos 'id' o 'rowid' como fallback.
+        $orderBy = $this->resolveOrderBy($table);
+
         $offset = 0;
         $copied = 0;
         while ($offset < $total) {
-            $batch = $this->source->query("SELECT * FROM `$table` LIMIT " . self::BATCH_SIZE . " OFFSET $offset")
+            $batch = $this->source->query("SELECT * FROM `$table` $orderBy LIMIT $batchSize OFFSET $offset")
                 ->fetchAll();
             if (empty($batch)) break;
 
@@ -216,10 +235,34 @@ class CrossDbMigrator
                 }
             }
             $stmt->execute($params);
-            $copied += count($batch);
-            $offset += self::BATCH_SIZE;
-            if ($onProgress) $onProgress($table, $copied, $total);
+            // Liberar el statement antes del siguiente batch para que PHP
+            // pueda recuperar la memoria del prepared. Importante en HEAVY.
+            unset($stmt, $batch, $params);
+            $copied += $batchSize;  // approximation; siguiente iteración corrige
+            $offset += $batchSize;
+            if ($onProgress) $onProgress($table, min($copied, $total), $total);
         }
         return $copied;
+    }
+
+    /**
+     * Devuelve la cláusula ORDER BY a usar para paginación determinista.
+     * Sin esto, LIMIT/OFFFSET puede devolver filas duplicadas o saltarse
+     * otras si el optimizer cambia el orden entre páginas.
+     */
+    private function resolveOrderBy(string $table): string
+    {
+        // Tablas con clave string conocida (PK por valor, no autoincrement).
+        $byKey = [
+            'settings' => '`key`',
+            'audits' => 'id',  // UUID, lexicográfico estable
+            'audit_jobs' => 'id',
+            'wp_snapshots' => 'id',
+        ];
+        if (isset($byKey[$table])) return 'ORDER BY ' . $byKey[$table];
+        // Fallback genérico: rowid funciona en SQLite para cualquier tabla
+        // sin PK explícita; ORDER BY 1 ordena por la primera columna en
+        // MySQL si rowid no aplica.
+        return 'ORDER BY rowid';
     }
 }

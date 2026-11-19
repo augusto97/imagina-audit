@@ -56,10 +56,10 @@ export default function DashboardPage() {
     return (
       <div className="p-6">
         <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <h2 className="text-base font-bold text-red-800 mb-2">Dashboard error</h2>
+          <h2 className="text-base font-bold text-red-800 mb-2">{t('dashboard.error_title')}</h2>
           <pre className="text-xs whitespace-pre-wrap font-mono text-red-700 bg-red-100 rounded p-3 overflow-x-auto">{error}</pre>
           <Button variant="outline" size="sm" className="mt-3" onClick={() => load(true)}>
-            <RefreshCw className="h-3.5 w-3.5" /> Retry
+            <RefreshCw className="h-3.5 w-3.5" /> {t('common.retry')}
           </Button>
         </div>
       </div>

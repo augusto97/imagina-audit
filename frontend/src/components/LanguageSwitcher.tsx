@@ -22,7 +22,7 @@ export function LanguageSwitcher({
   variant?: 'compact' | 'full'
   align?: 'left' | 'right'
 }) {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { languages, loaded, load } = useLanguagesStore()
   const [open, setOpen] = useState(false)
   const [switching, setSwitching] = useState(false)
@@ -71,7 +71,7 @@ export function LanguageSwitcher({
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        aria-label="Change language"
+        aria-label={t('languages.change_aria')}
         className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]`}
       >
         {variant === 'full' && <Languages className="h-3.5 w-3.5" strokeWidth={1.5} />}
@@ -104,7 +104,7 @@ export function LanguageSwitcher({
           })}
           {!activeEntry && (
             <div className="border-t border-[var(--border-default)] px-3 py-1.5 text-[10px] italic text-[var(--text-tertiary)]">
-              Active: {current.toUpperCase()}
+              {t('languages.active_indicator', { code: current.toUpperCase() })}
             </div>
           )}
         </div>

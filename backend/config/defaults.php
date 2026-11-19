@@ -13,6 +13,19 @@ return [
     'company_plans_url' => 'https://imaginawp.com/mensualidad',
     'logo_url' => '',
 
+    // Captura de leads. Dos modos:
+    //   'upfront' — el formulario público pide URL + datos de contacto de
+    //               una vez (comportamiento histórico).
+    //   'gated'   — el formulario pide SOLO la URL; tras el escaneo se
+    //               muestra un adelanto (score + semáforos) y el resto del
+    //               informe queda bloqueado tras un form de captura. Mejor
+    //               conversión: el prospecto ya vio su mal score.
+    'lead_capture_mode' => 'upfront',
+    // En modo gated, qué campos son obligatorios en el form de desbloqueo.
+    'lead_gate_require_email' => true,
+    'lead_gate_require_name' => false,
+    'lead_gate_require_whatsapp' => false,
+
     // Umbrales de scoring — recalibrados v2.1 para reflejar la realidad de los
     // sitios analizados. Antes "good ≥ 70" hacía que sitios con problemas
     // reales cayeran en zona verde. Ahora "good ≥ 80" es un umbral exigente:

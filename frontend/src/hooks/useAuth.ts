@@ -3,23 +3,33 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/lib/api'
 
+// Promesa compartida entre todos los consumidores de useAuth para que
+// AdminPage + AdminLayout (que ambos montan useAuth) no disparen dos
+// GET /admin/session.php por carga. Si la primera está en vuelo, la
+// segunda se suscribe a la misma promesa.
+let pendingSessionCheck: Promise<void> | null = null
+
 export function useAuth() {
   const navigate = useNavigate()
   const { isAuthenticated, isLoading, setAuthenticated, setLoading, setCsrfToken } = useAuthStore()
 
   const checkSession = useCallback(async () => {
-    try {
-      const res = await api.get('/admin/session.php')
-      const data = res.data?.data
-      const authed = data?.authenticated === true
-      setAuthenticated(authed)
-      setCsrfToken(authed ? (data?.csrfToken ?? null) : null)
-    } catch {
-      setAuthenticated(false)
-      setCsrfToken(null)
-    } finally {
-      setLoading(false)
-    }
+    if (pendingSessionCheck) return pendingSessionCheck
+    pendingSessionCheck = (async () => {
+      try {
+        const res = await api.get('/admin/session.php')
+        const data = res.data?.data
+        const authed = data?.authenticated === true
+        setAuthenticated(authed)
+        setCsrfToken(authed ? (data?.csrfToken ?? null) : null)
+      } catch {
+        setAuthenticated(false)
+        setCsrfToken(null)
+      } finally {
+        setLoading(false)
+      }
+    })()
+    try { await pendingSessionCheck } finally { pendingSessionCheck = null }
   }, [setAuthenticated, setLoading, setCsrfToken])
 
   /**

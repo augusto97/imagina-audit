@@ -11,12 +11,15 @@
  *   (en ese caso se valida CRON_TOKEN del .env contra ?token)
  */
 
-// Si está corriendo por web, validar token
+// Si está corriendo por web, validar token. Unificado con el resto de
+// crons: nombre estándar CRON_SECRET_TOKEN + ensureCronToken() para
+// instalaciones que no tengan el var configurado en .env.
 if (PHP_SAPI !== 'cli') {
     require_once dirname(__DIR__) . '/api/bootstrap.php';
-    $expected = env('CRON_TOKEN', '');
-    $given = $_GET['token'] ?? '';
-    if ($expected === '' || !hash_equals($expected, (string) $given)) {
+    $expected = '';
+    try { $expected = QueueManager::ensureCronToken(); } catch (Throwable $e) {}
+    $given = (string) ($_GET['token'] ?? '');
+    if ($expected === '' || !hash_equals($expected, $given)) {
         http_response_code(403);
         exit('Forbidden');
     }

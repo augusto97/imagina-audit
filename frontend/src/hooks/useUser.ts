@@ -97,28 +97,37 @@ export interface ProjectDetail {
  * mantiene el estado en `userAuthStore`, y recarga desde /api/user/session
  * al montar para que un refresh de la página no pierda la sesión.
  */
+// Promesa compartida (ver useAuth.ts) — el Header monta useUser en cada
+// página pública y varias páginas de cuenta también, generando hasta 3
+// fetch /user/session.php por navegación. Single-flight evita ese fan-out.
+let pendingUserSessionCheck: Promise<void> | null = null
+
 export function useUser() {
   const navigate = useNavigate()
   const { isAuthenticated, isLoading, user, quota, csrfToken, setSession, setLoading, clear } = useUserAuthStore()
 
   const checkSession = useCallback(async () => {
-    try {
-      const res = await api.get<{ success: boolean; data: SessionResponse }>('/user/session.php')
-      const data = res.data?.data
-      if (data?.authenticated && data.user) {
-        setSession({
-          user: data.user,
-          quota: data.quota ?? null,
-          csrfToken: data.csrfToken ?? null,
-        })
-      } else {
+    if (pendingUserSessionCheck) return pendingUserSessionCheck
+    pendingUserSessionCheck = (async () => {
+      try {
+        const res = await api.get<{ success: boolean; data: SessionResponse }>('/user/session.php')
+        const data = res.data?.data
+        if (data?.authenticated && data.user) {
+          setSession({
+            user: data.user,
+            quota: data.quota ?? null,
+            csrfToken: data.csrfToken ?? null,
+          })
+        } else {
+          clear()
+        }
+      } catch {
         clear()
+      } finally {
+        setLoading(false)
       }
-    } catch {
-      clear()
-    } finally {
-      setLoading(false)
-    }
+    })()
+    try { await pendingUserSessionCheck } finally { pendingUserSessionCheck = null }
   }, [setSession, setLoading, clear])
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {

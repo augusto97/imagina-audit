@@ -15,20 +15,22 @@
  * de hasta 500MB).
  */
 
+// Bootstrap antes del token-check: ensureCronToken vive en QueueManager.
+require_once dirname(__DIR__) . '/config/env.php';
+spl_autoload_register(function (string $class) {
+    $paths = [dirname(__DIR__) . '/lib/' . $class . '.php', dirname(__DIR__) . '/lib/db/' . $class . '.php', dirname(__DIR__) . '/analyzers/' . $class . '.php'];
+    foreach ($paths as $p) { if (file_exists($p)) { require_once $p; return; } }
+});
+
 if (php_sapi_name() !== 'cli') {
-    $token = $_GET['token'] ?? '';
-    $expectedToken = getenv('CRON_SECRET_TOKEN') ?: 'cambiar-este-token';
-    if ($token !== $expectedToken) {
+    $token = (string) ($_GET['token'] ?? '');
+    $expected = '';
+    try { $expected = QueueManager::ensureCronToken(); } catch (Throwable $e) {}
+    if ($expected === '' || !hash_equals($expected, $token)) {
         http_response_code(403);
         die('Acceso denegado');
     }
 }
-
-require_once dirname(__DIR__) . '/config/env.php';
-spl_autoload_register(function (string $class) {
-    $paths = [dirname(__DIR__) . '/lib/' . $class . '.php', dirname(__DIR__) . '/analyzers/' . $class . '.php'];
-    foreach ($paths as $p) { if (file_exists($p)) { require_once $p; return; } }
-});
 
 set_time_limit(300);
 

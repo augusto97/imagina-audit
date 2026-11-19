@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, RotateCw, RefreshCw, Share2, LinkIcon } from 'lucide-react'
@@ -10,38 +10,51 @@ import EconomicImpact from '@/components/audit/EconomicImpact'
 import SolutionMapping from '@/components/audit/SolutionMapping'
 import CtaSection from '@/components/audit/CtaSection'
 import PdfReport from '@/components/audit/PdfReport'
-import HistorySection from '@/components/audit/HistorySection'
+// HistorySection arrastra Recharts (~341 KB). Lazy + Suspense lo saca del
+// preload de la landing pública: solo se descarga si el visitante abre
+// resultados de un dominio con historial.
+const HistorySection = lazy(() => import('@/components/audit/HistorySection'))
 import TechStackSection from '@/components/audit/TechStackSection'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuditStore } from '@/store/auditStore'
+import { useUserAuthStore } from '@/store/userAuthStore'
 import { useAudit } from '@/hooks/useAudit'
 import { getAuditResult, getConfig } from '@/lib/api'
+import LeadGate from '@/components/audit/LeadGate'
 import type { AuditResult } from '@/types/audit'
 
 /** Genera mensaje de WhatsApp con resumen del informe */
-function buildWhatsAppMessage(result: AuditResult, baseUrl: string): string {
-  const moduleLines = result.modules.map((m) => {
-    const emojis: Record<string, string> = {
-      security: '🛡️', performance: '⚡', seo: '🔍', wordpress: '🧩',
-      mobile: '📱', infrastructure: '🖥️', conversion: '📊',
-    }
-    return `${emojis[m.id] || '📋'} ${m.name}: ${m.score ?? '-'}/100`
-  }).join('\n')
+function buildWhatsAppMessage(
+  result: AuditResult,
+  baseUrl: string,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  lang: string,
+): string {
+  const emojis: Record<string, string> = {
+    security: '🛡️', performance: '⚡', seo: '🔍', wordpress: '🧩',
+    mobile: '📱', infrastructure: '🖥️', conversion: '📊',
+  }
+  const moduleLines = result.modules
+    .map((m) => `${emojis[m.id] || '📋'} ${m.name}: ${m.score ?? '-'}/100`)
+    .join('\n')
+  const date = new Date(result.timestamp).toLocaleDateString(lang, { day: 'numeric', month: 'short', year: 'numeric' })
 
-  return `🔍 *Auditoría Web — ${result.domain}*
-📅 ${new Date(result.timestamp).toLocaleDateString('es-CO')}
-
-📊 *Score Global: ${result.globalScore}/100*
-
-${moduleLines}
-
-⚠️ *${result.totalIssues.critical} problemas críticos* y *${result.totalIssues.warning} advertencias*.
-
-📄 Ver informe completo:
-${baseUrl}/results/${result.id}
-
-_Informe generado por Imagina Audit_`
+  return [
+    t('public.share_wa_title', { domain: result.domain }),
+    `📅 ${date}`,
+    '',
+    t('public.share_wa_score', { score: result.globalScore }),
+    '',
+    moduleLines,
+    '',
+    t('public.share_wa_issues', { critical: result.totalIssues.critical, warning: result.totalIssues.warning }),
+    '',
+    t('public.share_wa_report'),
+    `${baseUrl}/results/${result.id}`,
+    '',
+    t('public.share_wa_footer'),
+  ].join('\n')
 }
 
 export default function ResultsPage() {
@@ -56,6 +69,19 @@ export default function ResultsPage() {
   const [result, setResult] = useState<AuditResult | null>(storeResult)
   const [loading, setLoading] = useState(!storeResult)
   const [error, setError] = useState<string | null>(null)
+  const [unlocked, setUnlocked] = useState(false)
+  const isUser = useUserAuthStore((s) => s.isAuthenticated)
+
+  // Gating (modo 'gated'): el informe detallado se bloquea hasta capturar
+  // el contacto. NO aplica si: el modo es 'upfront', el lead ya fue
+  // capturado (audit con email/whatsapp), el viewer es un usuario logueado
+  // (ya identificado), o ya desbloqueó en este navegador.
+  const lc = config.leadCapture
+  const leadCaptured = (result as (AuditResult & { _leadCaptured?: boolean }) | null)?._leadCaptured === true
+  const alreadyUnlockedLocal = !!auditId && (() => {
+    try { return localStorage.getItem(`unlocked_${auditId}`) === '1' } catch { return false }
+  })()
+  const shouldGate = lc?.mode === 'gated' && !leadCaptured && !isUser && !unlocked && !alreadyUnlockedLocal
 
   const rescan = () => {
     if (!result) return
@@ -73,7 +99,7 @@ export default function ResultsPage() {
   const shareWhatsApp = () => {
     if (!result) return
     const baseUrl = window.location.origin
-    const msg = buildWhatsAppMessage(result, baseUrl)
+    const msg = buildWhatsAppMessage(result, baseUrl, t, i18n.language)
     const waNumber = config.companyWhatsapp.replace(/[^0-9]/g, '')
     window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank')
   }
@@ -134,13 +160,19 @@ export default function ResultsPage() {
             </span>
           </div>
           <div className="flex items-center shrink-0">
-            <PdfReport result={result} />
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={shareWhatsApp} title={t('public.results_share_whatsapp')}>
-              <Share2 className="h-4 w-4" strokeWidth={1.5} />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyLink} title={t('public.results_copy_link')}>
-              <LinkIcon className="h-4 w-4" strokeWidth={1.5} />
-            </Button>
+            {/* PDF / compartir / copiar exponen el informe completo — ocultos
+                hasta desbloquear en modo gated. */}
+            {!shouldGate && <PdfReport result={result} />}
+            {!shouldGate && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={shareWhatsApp} title={t('public.results_share_whatsapp')}>
+                <Share2 className="h-4 w-4" strokeWidth={1.5} />
+              </Button>
+            )}
+            {!shouldGate && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyLink} title={t('public.results_copy_link')}>
+                <LinkIcon className="h-4 w-4" strokeWidth={1.5} />
+              </Button>
+            )}
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={rescan} title={t('public.results_rescan')}>
               <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
             </Button>
@@ -155,39 +187,75 @@ export default function ResultsPage() {
 
       <ScoreOverview result={result} />
 
-      <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-        {/* Historial (solo se muestra si hay más de 1 auditoría) */}
-        <HistorySection domain={result.domain} />
-
-        {/* Stack tecnológico (informativo) */}
-        {result.techStack && <TechStackSection techStack={result.techStack} />}
-
-        {result.modules
-          .filter((m) => ['wordpress', 'security'].includes(m.id))
-          .map((module, idx) => (
-            <ModuleCard key={module.id} module={module} index={idx} />
-          ))}
-
-        <EconomicImpact
-          estimatedMonthlyLoss={result.economicImpact.estimatedMonthlyLoss}
-          currency={result.economicImpact.currency}
-          explanation={result.economicImpact.explanation}
-        />
-
-        {result.modules
-          .filter((m) => !['wordpress', 'security'].includes(m.id))
-          .map((module, idx) => (
-            <ModuleCard key={module.id} module={module} index={idx + 2} />
-          ))}
-
-        <SolutionMapping solutions={result.solutionMap} />
-        <CtaSection />
-
-        <div className="py-8 text-center text-xs text-[var(--text-tertiary)]">
-          <p>{t('public.results_footer_generated')} <span className="font-medium text-[var(--accent-primary)]">Imagina Audit</span> &mdash; imaginawp.com</p>
-          <p className="mt-1">{t('public.results_footer_duration', { sec: (result.scanDurationMs / 1000).toFixed(1) })}</p>
+      {shouldGate ? (
+        <div className="relative mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+          {/* Adelanto difuminado: genera deseo — ve que hay contenido pero
+              no lo puede leer hasta entregar su contacto. */}
+          <div className="pointer-events-none max-h-[560px] select-none overflow-hidden blur-[7px]" aria-hidden="true">
+            <div className="space-y-6">
+              {result.modules
+                .filter((m) => ['wordpress', 'security'].includes(m.id))
+                .map((module, idx) => (
+                  <ModuleCard key={module.id} module={module} index={idx} />
+                ))}
+              <EconomicImpact
+                estimatedMonthlyLoss={result.economicImpact.estimatedMonthlyLoss}
+                currency={result.economicImpact.currency}
+                explanation={result.economicImpact.explanation}
+              />
+            </div>
+          </div>
+          {/* Fade inferior */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)]/80 to-transparent" />
+          {/* Gate flotante */}
+          <div className="absolute inset-0 flex items-start justify-center px-4 pt-12 sm:pt-20">
+            <LeadGate
+              auditId={result.id}
+              requireEmail={lc?.requireEmail ?? true}
+              requireName={lc?.requireName ?? false}
+              requireWhatsapp={lc?.requireWhatsapp ?? false}
+              score={result.globalScore}
+              onUnlock={() => setUnlocked(true)}
+            />
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+          {/* Historial (solo se muestra si hay más de 1 auditoría) */}
+          <Suspense fallback={null}>
+            <HistorySection domain={result.domain} />
+          </Suspense>
+
+          {/* Stack tecnológico (informativo) */}
+          {result.techStack && <TechStackSection techStack={result.techStack} />}
+
+          {result.modules
+            .filter((m) => ['wordpress', 'security'].includes(m.id))
+            .map((module, idx) => (
+              <ModuleCard key={module.id} module={module} index={idx} />
+            ))}
+
+          <EconomicImpact
+            estimatedMonthlyLoss={result.economicImpact.estimatedMonthlyLoss}
+            currency={result.economicImpact.currency}
+            explanation={result.economicImpact.explanation}
+          />
+
+          {result.modules
+            .filter((m) => !['wordpress', 'security'].includes(m.id))
+            .map((module, idx) => (
+              <ModuleCard key={module.id} module={module} index={idx + 2} />
+            ))}
+
+          <SolutionMapping solutions={result.solutionMap} />
+          <CtaSection />
+
+          <div className="py-8 text-center text-xs text-[var(--text-tertiary)]">
+            <p>{t('public.results_footer_generated')} <span className="font-medium text-[var(--accent-primary)]">Imagina Audit</span> &mdash; imaginawp.com</p>
+            <p className="mt-1">{t('public.results_footer_duration', { sec: (result.scanDurationMs / 1000).toFixed(1) })}</p>
+          </div>
+        </div>
+      )}
     </Layout>
   )
 }

@@ -363,7 +363,7 @@ export default function SettingsScoring() {
           <CardContent className="space-y-3">
             <div className="text-xs text-[var(--text-secondary)]">
               <span className="font-semibold">{previewAudit.domain}</span>
-              <span className="text-[var(--text-tertiary)] ml-2">audit del más reciente</span>
+              <span className="text-[var(--text-tertiary)] ml-2">{t('settings.scoring_preview_domain_hint')}</span>
             </div>
             <Button variant="outline" size="sm" onClick={runPreview} disabled={previewing}>
               {previewing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}

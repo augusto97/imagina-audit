@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import i18n from '@/i18n'
 import { Pin, Eye, MessageCircle, FileSearch } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -55,7 +56,7 @@ export function RecentAuditsTable({ audits }: { audits: DashboardData['recentAud
                 <th className="px-3 pb-3">{t('report.executive_site_type')}</th>
                 <th className="px-3 pb-3">{t('leads.col_date')}</th>
                 <th className="px-3 pb-3">{t('leads.tile_with_contact')}</th>
-                <th className="px-3 pb-3">Score</th>
+                <th className="px-3 pb-3">{t('leads.col_score')}</th>
                 <th className="px-3 pb-3" />
               </tr>
             </thead>
@@ -90,7 +91,7 @@ export function RecentAuditsTable({ audits }: { audits: DashboardData['recentAud
                       : <Badge variant="outline" className="text-[10px]">{t('report.executive_site_external')}</Badge>}
                   </td>
                   <td className="px-3 py-3 text-xs text-[var(--text-tertiary)]">
-                    {new Date(a.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
+                    {new Date(a.createdAt).toLocaleDateString(i18n.language, { day: 'numeric', month: 'short' })}
                   </td>
                   <td className="px-3 py-3">
                     <Badge variant={a.hasContactInfo ? 'success' : 'secondary'} className="text-[10px]">
@@ -103,7 +104,7 @@ export function RecentAuditsTable({ audits }: { audits: DashboardData['recentAud
                   <td className="px-3 py-3">
                     <div className="flex gap-1">
                       <Link to={`/admin/leads/${a.id}`}>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" title="Ver en admin">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" title={t('leads.action_open')}>
                           <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />
                         </Button>
                       </Link>

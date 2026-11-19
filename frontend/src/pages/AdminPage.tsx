@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { Component, type ReactNode } from 'react'
+import i18n from '@/i18n'
 import { useAuth } from '@/hooks/useAuth'
 import AdminLogin from '@/components/admin/AdminLogin'
 import AdminLayout from '@/components/admin/AdminLayout'
@@ -25,6 +26,8 @@ import AdminLanguages from '@/components/admin/AdminLanguages'
 import AdminDatabaseMigration from '@/components/admin/AdminDatabaseMigration'
 import AdminBackups from '@/components/admin/AdminBackups'
 import SystemHealth from '@/components/admin/SystemHealth'
+import Diagnostics from '@/components/admin/Diagnostics'
+import SettingsEmbed from '@/components/admin/SettingsEmbed'
 import VulnerabilityManager from '@/components/admin/VulnerabilityManager'
 import TechnicalReport from '@/components/admin/TechnicalReport'
 import SnapshotReport from '@/components/admin/SnapshotReport'
@@ -36,9 +39,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: string |
   render() {
     if (this.state.error) return (
       <div className="p-8 text-center">
-        <p className="text-red-600 font-bold">Error en el panel</p>
+        <p className="text-red-600 font-bold">{i18n.t('dashboard.error_title')}</p>
         <pre className="mt-2 text-xs text-left bg-red-50 p-4 rounded overflow-auto max-h-64">{this.state.error}</pre>
-        <button onClick={() => window.location.reload()} className="mt-4 text-blue-600 underline">Recargar</button>
+        <button onClick={() => window.location.reload()} className="mt-4 text-blue-600 underline">{i18n.t('common.reload')}</button>
       </div>
     )
     return this.props.children
@@ -88,6 +91,8 @@ export default function AdminPage() {
         <Route path="database" element={<AdminDatabaseMigration />} />
         <Route path="backups" element={<AdminBackups />} />
         <Route path="health" element={<SystemHealth />} />
+        <Route path="diagnostics" element={<Diagnostics />} />
+        <Route path="embed" element={<SettingsEmbed />} />
         <Route path="vulnerabilities" element={<VulnerabilityManager />} />
         <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Routes>

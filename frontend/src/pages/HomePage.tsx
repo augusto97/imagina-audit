@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import Layout from '@/components/layout/Layout'
 import AuditForm from '@/components/audit/AuditForm'
 import ScanningAnimation from '@/components/audit/ScanningAnimation'
@@ -23,6 +24,7 @@ const itemVariants = {
 }
 
 export default function HomePage() {
+  const { t } = useTranslation()
   const status = useAuditStore((s) => s.status)
   const home = useConfigStore((s) => s.config.home)
 
@@ -88,7 +90,7 @@ export default function HomePage() {
               >
                 <span className="text-2xl">{MODULE_EMOJIS[id]}</span>
                 <span className="text-sm font-semibold text-[var(--text-primary)]">
-                  {MODULE_NAMES[id]}
+                  {t(`public.module_name_${id}`, { defaultValue: MODULE_NAMES[id] })}
                 </span>
               </motion.div>
             ))}

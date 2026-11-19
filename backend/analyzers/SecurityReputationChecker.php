@@ -15,10 +15,40 @@ class SecurityReputationChecker {
         private array $wpData = []
     ) {}
 
+    /**
+     * Devuelve el dominio "registrable" — el de segundo nivel del host
+     * actual. SPF/DMARC viven en el apex, no en el subdominio www. Si
+     * consultáramos TXT www.dominio.com tendríamos un falso negativo
+     * para cualquier sitio con www (que son la mayoría).
+     * Esto es heurístico: maneja .com.co, .co.uk con array de TLDs
+     * compuestos comunes; resto, últimos 2 segments.
+     */
+    private function registrableDomain(): string {
+        $host = strtolower($this->host);
+        $parts = explode('.', $host);
+        $n = count($parts);
+        if ($n <= 2) return $host;
+        $compound = ['co.uk', 'com.co', 'com.ar', 'com.mx', 'com.br', 'com.au', 'co.nz', 'co.jp', 'com.es', 'com.pe', 'com.ve', 'com.uy', 'com.do', 'com.ec'];
+        $last2 = $parts[$n - 2] . '.' . $parts[$n - 1];
+        if (in_array($last2, $compound, true) && $n >= 3) {
+            return $parts[$n - 3] . '.' . $last2;
+        }
+        return $last2;
+    }
+
     public function checkExposedEmail(): array {
         preg_match_all('/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/', $this->html, $matches);
         $emails = array_unique($matches[0] ?? []);
-        $realEmails = array_filter($emails, fn($e) => !str_contains($e, 'example.com') && !str_contains($e, 'wixpress') && !str_contains($e, 'schema.org'));
+        // Filtrar falsos positivos: TLDs de imagen (logo@2x.png), placeholders,
+        // y assets retina típicos.
+        $imageTlds = ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif', 'ico'];
+        $realEmails = array_filter($emails, function($e) use ($imageTlds) {
+            $lower = strtolower($e);
+            if (str_contains($lower, 'example.com') || str_contains($lower, 'wixpress') || str_contains($lower, 'schema.org')) return false;
+            $tld = strtolower(substr($e, strrpos($e, '.') + 1));
+            if (in_array($tld, $imageTlds, true)) return false;
+            return true;
+        });
         $realEmails = array_values($realEmails);
         $count = count($realEmails);
 
@@ -38,7 +68,11 @@ class SecurityReputationChecker {
     }
 
     public function checkDmarc(): array {
-        $records = @dns_get_record('_dmarc.' . $this->host, DNS_TXT);
+        // DMARC vive en _dmarc.<dominio-apex>. Si el host actual es
+        // www.dominio.com, consultar _dmarc.www.dominio.com da NX en el
+        // 99% de los casos → falso "sin DMARC" para casi todo sitio.
+        $apex = $this->registrableDomain();
+        $records = @dns_get_record('_dmarc.' . $apex, DNS_TXT);
         $hasDmarc = false;
         $dmarcValue = '';
 
@@ -75,7 +109,8 @@ class SecurityReputationChecker {
     }
 
     public function checkSpf(): array {
-        $records = @dns_get_record($this->host, DNS_TXT);
+        // SPF también vive en el apex — mismo motivo que DMARC.
+        $records = @dns_get_record($this->registrableDomain(), DNS_TXT);
         $hasSpf = false;
         $spfValue = '';
 

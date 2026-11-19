@@ -11,6 +11,18 @@ class Fetcher {
     private const DEFAULT_TIMEOUT = 10;
 
     /**
+     * Memo-cache por scan: clave = method:url. Los analyzers piden las
+     * mismas URLs (~10 redundantes por scan WP: /wp-json/wp/v2/users ×3,
+     * /robots.txt ×2, /?author=1 ×2, etc.). Con esto se ahorran ~5-10s.
+     * Se invalida al inicio de cada scan vía clearScanCache().
+     */
+    private static array $scanCache = [];
+
+    public static function clearScanCache(): void {
+        self::$scanCache = [];
+    }
+
+    /**
      * Resultado de un fetch
      */
     public static function createResult(
@@ -45,7 +57,18 @@ class Fetcher {
         bool $followRedirects = true,
         int $retries = 1
     ): array {
-        return self::request('GET', $url, null, $timeout, $followRedirects, $retries);
+        // Cache hit: misma URL+method ya consultada en este scan.
+        $cacheKey = "GET:$url:$followRedirects";
+        if (isset(self::$scanCache[$cacheKey])) {
+            return self::$scanCache[$cacheKey];
+        }
+        $result = self::request('GET', $url, null, $timeout, $followRedirects, $retries);
+        // Solo cachear respuestas válidas (status > 0) para no enmascarar
+        // errores de red transientes en re-fetches.
+        if (($result['statusCode'] ?? 0) > 0) {
+            self::$scanCache[$cacheKey] = $result;
+        }
+        return $result;
     }
 
     /**

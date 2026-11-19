@@ -248,6 +248,13 @@ $leadData = [
     // corre inline como si fue procesado por el drain worker.
     'userId' => $authUser ? $authUser['id'] : null,
     'projectId' => $projectId,
+    // El worker no conoce el lang activo del request original (drain-queue
+    // corre en CLI o vía HTTP kick sin Accept-Language relevante). Lo
+    // persistimos aquí para que processJob() pueda restaurarlo antes de
+    // correr los analyzers — si no, todas las cadenas del result_json
+    // salen en DEFAULT_LANG y el resumen acaba en inglés aunque el user
+    // pidió el audit en español.
+    'lang' => $lang,
 ];
 
 // Arquitectura queue-only: SIEMPRE encolamos, nunca corremos el scan

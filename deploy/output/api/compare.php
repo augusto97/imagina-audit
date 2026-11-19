@@ -13,6 +13,14 @@ ini_set('memory_limit', '256M');
 
 $body = Response::getJsonBody();
 
+// Idioma activo — el resto del backend (audit.php) lo hace; sin esto los
+// strings del result_json comparado salen en el default (en) aunque el
+// visitante pidió la comparación en español.
+$lang = strtolower(substr(trim($body['lang'] ?? ''), 0, 2));
+if (in_array($lang, Translator::supported(), true)) {
+    Translator::setLang($lang);
+}
+
 $url1 = trim($body['url1'] ?? '');
 $url2 = trim($body['url2'] ?? '');
 
@@ -59,9 +67,12 @@ function getOrRunAudit(string $url): array {
     $cacheTtl = (int) env('CACHE_TTL_SECONDS', '86400');
     $db = Database::getInstance();
 
-    // Verificar cache
+    // Scope del cache: el endpoint es público, no debe devolver audits
+    // que pertenezcan a usuarios registrados (filtra `user_id IS NULL`)
+    // ni audits borrados. Antes podía servir el result_json de un audit
+    // privado a cualquier visitante que conociera la URL del cliente.
     $cached = $db->queryOne(
-        "SELECT result_json FROM audits WHERE url = ? AND created_at > ? ORDER BY created_at DESC LIMIT 1",
+        "SELECT result_json FROM audits WHERE url = ? AND user_id IS NULL AND is_deleted = 0 AND created_at > ? ORDER BY created_at DESC LIMIT 1",
         [$url, $db->nowMinus($cacheTtl)]
     );
 

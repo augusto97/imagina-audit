@@ -98,7 +98,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'auditMaxAttempts'         => (int) ($dbSettings['audit_max_attempts'] ?? $defaults['audit_max_attempts'] ?? 3),
 
             'systemTotalRamMb' => (int) ($dbSettings['system_total_ram_mb'] ?? 0),
-            'googlePagespeedApiKey' => $dbSettings['google_pagespeed_api_key'] ?? '',
+            // Consistencia con el resto de keys: enmascarar también la de PSI.
+            // El PUT corresponiente debe ignorar el valor si llega con
+            // bullets (no sobreescribir con placeholder).
+            'googlePagespeedApiKey' => !empty($dbSettings['google_pagespeed_api_key']) ? '••••••••' : '',
             'defaultAiProvider'      => $dbSettings['default_ai_provider']       ?? 'claude',
             'openaiApiKey'           => !empty($dbSettings['openai_api_key']) ? '••••••••' : '',
             'openaiModel'            => $dbSettings['openai_model']              ?? 'gpt-4o-mini',
@@ -106,6 +109,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'anthropicModel'         => $dbSettings['anthropic_model']           ?? 'claude-sonnet-4-5',
             'googleTranslateApiKey'  => !empty($dbSettings['google_translate_api_key']) ? '••••••••' : '',
             'leadNotificationEmail' => $dbSettings['lead_notification_email'] ?? '',
+            'leadCaptureMode' => $dbSettings['lead_capture_mode'] ?? $defaults['lead_capture_mode'],
+            'leadGateRequireEmail'    => isset($dbSettings['lead_gate_require_email'])    ? ($dbSettings['lead_gate_require_email'] === '1')    : $defaults['lead_gate_require_email'],
+            'leadGateRequireName'     => isset($dbSettings['lead_gate_require_name'])     ? ($dbSettings['lead_gate_require_name'] === '1')     : $defaults['lead_gate_require_name'],
+            'leadGateRequireWhatsapp' => isset($dbSettings['lead_gate_require_whatsapp']) ? ($dbSettings['lead_gate_require_whatsapp'] === '1') : $defaults['lead_gate_require_whatsapp'],
             'smtpHost' => $dbSettings['smtp_host'] ?? '',
             'smtpPort' => (int) ($dbSettings['smtp_port'] ?? 587),
             'smtpUsername' => $dbSettings['smtp_username'] ?? '',
@@ -149,13 +156,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 continue;
             }
             // Tampoco pisar las API keys con el placeholder de bullets
-            if (in_array($key, ['openaiApiKey', 'anthropicApiKey', 'googleTranslateApiKey'], true)
+            // No sobreescribir keys ya guardadas si llegan enmascaradas
+            // o vacías. googlePagespeedApiKey se añadió aquí cuando empezamos
+            // a enmascararla también en el GET.
+            if (in_array($key, ['openaiApiKey', 'anthropicApiKey', 'googleTranslateApiKey', 'googlePagespeedApiKey'], true)
                 && ($value === '••••••••' || $value === '')) {
                 continue;
             }
 
             // Cambio de contraseña admin
             if ($key === 'adminPassword' && !empty($value)) {
+                // Mismo mínimo que el wizard de install: 10 chars. Antes el
+                // PUT aceptaba cualquier longitud > 0, contradiciendo el
+                // install.
+                if (strlen($value) < 10) {
+                    Response::error(Translator::t('admin_api.settings.password_too_short'), 400);
+                }
                 $hash = password_hash($value, PASSWORD_BCRYPT);
                 $db->setting('admin_password_hash', $hash);
                 continue;

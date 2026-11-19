@@ -101,11 +101,16 @@ class EnvWriter
 
     /**
      * Escapa el valor para el formato .env. Si contiene espacios, #, o
-     * caracteres especiales, lo envuelve en comillas dobles.
+     * caracteres especiales, lo envuelve en comillas dobles. Strips CR/LF
+     * para evitar inyección de líneas adicionales (un valor con \n quedaría
+     * envuelto en comillas pero el loadEnv parsea línea por línea y la
+     * nueva línea crearía un KEY=value extra).
      */
     private static function escape(string $value): string
     {
         if ($value === '') return '';
+        // Anti-inyección: eliminar CR/LF antes de cualquier otra cosa.
+        $value = str_replace(["\r", "\n"], '', $value);
         if (preg_match('/[\s#\'"\\\\]/', $value)) {
             // Comillas dobles: escapa " y \
             return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';

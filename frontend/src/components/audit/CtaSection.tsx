@@ -8,8 +8,16 @@ import { useAuditStore } from '@/store/auditStore'
 export default function CtaSection() {
   const { t } = useTranslation()
   const config = useAuditStore((s) => s.config)
+  const result = useAuditStore((s) => s.result)
 
-  const whatsappUrl = `https://wa.me/${config.companyWhatsapp.replace(/[^0-9+]/g, '')}?text=${encodeURIComponent(t('public.cta_whatsapp_message'))}`
+  // Mensaje precargado de WhatsApp. Si hay un audit en contexto, identifica
+  // el sitio y el score para que el vendedor sepa de inmediato de dónde
+  // viene el lead (ej: "ausité miempresa.com y saqué 49/100..."). Si no
+  // hay audit (caso raro), cae al mensaje genérico.
+  const waMessage = result
+    ? t('public.cta_whatsapp_message_audit', { domain: result.domain, score: result.globalScore })
+    : t('public.cta_whatsapp_message')
+  const whatsappUrl = `https://wa.me/${config.companyWhatsapp.replace(/[^0-9+]/g, '')}?text=${encodeURIComponent(waMessage)}`
 
   return (
     <motion.div

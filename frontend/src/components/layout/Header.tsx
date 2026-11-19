@@ -38,7 +38,7 @@ export default function Header() {
           <Link to="/compare">
             <Button variant="ghost" size="sm" className="text-[var(--text-secondary)]">
               <GitCompareArrows className="h-4 w-4" strokeWidth={1.5} />
-              <span className="hidden sm:inline">{header?.compareText || 'Comparar'}</span>
+              <span className="hidden sm:inline">{header?.compareText || t('public.header_compare')}</span>
             </Button>
           </Link>
           {header?.externalUrl && (

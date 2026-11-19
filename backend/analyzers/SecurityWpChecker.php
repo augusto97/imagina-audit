@@ -46,6 +46,20 @@ class SecurityWpChecker {
     }
 
     public function checkWpInfoFiles(): array {
+        // Si el sitio tiene soft-404 (responde 200 a cualquier path), no
+        // podemos distinguir archivo real de inexistente solo por status:
+        // devolvemos métrica `unknown` en lugar de marcar todos como expuestos.
+        if (!empty($this->wpData['soft404']['active'])) {
+            return Scoring::createMetric(
+                'wp_info_files', Translator::t('security.wpinfo.name'),
+                null, Translator::t('common.level_unknown'),
+                null,
+                Translator::t('security.wpinfo.desc.ok'),
+                '',
+                Translator::t('security.wpinfo.solution'),
+                ['skipped' => 'soft_404']
+            );
+        }
         $files = ['/readme.html', '/license.txt', '/wp-config-sample.php'];
         // PARALELIZADO: 3 HEAD paralelas en ~1s vs ~9s secuencial
         $urls = [];
@@ -73,6 +87,17 @@ class SecurityWpChecker {
     }
 
     public function checkWpInstallFiles(): array {
+        if (!empty($this->wpData['soft404']['active'])) {
+            return Scoring::createMetric(
+                'wp_install_files', Translator::t('security.wpinstall.name'),
+                null, Translator::t('common.level_unknown'),
+                null,
+                Translator::t('security.wpinstall.desc.ok'),
+                '',
+                Translator::t('security.wpinstall.solution'),
+                ['skipped' => 'soft_404']
+            );
+        }
         $files = ['/wp-admin/install.php', '/wp-admin/upgrade.php', '/wp-admin/install-helper.php'];
         // PARALELIZADO: 3 HEAD paralelas
         $urls = [];

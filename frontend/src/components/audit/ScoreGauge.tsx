@@ -20,31 +20,41 @@ export default function ScoreGauge({
 }: ScoreGaugeProps) {
   const [displayScore, setDisplayScore] = useState(animate ? 0 : score)
 
-  // Animación del número
+  // Animación del número. Guardamos el id de RAF para cancelar al
+  // desmontar o al cambiar de score — sin esto, si el componente se
+  // desmonta a mitad de animación tenemos setState tras unmount; y si
+  // `score` cambia, dos loops compiten escribiendo displayScore (flicker
+  // visible con 8+ gauges por página de resultados).
   useEffect(() => {
     if (!animate) {
       setDisplayScore(score)
       return
     }
 
+    let rafId = 0
+    let cancelled = false
     let start = 0
     const duration = 1500
     const startTime = performance.now()
 
     const step = (currentTime: number) => {
+      if (cancelled) return
       const elapsed = currentTime - startTime
       const progress = Math.min(elapsed / duration, 1)
-      // Easing ease-out
       const eased = 1 - Math.pow(1 - progress, 3)
       start = Math.round(eased * score)
       setDisplayScore(start)
 
       if (progress < 1) {
-        requestAnimationFrame(step)
+        rafId = requestAnimationFrame(step)
       }
     }
 
-    requestAnimationFrame(step)
+    rafId = requestAnimationFrame(step)
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(rafId)
+    }
   }, [score, animate])
 
   const dimensions = {
