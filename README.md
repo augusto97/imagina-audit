@@ -6,11 +6,13 @@ This branch holds the **ready-to-install build artifact**. Nothing else.
 
 The latest packaged build sits at the root of this branch:
 
-- **`imagina-audit-v2.7.0.zip`** (~1.3 MB) — current
+- **`imagina-audit-v2.7.1.zip`** (~1.3 MB) — current
 
 > **Desde v2.7.0 las versiones se publican en [GitHub Releases](https://github.com/augusto97/imagina-audit/releases)** y se instalan desde el panel de la app (Configuración → Actualizaciones). Esta rama se mantiene solo durante la transición y dejará de actualizarse en las próximas versiones.
 
 ### Changelog
+
+- **v2.7.1** — la protección de carpetas se comprueba **en vivo**: la app intenta descargar por HTTP un archivo de prueba de cada carpeta interna y el `.env` desde su propia URL pública; si algo es accesible dice qué, detecta el servidor y da el bloque exacto para Nginx (verificado contra Apache, Nginx sin bloque y Nginx con bloque reales). Sustituye el aviso genérico de Nginx. Si la API de GitHub está limitada (60/h por IP), el actualizador lee el release por la URL de descarga directa. **Se instala desde el panel** (Configuración → Actualizaciones) si ya tienes la v2.7.0.
 
 - **v2.7.0** — **Actualizaciones automáticas desde GitHub Releases.** Nuevo panel Configuración → Actualizaciones (`/admin/updates`) que revisa GitHub (máx. 1 vez/hora) e instala la versión nueva con un clic: requisitos y espacio (sin espacio no descarga) → descarga + verificación sha256 → descompresión segura → copia de la base → migraciones con el código nuevo antes del cambio → `.env` (solo variables nuevas, sin pisar las tuyas) → cambio de versión → verificación; si falla, vuelve sola a la versión anterior. Conserva 3 versiones previas (botón «Volver a vX») y 5 copias de la base. Opción de instalación automática por cron (desactivada por defecto), `update-rescue.php` de emergencia, `installer.php` para servidores nuevos. Verificado con PHPUnit (107 pruebas, incluida la orquestación con un deployer falso) y de punta a punta en navegador contra SQLite y MariaDB: actualización correcta, health-check roto con vuelta atrás automática, vuelta atrás manual, rescate e instalación automática. **Esta versión se instala a mano una última vez** (extraer el zip como siempre); las siguientes, desde el panel.
 
