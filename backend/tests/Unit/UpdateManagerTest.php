@@ -220,7 +220,8 @@ final class UpdateManagerTest extends TestCase
 
         // Migraciones con el paquete nuevo, ANTES del cambio, con backup previo
         $this->assertSame([$this->work . '/releases/' . self::NEW], $this->migrated);
-        $this->assertCount(1, glob($this->app . '/storage/backups/pre-update-v2.7.0-to-v' . self::NEW . '-*'));
+        // fromVersion = versión en ejecución (AppVersion), no el VERSION del fixture.
+        $this->assertCount(1, glob($this->app . '/storage/backups/pre-update-v' . AppVersion::current() . '-to-v' . self::NEW . '-*'));
 
         // Versión anterior guardada para volver atrás; sin restos
         $prev = $um->latestPrevious();
@@ -237,7 +238,7 @@ final class UpdateManagerTest extends TestCase
         $state = $this->runUntilSettled($um);
 
         $this->assertSame('failed', $state['status']);
-        $this->assertStringContainsString('Se restauró la versión 2.7.0', $state['error']);
+        $this->assertStringContainsString('Se restauró la versión ' . AppVersion::current(), $state['error']);
         $this->assertOldVersionIntact();
         $this->assertNoLeftovers();
         $this->assertNull($um->latestPrevious(), 'no queda carpeta _prev vacía');
